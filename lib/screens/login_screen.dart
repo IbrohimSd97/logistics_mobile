@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/api/api_exception.dart';
 import '../core/api/auth_api.dart';
 import '../core/config/api_config.dart';
+import '../core/i18n/i18n.dart';
 import '../core/session/session_store.dart';
 import '../core/theme/app_palette.dart';
 import '../core/util/network_error_message.dart';
@@ -24,7 +25,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with I18nObserverMixin<LoginScreen> {
   static const _auth = AuthApi();
   final _session = SessionStore();
 
@@ -38,6 +40,9 @@ class _LoginScreenState extends State<LoginScreen> {
   /// `true` — avval ro‘yxatdan o‘tgan; `exchange-token` majburiy va xato bo‘lsa qayta urinish.
   bool _exchangeFailed = false;
   bool? _isVerifiedUser;
+  /// Avtomat verify har bir kod uchun faqat bir marta — `Tasdiqlash` tugmasi bilan
+  /// `otp-verify` ikki marta yuborilib, ikkinchisi "kod ishlatilgan" xatosini bermasligi uchun.
+  String? _autoSubmittedCode;
 
   String? _phoneApi;
   String? _devCodeHint;
@@ -70,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Tarmoq / CORS'),
+        title: Text(I18n.t('auth.network_cors_title')),
         content: SingleChildScrollView(
           child: SelectableText(
             networkFailureDetailGuide(url),
@@ -80,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Yopish'),
+            child: Text(I18n.t('common.close')),
           ),
         ],
       ),
@@ -101,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
         duration: const Duration(seconds: 10),
         backgroundColor: const Color(0xFF991B1B),
         action: SnackBarAction(
-          label: 'Batafsil',
+          label: I18n.t('auth.details_action'),
           textColor: Colors.white,
           onPressed: () => _showNetworkHelpDialog(url),
         ),
@@ -111,10 +116,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? _validatePhoneInput() {
     final raw = _phoneController.text.trim();
-    if (raw.isEmpty) return 'Telefon raqamini kiriting';
+    if (raw.isEmpty) return I18n.t('auth.enter_phone_number');
     final api = normalizeUzbekPhoneForApi(raw);
     if (api.length < 12) {
-      return 'To‘liq O‘zbekiston raqami kerak (+998 …)';
+      return I18n.t('auth.full_uz_phone_required');
     }
     return null;
   }
@@ -135,6 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _isVerifiedUser = null;
       _tempToken = null;
       _verifyUserType = null;
+      _autoSubmittedCode = null;
     });
     try {
       final r = await _auth.otpSend(apiPhone);
@@ -150,8 +156,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final sec = r.expiresInSec != null ? ' (${r.expiresInSec} s)' : '';
       _toast(
         r.devCode != null
-            ? 'OTP yuborildi$sec. Dev: ${r.devCode}'
-            : 'OTP yuborildi$sec',
+            ? I18n.t('auth.otp_sent_dev', {'sec': sec, 'code': r.devCode})
+            : I18n.t('auth.otp_sent_basic', {'sec': sec}),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -216,6 +222,8 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _loading = false);
     final uid = otpUserId != 0 ? otpUserId : null;
+    // Login ekranidagi eski (masalan, tarmoq) SnackBar yangi ekranga "yopishib" qolmasin.
+    ScaffoldMessenger.of(context).clearSnackBars();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => MainShell(
@@ -233,6 +241,8 @@ class _LoginScreenState extends State<LoginScreen> {
     required int userId,
     required String userType,
   }) {
+    // Login ekranidagi eski (masalan, tarmoq) SnackBar yangi ekranga "yopishib" qolmasin.
+    ScaffoldMessenger.of(context).clearSnackBars();
     if (userType == 'driver') {
       // Driver uchun status'ni so'raymiz va shunga qarab yo'naltiramiz.
       _routeDriverByStatus(phone: phone, userId: userId);
@@ -258,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       status = await DriverApi.instance.registrationStatus();
     } on ApiException catch (e) {
-      _toast('Status: ${e.firstFieldMessage}', error: true);
+      _toast(I18n.t('auth.status_label', {'msg': e.firstFieldMessage}), error: true);
     } catch (e) {
       _toastNetworkFailure(e);
     }
@@ -313,6 +323,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _verifyOtp() async {
+    // Re-entrancy qo'riqchisi: in-flight so'rov ustiga ikkinchisi tushmasin
+    // (klaviatura "done", tugma va avto-submit bir vaqtda tegishi mumkin).
+    if (_loading) return;
     if (_tempToken != null && _exchangeFailed && _isVerifiedUser == true) {
       final phone = _phoneApi;
       if (phone != null) await _exchangeAndRouteRegistered(phone);
@@ -322,7 +335,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final code = _otpController.text.trim();
     final phone = _phoneApi;
     if (code.length != 6) {
-      _toast('6 xonali OTP kiriting', error: true);
+      _toast(I18n.t('auth.enter_6_digit_otp'), error: true);
       return;
     }
     if (phone == null) return;
@@ -367,6 +380,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _verifyUserType = null;
       _exchangeFailed = false;
       _isVerifiedUser = null;
+      _autoSubmittedCode = null;
     });
     _phoneFocus.requestFocus();
   }
@@ -505,7 +519,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Telefon raqamingiz bilan kiring',
+                        I18n.t('auth.login_with_phone'),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppPalette.muted,
                               height: 1.35,
@@ -525,8 +539,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           _MaxDigitsFormatter(12),
                         ],
                         decoration: _fieldDecoration(
-                          'Telefon raqami',
-                          '+998 90 123 45 67',
+                          I18n.t('auth.phone_number'),
+                          I18n.t('auth.phone_hint'),
                           prefix: const Icon(Icons.phone_iphone_rounded, color: AppPalette.muted),
                         ),
                         onFieldSubmitted: (_) =>
@@ -549,13 +563,15 @@ class _LoginScreenState extends State<LoginScreen> {
                           cursorColor: AppPalette.amber,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           decoration: _fieldDecoration(
-                            'SMS kodi',
+                            I18n.t('auth.sms_code_label'),
                             '• • • • • •',
                             prefix: const Icon(Icons.shield_outlined, color: AppPalette.muted),
                           ).copyWith(counterText: ''),
                           onChanged: (v) {
-                            // 6 ta raqam kiritilganda avtomat verify
-                            if (v.length == 6 && !_loading) {
+                            // 6 ta raqam kiritilganda avtomat verify — har bir kod uchun faqat bir marta
+                            // ('Tasdiqlash' tugmasi bilan takror yubormaslik uchun).
+                            if (v.length == 6 && !_loading && v != _autoSubmittedCode) {
+                              _autoSubmittedCode = v;
                               _verifyOtp();
                             }
                           },
@@ -578,8 +594,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    'Dev muhit: OTP $_devCodeHint'
-                                    '${_otpExpiresSec != null ? ' · ${_otpExpiresSec}s' : ''}',
+                                    I18n.t('auth.dev_otp_label', {
+                                      'code': _devCodeHint ?? '',
+                                      'rest': _otpExpiresSec != null ? ' · ${_otpExpiresSec}s' : '',
+                                    }),
                                     style: const TextStyle(color: AppPalette.muted, height: 1.35),
                                   ),
                                 ),
@@ -590,7 +608,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (showExchangeRetry) ...[
                           const SizedBox(height: 12),
                           Text(
-                            'Token almashtirish muvaffaqiyatsiz. «Qayta urinish» — exchange-token qayta yuboriladi.',
+                            I18n.t('auth.token_exchange_failed_retry'),
                             style: TextStyle(color: AppPalette.muted.withValues(alpha: 0.9), height: 1.35),
                           ),
                         ],
@@ -632,9 +650,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     : Text(
                                         _otpSent
                                             ? (showExchangeRetry
-                                                ? 'Qayta urinish (exchange)'
-                                                : 'Tasdiqlash')
-                                            : 'OTP yuborish',
+                                                ? I18n.t('auth.retry_exchange')
+                                                : I18n.t('auth.verify'))
+                                            : I18n.t('auth.send_otp'),
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 16,
@@ -650,15 +668,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 12),
                         TextButton(
                           onPressed: _loading ? null : _resetOtpStep,
-                          child: const Text(
-                            'Raqamni o‘zgartirish',
-                            style: TextStyle(color: AppPalette.muted),
+                          child: Text(
+                            I18n.t('auth.change_number'),
+                            style: const TextStyle(color: AppPalette.muted),
                           ),
                         ),
                       ],
                       const SizedBox(height: 20),
                       Text(
-                        '1) Telefon · 2) otp-verify (is_verified) · 3) exchange-token · 4) yangi raqam → customer',
+                        I18n.t('auth.flow_hint'),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppPalette.muted.withValues(alpha: 0.55),

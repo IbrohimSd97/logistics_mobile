@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../core/api/api_exception.dart';
+import '../core/api/cancel_reasons_api.dart';
 import '../core/api/http_response_codec.dart';
 import '../core/config/api_config.dart';
+import '../core/i18n/i18n.dart';
 import '../core/session/session_store.dart';
 import 'customer_models.dart';
 
@@ -25,11 +27,24 @@ class CustomerApi {
   Map<String, String> _jsonAuth(String token) => {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'Accept-Language': I18n.instance.code,
         'Authorization': 'Bearer $token',
       };
 
   Map<String, dynamic> _decodeResponse(http.Response res) {
     return decodeJsonEnvelopeOrThrow(res);
+  }
+
+  /// GET /api/customer/cancel-reasons — buyurtmani bekor qilish dialogi uchun
+  /// catalog. Birinchi chaqiriqda fetch qilinadi va xotirada cache'lanadi
+  /// (`reload=true` bilan qayta yuklash mumkin).
+  List<CancelReason>? _cancelReasonsCache;
+  Future<List<CancelReason>> cancelReasons({bool reload = false}) async {
+    if (!reload && _cancelReasonsCache != null) return _cancelReasonsCache!;
+    final api = CancelReasonsApi.customer(tokenFn: _requireBearer);
+    final list = await api.list();
+    _cancelReasonsCache = list;
+    return list;
   }
 
   /// GET /api/customer/me — driver step1 prefill uchun
@@ -53,6 +68,8 @@ class CustomerApi {
   }
 
   /// POST /api/customer/orders/create — cargo_type_id (preferred) yoki tariff_id
+  /// `scheduledPickupAt` — rejali buyurtma uchun kelajakdagi olib ketish vaqti.
+  /// Berilmasa zudlik bilan buyurtma (radius feed'da chiqadi).
   Future<CreateOrderResult> createOrder({
     int? cargoTypeId,
     int? tariffId,
@@ -64,6 +81,7 @@ class CustomerApi {
     required double deliveryLng,
     required int cargoWeightKg,
     String? comment,
+    DateTime? scheduledPickupAt,
   }) async {
     final token = await _requireBearer();
     final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/orders/create');
@@ -78,6 +96,8 @@ class CustomerApi {
       'delivery_lng': deliveryLng,
       'cargo_weight_kg': cargoWeightKg,
       if (comment != null && comment.isNotEmpty) 'comment': comment,
+      if (scheduledPickupAt != null)
+        'scheduled_pickup_at': scheduledPickupAt.toUtc().toIso8601String(),
     };
     final res = await http.post(
       url,
@@ -107,6 +127,18 @@ class CustomerApi {
     final res = await http.get(url, headers: _jsonAuth(token));
     final map = _decodeResponse(res);
     return WalletSnapshot.fromData(map['data']) ?? const WalletSnapshot();
+  }
+
+  /// GET /api/customer/wallet/billing-info — korporativ xodim uchun
+  /// kompaniya hamyoni + shaxsiy hamyon bir javobda.
+  Future<CustomerBillingInfo?> billingInfo() async {
+    final token = await _requireBearer();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/wallet/billing-info');
+    final res = await http.get(url, headers: _jsonAuth(token));
+    final map = _decodeResponse(res);
+    final data = map['data'];
+    if (data is! Map<String, dynamic>) return null;
+    return CustomerBillingInfo.fromMap(data);
   }
 
   /// GET /api/customer/wallet/transactions
@@ -139,6 +171,21 @@ class CustomerApi {
     return list.map(CustomerOrder.fromMap).whereType<CustomerOrder>().toList();
   }
 
+  /// GET /api/customer/orders/{id}/driver-location — driver oxirgi GPS pozitsiyasi
+  /// (PostGIS ko'magida jadvaldagi eng so'nggi recorded_at qiymati). Customer
+  /// order detail map'ida driver markerini real vaqt yangilash uchun.
+  /// Driver hali assign qilinmagan yoki lokatsiya yo'q bo'lsa null qaytaradi.
+  Future<DriverLiveLocation?> driverLocation(int orderId) async {
+    final token = await _requireBearer();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/orders/$orderId/driver-location');
+    final res = await http.get(url, headers: _jsonAuth(token));
+    if (res.statusCode == 404) return null;
+    final map = _decodeResponse(res);
+    final data = map['data'];
+    if (data is! Map<String, dynamic>) return null;
+    return DriverLiveLocation.fromMap(data);
+  }
+
   /// GET /api/customer/orders/{id}/documents
   Future<Map<String, dynamic>> orderDocuments(int orderId) async {
     final token = await _requireBearer();
@@ -147,17 +194,26 @@ class CustomerApi {
     return _decodeResponse(res);
   }
 
-  /// POST /api/customer/orders/cancel — backend `cancel_reason` kutadi.
-  Future<void> cancelOrder(int orderId, {String? reason}) async {
+  /// POST /api/customer/orders/cancel
+  ///
+  /// `cancelReasonId` — `cancel_reasons` jadvalidan tanlangan ID (majburiy).
+  /// `customText`   — "Boshqa" tanlanganda foydalanuvchi qo'lda yozgan matn
+  /// (`is_other=true` qator uchun majburiy, qolgan sabablar uchun e'tiborga
+  /// olinmaydi).
+  Future<void> cancelOrder(int orderId, {required int cancelReasonId, String? customText}) async {
     final token = await _requireBearer();
     final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/orders/cancel');
+    final body = <String, dynamic>{
+      'order_id': orderId,
+      'cancel_reason_id': cancelReasonId,
+    };
+    if (customText != null && customText.trim().isNotEmpty) {
+      body['cancel_reason'] = customText.trim();
+    }
     final res = await http.post(
       url,
       headers: _jsonAuth(token),
-      body: jsonEncode({
-        'order_id': orderId,
-        if (reason != null && reason.isNotEmpty) 'cancel_reason': reason,
-      }),
+      body: jsonEncode(body),
     );
     _decodeResponse(res);
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../screens/login_screen.dart';
 import '../driver_api.dart';
@@ -22,7 +23,8 @@ class DriverRejectedPage extends StatefulWidget {
   State<DriverRejectedPage> createState() => _DriverRejectedPageState();
 }
 
-class _DriverRejectedPageState extends State<DriverRejectedPage> {
+class _DriverRejectedPageState extends State<DriverRejectedPage>
+    with I18nObserverMixin<DriverRejectedPage> {
   DriverRegistrationRejects? _rejects;
   bool _loading = true;
   String? _error;
@@ -55,7 +57,7 @@ class _DriverRejectedPageState extends State<DriverRejectedPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Tarmoq xatosi: $e';
+        _error = I18n.t('driver.network_error_label', {'msg': '$e'});
       });
     }
   }
@@ -73,9 +75,9 @@ class _DriverRejectedPageState extends State<DriverRejectedPage> {
     if (errors == null || errors.isEmpty) {
       return Card(
         child: ListTile(
-          leading: Icon(Icons.check_circle_outline_rounded, color: Colors.green),
-          title: Text('Step $stepNo: $title'),
-          subtitle: const Text('Xatolik yo‘q'),
+          leading: const Icon(Icons.check_circle_outline_rounded, color: Colors.green),
+          title: Text(I18n.t('driver.rejected.step_prefix', {'n': stepNo, 'title': title})),
+          subtitle: Text(I18n.t('driver.rejected.step_no_error')),
         ),
       );
     }
@@ -91,7 +93,7 @@ class _DriverRejectedPageState extends State<DriverRejectedPage> {
                 Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
                 const SizedBox(width: 8),
                 Text(
-                  'Step $stepNo: $title',
+                  I18n.t('driver.rejected.step_prefix', {'n': stepNo, 'title': title}),
                   style: TextStyle(
                     color: cs.onErrorContainer,
                     fontWeight: FontWeight.w700,
@@ -128,7 +130,21 @@ class _DriverRejectedPageState extends State<DriverRejectedPage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Ariza rad etildi')),
+      appBar: AppBar(
+        title: Text(I18n.t('driver.rejected.title')),
+        actions: [
+          IconButton(
+            tooltip: I18n.t('driver.pending.refresh_tooltip'),
+            icon: _loading
+                ? const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+            onPressed: _loading ? null : _load,
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -148,7 +164,7 @@ class _DriverRejectedPageState extends State<DriverRejectedPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Sizning arizangiz rad etildi',
+                            I18n.t('driver.rejected.body_heading'),
                             style: TextStyle(
                               color: cs.onErrorContainer,
                               fontWeight: FontWeight.w700,
@@ -157,12 +173,12 @@ class _DriverRejectedPageState extends State<DriverRejectedPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Quyidagi kamchiliklarni tuzatib, qayta kiring va ro‘yxatdan o‘ting.',
+                            I18n.t('driver.rejected.fix_body'),
                             style: TextStyle(color: cs.onErrorContainer, height: 1.35),
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Rad etilgan: ${widget.status.rejectCount}/3 marta',
+                            I18n.t('driver.rejected.rejected_count', {'count': widget.status.rejectCount}),
                             style: TextStyle(color: cs.onErrorContainer, fontWeight: FontWeight.w600),
                           ),
                         ],
@@ -180,7 +196,7 @@ class _DriverRejectedPageState extends State<DriverRejectedPage> {
                 child: ListTile(
                   leading: Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
                   title: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
-                  trailing: FilledButton.tonal(onPressed: _load, child: const Text('Qayta')),
+                  trailing: FilledButton.tonal(onPressed: _load, child: Text(I18n.t('driver.retry_btn_short'))),
                 ),
               ),
               const SizedBox(height: 12),
@@ -194,7 +210,7 @@ class _DriverRejectedPageState extends State<DriverRejectedPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Admin izohi',
+                        Text(I18n.t('driver.rejected.admin_comment'),
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               color: cs.onTertiaryContainer,
@@ -210,22 +226,22 @@ class _DriverRejectedPageState extends State<DriverRejectedPage> {
                 ),
                 const SizedBox(height: 8),
               ],
-              _stepCard(1, 'Shaxsiy ma‘lumotlar', _rejects!.step1Errors, cs),
-              _stepCard(2, 'Mashina ma‘lumotlari', _rejects!.step2Errors, cs),
-              _stepCard(3, 'Egalik va yuridik holat', _rejects!.step3Errors, cs),
+              _stepCard(1, I18n.t('driver.rejected.step1_title'), _rejects!.step1Errors, cs),
+              _stepCard(2, I18n.t('driver.rejected.step2_title'), _rejects!.step2Errors, cs),
+              _stepCard(3, I18n.t('driver.rejected.step3_title'), _rejects!.step3Errors, cs),
             ],
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _logoutAndRetry,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Qayta kirish va tuzatish'),
+              label: Text(I18n.t('driver.rejected.relogin_btn')),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Qayta kirish: telefoningizga yangi OTP yuboriladi va siz kamchiliklarni tuzatib qayta yuborishingiz mumkin.',
+              I18n.t('driver.rejected.relogin_hint'),
               style: TextStyle(color: cs.onSurfaceVariant, height: 1.35, fontSize: 12),
             ),
           ],

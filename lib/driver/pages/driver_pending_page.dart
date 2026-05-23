@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../screens/login_screen.dart';
 import '../../screens/main_shell.dart';
@@ -27,7 +28,8 @@ class DriverPendingPage extends StatefulWidget {
   State<DriverPendingPage> createState() => _DriverPendingPageState();
 }
 
-class _DriverPendingPageState extends State<DriverPendingPage> {
+class _DriverPendingPageState extends State<DriverPendingPage>
+    with I18nObserverMixin<DriverPendingPage> {
   Timer? _poll;
   bool _checking = false;
   String? _error;
@@ -70,7 +72,7 @@ class _DriverPendingPageState extends State<DriverPendingPage> {
       if (!mounted) return;
       setState(() {
         _checking = false;
-        _error = 'Tarmoq xatosi: $e';
+        _error = I18n.t('driver.network_error_label', {'msg': '$e'});
       });
     }
   }
@@ -129,10 +131,20 @@ class _DriverPendingPageState extends State<DriverPendingPage> {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tasdiqlash kutilmoqda'),
+        title: Text(I18n.t('driver.pending.title')),
         actions: [
           IconButton(
-            tooltip: 'Chiqish',
+            tooltip: I18n.t('driver.pending.refresh_tooltip'),
+            icon: _checking
+                ? const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+            onPressed: _checking ? null : _check,
+          ),
+          IconButton(
+            tooltip: I18n.t('auth.logout'),
             icon: const Icon(Icons.logout_rounded),
             onPressed: _logout,
           ),
@@ -147,14 +159,13 @@ class _DriverPendingPageState extends State<DriverPendingPage> {
               Icon(Icons.hourglass_empty_rounded, size: 80, color: cs.primary),
               const SizedBox(height: 16),
               Text(
-                'Arizangiz ko‘rib chiqilmoqda',
+                I18n.t('driver.pending.heading'),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                'Super Admin sizning ma‘lumotlaringizni tekshirmoqda. '
-                'Tasdiqlangach, bu sahifa avtomat yangilanadi.',
+                I18n.t('driver.pending.body'),
                 style: TextStyle(color: cs.onSurfaceVariant, height: 1.4),
                 textAlign: TextAlign.center,
               ),
@@ -163,7 +174,7 @@ class _DriverPendingPageState extends State<DriverPendingPage> {
                 color: cs.surfaceContainerHighest,
                 child: ListTile(
                   leading: const Icon(Icons.phone_outlined),
-                  title: const Text('Telefon'),
+                  title: Text(I18n.t('driver.pending.phone_label')),
                   subtitle: Text(widget.phoneDisplay),
                 ),
               ),
@@ -172,7 +183,7 @@ class _DriverPendingPageState extends State<DriverPendingPage> {
                   color: cs.tertiaryContainer,
                   child: ListTile(
                     leading: Icon(Icons.info_outline, color: cs.onTertiaryContainer),
-                    title: Text('Avval rad etilgan: ${_status!.rejectCount}/3 marta',
+                    title: Text(I18n.t('driver.pending.reject_count', {'count': _status!.rejectCount}),
                         style: TextStyle(color: cs.onTertiaryContainer)),
                   ),
                 ),
@@ -190,7 +201,7 @@ class _DriverPendingPageState extends State<DriverPendingPage> {
                 icon: _checking
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.refresh_rounded),
-                label: Text(_checking ? 'Tekshirilmoqda…' : 'Holatni qayta tekshirish'),
+                label: Text(_checking ? I18n.t('driver.pending.checking') : I18n.t('driver.pending.check_status')),
               ),
             ],
           ),

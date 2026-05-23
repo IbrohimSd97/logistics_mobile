@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -6,9 +7,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/api/cancel_reasons_api.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/widgets/deadline_banner.dart';
-import '../../core/widgets/location_picker_page.dart';
 import '../../core/widgets/order_timeline.dart';
 import '../../core/widgets/osrm_route.dart';
 import '../../core/widgets/slide_button.dart';
@@ -30,32 +32,71 @@ class DriverOrderDetailPage extends StatefulWidget {
   State<DriverOrderDetailPage> createState() => _DriverOrderDetailPageState();
 }
 
-class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
+class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
+    with I18nObserverMixin<DriverOrderDetailPage> {
   static const _toshkent = LatLng(41.311081, 69.240562);
 
   bool _busy = false;
+  bool _reloading = false;
   late DriverOrder _order;
   final MapController _mapCtrl = MapController();
+
+  /// Bottom sheet'ning hozirgi balandligi (0..1). Recenter FAB shu qiymatga
+  /// qarab map'ning ko'rinib turgan qismida turishi uchun ishlatiladi.
+  double _sheetExtent = 0.5;
 
   OsrmRoute? _route;
   bool _routeLoading = false;
   Timer? _waitTicker;
 
-  // Auto-transition: status==5 (Loading) bo'lganda GPS oqimini ochib,
-  // pickup'dan 100m uzoqlashganda avtomat in-transit'ga o'tkazadi.
+  /// Driverning real vaqt joylashuvi (GPS oqimidan). Map markeri va route
+  /// boshlang'ich nuqtasi sifatida ishlatiladi. `null` bo'lsa, fallback —
+  /// `widget.initialDriverLocation` yoki saqlab qo'yilgan `accept_lat/lng`.
+  LatLng? _currentDriverLocation;
+
+  /// Driver tezligi (km/h) — Position.speed (m/s) dan hisoblab olamiz.
+  /// HUD da ko'rsatiladi.
+  double _currentSpeedKmh = 0;
+
+  /// Driverning hozirgi yo'nalishi (gradus, 0=N, 90=E, 180=S, 270=W).
+  /// Avval `pos.heading`'dan olinadi; agar GPS heading bermasa (emulator,
+  /// stansiyali GPS) — ketma-ket lokatsiyalardan bearing hisoblanadi.
+  /// Map'ni "yuqori = driver oldida" qilib aylantirish uchun ishlatiladi.
+  double _currentHeading = 0;
+
+  /// Heading hisoblash uchun oldingi lokatsiya (oxirgi tasdiqlangan).
+  LatLng? _prevHeadingLoc;
+
+  /// Map qachon dasturiy aylantirildi — onPositionChanged shu vaqtga yaqin
+  /// gesture'larni "user pan" deb noto'g'ri belgilamasligi uchun.
+  DateTime? _lastProgrammaticCameraChange;
+
+  /// Auto-follow holati — true bo'lsa har bir GPS yangilanishida map driver
+  /// pozitsiyasiga avto-recenter bo'ladi. Foydalanuvchi qo'lda map'ni siljitsa
+  /// false ga tushadi (FAB tap → yana true).
+  bool _followDriver = true;
+
+  // GPS oqimi: doimo ochiladi (driver harakatini map'da ko'rsatish va
+  // status==5 da pickup'dan 100m uzoqlashganda avtomat InTransit uchun).
   StreamSubscription<Position>? _gpsSub;
   bool _autoTransitionTriggered = false;
   static const double _autoTransitionDistanceM = 100.0;
+
+  /// OSRM ni qayta chaqirishda throttle: oxirgi route boshlangan
+  /// nuqta. Driver bundan ≥ 500 m uzoqlashsa qayta hisoblanadi.
+  LatLng? _lastRouteFromLoc;
+  static const double _routeRecalcDistanceM = 500.0;
 
   @override
   void initState() {
     super.initState();
     _order = widget.order;
+    _currentDriverLocation = widget.initialDriverLocation;
     _refetchRoute();
     _waitTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
-    _maybeStartAutoTransitionTracker();
+    _startGpsStream();
   }
 
   @override
@@ -66,10 +107,12 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
     super.dispose();
   }
 
-  /// Status==5 (Loading) bo'lsa GPS oqimini ochamiz. Pickup'dan 100m uzoqlashilsa,
-  /// avtomat InTransit (status=6)ga o'tkazamiz. Permission yo'q bo'lsa jimgina o'tib ketamiz.
-  Future<void> _maybeStartAutoTransitionTracker() async {
-    if (_order.status != 5 || _pickup == null) return;
+  /// GPS oqimini ochib, har bir yangilanishda:
+  ///   1) `_currentDriverLocation`'ni yangilab, map markerini siljitamiz va
+  ///      agar route hali yo'q bo'lsa ([_stageRoute]'ga qarab) qaytadan chizamiz.
+  ///   2) Agar status==5 (Loading) bo'lsa va pickup'dan 100m uzoqlashilsa,
+  ///      avtomat `InTransit` (status=6)'ga o'tkazamiz.
+  Future<void> _startGpsStream() async {
     if (_gpsSub != null) return;
 
     // Permission tekshiruv
@@ -88,38 +131,142 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
       return;
     }
 
-    final pickupLatLng = _pickup!;
     _gpsSub = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 10, // 10m'dan kichik o'zgarishlarni e'tiborga olmaymiz
+        distanceFilter: 5, // 5m'dan kichik o'zgarishlarni e'tiborga olmaymiz
       ),
     ).listen((pos) async {
-      if (_autoTransitionTriggered || _order.status != 5) return;
-      final dist = Geolocator.distanceBetween(
-        pickupLatLng.latitude,
-        pickupLatLng.longitude,
-        pos.latitude,
-        pos.longitude,
-      );
-      if (dist >= _autoTransitionDistanceM) {
-        _autoTransitionTriggered = true;
+      final newLoc = LatLng(pos.latitude, pos.longitude);
+      final hadNoLoc = _currentDriverLocation == null;
+      // Speed: m/s → km/h (manfiy yoki NaN bo'lsa 0)
+      final speedKmh = (pos.speed.isFinite && pos.speed > 0) ? pos.speed * 3.6 : 0.0;
+
+      // ── Heading hisoblash ──
+      // 1-priority: GPS-ning o'zi bergan heading (mobile qurilmada eng aniq).
+      // 2-fallback: ketma-ket ikki lokatsiya orasidagi bearing — emulator yoki
+      // GPS heading bermagan qurilmalarda ishlaydi. Tezlik 1 km/h dan past
+      // bo'lsa heading shovqinli bo'ladi — oldingi qiymatni saqlaymiz.
+      double? incomingHeading;
+      if (pos.heading.isFinite && pos.heading >= 0 && pos.heading <= 360) {
+        incomingHeading = pos.heading;
+      } else if (_prevHeadingLoc != null) {
+        final movedM = Geolocator.distanceBetween(
+          _prevHeadingLoc!.latitude, _prevHeadingLoc!.longitude,
+          newLoc.latitude, newLoc.longitude,
+        );
+        // Faqat sezilarli harakatda hisoblaymiz (GPS shovqinidan farqlash uchun).
+        if (movedM >= 5) {
+          incomingHeading = _bearingDegrees(_prevHeadingLoc!, newLoc);
+        }
+      }
+      if (incomingHeading != null && speedKmh >= 1.0) {
+        _currentHeading = incomingHeading;
+        _prevHeadingLoc = newLoc;
+      } else if (_prevHeadingLoc == null) {
+        _prevHeadingLoc = newLoc;
+      }
+
+      if (mounted) {
+        setState(() {
+          _currentDriverLocation = newLoc;
+          _currentSpeedKmh = speedKmh;
+        });
+      }
+      // Auto-follow: faol bosqichlarda (Accepted → Delivered) — map doimo
+      // driver pozitsiyasiga ergashadi. Turn-by-turn: driver markazda,
+      // xarita yo'l bo'ylab siljiydi VA driver yo'nalishi yuqoriga qaratiladi
+      // (map -heading'ga aylantiriladi).
+      final s = _order.status;
+      final isActiveStage = s != null && s >= 3 && s <= 9 && s != 10 && s != 11;
+      if (_followDriver && isActiveStage) {
         try {
-          await DriverApi.instance.inTransit(_order.id);
-          if (!mounted) return;
-          setState(() => _order = _orderWithStatus(6));
-          await _gpsSub?.cancel();
-          _gpsSub = null;
+          final z = _mapCtrl.camera.zoom;
+          // Birinchi GPS yangilanishida (hadNoLoc) navigatsiya rejimiga
+          // o'tkazib zoom = 16 qilamiz (ko'cha darajasi). Keyin foydalanuvchi
+          // pinch bilan o'zgartirsa, o'sha zoom saqlanadi.
+          final targetZoom = hadNoLoc ? 16.0 : (z < 13 ? 16.0 : z);
+          // Heading-up: map'ni `-heading`'ga aylantiramiz — driver yo'nalishi
+          // har doim ekran yuqorisida bo'ladi.
+          _lastProgrammaticCameraChange = DateTime.now();
+          _mapCtrl.moveAndRotate(newLoc, targetZoom, -_currentHeading);
+        } catch (_) {
+          // map hali ready emas bo'lishi mumkin
+        }
+      }
+
+      // Agar accepted bo'lsa va hozirgacha route bo'lmagan bo'lsa,
+      // dastlabki driver lokatsiyasi kelganda A nuqtagacha route'ni chizamiz.
+      if (hadNoLoc && (_order.status == 3 || _order.status == 4)) {
+        _refetchRoute();
+      }
+
+      // Active bosqichlarda (3/4 — A ga, 6/7 — B ga) driver harakatlanganda
+      // OSRM marshrutni qayta hisoblaymiz. 500m'dan ortiq siljishdan keyin
+      // chaqirib, OSRM serverini ortiqcha urmaymiz.
+      if ((s == 3 || s == 4 || s == 6 || s == 7) && _lastRouteFromLoc != null) {
+        final moved = Geolocator.distanceBetween(
+          _lastRouteFromLoc!.latitude,
+          _lastRouteFromLoc!.longitude,
+          newLoc.latitude,
+          newLoc.longitude,
+        );
+        if (moved >= _routeRecalcDistanceM) {
           _refetchRoute();
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Pickup\'dan 100m uzoqlashdingiz — yo\'lda status faollashtirildi.')),
-          );
-        } catch (e) {
-          _autoTransitionTriggered = false;
+        }
+      }
+
+      // Status==5 → pickup'dan 100m uzoqlashganda InTransit
+      final pickupLatLng = _pickup;
+      if (!_autoTransitionTriggered && _order.status == 5 && pickupLatLng != null) {
+        final dist = Geolocator.distanceBetween(
+          pickupLatLng.latitude,
+          pickupLatLng.longitude,
+          pos.latitude,
+          pos.longitude,
+        );
+        if (dist >= _autoTransitionDistanceM) {
+          _autoTransitionTriggered = true;
+          try {
+            await DriverApi.instance.inTransit(_order.id);
+            if (!mounted) return;
+            setState(() => _order = _orderWithStatus(6));
+            _refetchRoute();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(I18n.t('driver.detail.auto_transit_msg'))),
+            );
+          } catch (e) {
+            _autoTransitionTriggered = false;
+          }
         }
       }
     }, onError: (_) {});
+  }
+
+  /// Map'ni driverning hozirgi joylashuviga (yoki fallback'ga) markazlaydi va
+  /// auto-follow rejimini yoqadi. Heading-up bilan birga aylantiriladi. Zoom
+  /// navigatsiya darajasi (16).
+  void _recenterToDriver() {
+    final loc = _currentDriverLocation ?? _pickup ?? _delivery ?? _toshkent;
+    _lastProgrammaticCameraChange = DateTime.now();
+    _mapCtrl.moveAndRotate(loc, 16, -_currentHeading);
+    if (!_followDriver) {
+      setState(() => _followDriver = true);
+    }
+  }
+
+  /// Ikki nuqta orasidagi yo'nalish (gradus, 0=N, soat strelkasi bo'yicha).
+  /// GPS heading bermagan emulator/qurilmalar uchun fallback.
+  static double _bearingDegrees(LatLng from, LatLng to) {
+    final lat1 = from.latitude * math.pi / 180;
+    final lat2 = to.latitude * math.pi / 180;
+    final dLng = (to.longitude - from.longitude) * math.pi / 180;
+    final y = math.sin(dLng) * math.cos(lat2);
+    final x = math.cos(lat1) * math.sin(lat2)
+        - math.sin(lat1) * math.cos(lat2) * math.cos(dLng);
+    final theta = math.atan2(y, x);
+    return ((theta * 180 / math.pi) + 360) % 360;
   }
 
   LatLng? get _pickup => (_order.pickupLat != null && _order.pickupLng != null)
@@ -130,31 +277,33 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
       ? LatLng(_order.deliveryLat!, _order.deliveryLng!)
       : null;
 
-  LatLng? get _acceptPoint => (_order.acceptLat != null && _order.acceptLng != null)
-      ? LatLng(_order.acceptLat!, _order.acceptLng!)
-      : widget.initialDriverLocation;
+  /// Driverning hozirgi yoki saqlab qo'yilgan accept nuqtasi.
+  /// Real GPS bo'lsa shu o'qiladi, aks holda backend `accept_lat/lng`,
+  /// bo'lmasa `widget.initialDriverLocation`.
+  LatLng? get _acceptPoint =>
+      _currentDriverLocation ??
+      ((_order.acceptLat != null && _order.acceptLng != null)
+          ? LatLng(_order.acceptLat!, _order.acceptLng!)
+          : widget.initialDriverLocation);
 
   /// Bosqichga qarab qaysi nuqtadan qaysi nuqtagacha chiziq ko'rsatamiz.
-  /// - status==3 (Accepted): driver → A (pickup)
-  /// - status==6 (InTransit): A → B (delivery)
-  /// - boshqa: A → B (umumiy ko'rinish)
+  /// - status==2 (Active, hali qabul qilinmagan): chiziq yo'q (faqat A pin va driver pin)
+  /// - status==3/4 (Accepted/ArrivedPickup): driver (current) → A (pickup)
+  /// - status==5 (Loading): chiziq yo'q
+  /// - status==6/7 (InTransit/ArrivedDelivery): driver (current) → B (delivery)
+  ///   Driver harakatlanganda real yo'l bo'yicha qayta chiziladi.
+  /// - boshqa: chiziq yo'q
   (LatLng?, LatLng?) get _stageRoute {
     final s = _order.status;
     if (s == 3 || s == 4) {
       final from = _acceptPoint ?? _pickup;
       return (from, _pickup);
     }
-    if (s == 5) {
-      // Loading — pickup'da turibmiz, marshrut yo'q
-      return (null, null);
+    if (s == 6 || s == 7) {
+      final from = _acceptPoint ?? _pickup;
+      return (from, _delivery);
     }
-    if (s == 6) {
-      return (_pickup, _delivery);
-    }
-    if (s == 7 || s == 8 || s == 9) {
-      return (null, null);
-    }
-    return (_pickup, _delivery);
+    return (null, null);
   }
 
   Future<void> _refetchRoute() async {
@@ -164,6 +313,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
       return;
     }
     setState(() => _routeLoading = true);
+    _lastRouteFromLoc = from;
     final r = await OsrmRoute.fetch(from, to);
     if (!mounted) return;
     setState(() {
@@ -180,22 +330,74 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
       _mapCtrl.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(64)));
       return;
     }
+    // Route yo'q (status==2 yoki hali yuklanmagan) — A va driverni qamragan
+    // hudud yoki pickup'ga yaqinlashtiramiz.
     final p = _pickup;
-    final d = _delivery;
-    if (p != null && d != null) {
+    final drv = _currentDriverLocation ?? _acceptPoint;
+    final pts = <LatLng>[
+      if (p != null) p,
+      if (drv != null) drv,
+    ];
+    if (pts.length >= 2) {
       _mapCtrl.fitCamera(
-        CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints([p, d]),
-          padding: const EdgeInsets.all(64),
-        ),
+        CameraFit.bounds(bounds: LatLngBounds.fromPoints(pts), padding: const EdgeInsets.all(64)),
       );
+    } else if (p != null) {
+      _mapCtrl.move(p, 14);
+    } else if (drv != null) {
+      _mapCtrl.move(drv, 14);
     }
   }
 
   void _showError(Object e) {
     if (!mounted) return;
-    final msg = e is ApiException ? e.firstFieldMessage : 'Tarmoq xatosi: $e';
+    final msg = e is ApiException
+        ? e.firstFieldMessage
+        : I18n.t('driver.detail.network_error_label', {'msg': '$e'});
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// Buyurtmani server'dan qayta yuklash — active/scheduled/archive ro'yxatlari
+  /// va current-order'dan bittasini ID bo'yicha topadi. Backend hozircha alohida
+  /// `GET orders/{id}` endpoint chiqarmagani uchun shu yo'l ishlatiladi.
+  Future<void> _reloadOrder() async {
+    if (_reloading) return;
+    setState(() => _reloading = true);
+    try {
+      final results = await Future.wait<List<DriverOrder>>([
+        DriverApi.instance.activeOrders().catchError((_) => <DriverOrder>[]),
+        DriverApi.instance.scheduledOrders().catchError((_) => <DriverOrder>[]),
+        DriverApi.instance.archiveOrders().catchError((_) => <DriverOrder>[]),
+      ]);
+      final all = <DriverOrder>[...results[0], ...results[1], ...results[2]];
+      DriverOrder? found;
+      for (final o in all) {
+        if (o.id == _order.id) {
+          found = o;
+          break;
+        }
+      }
+      // current-order ham bo'lishi mumkin (radius feed ID emas, lekin sinaymiz).
+      if (found == null) {
+        try {
+          final cur = await DriverApi.instance.currentOrder();
+          if (cur != null && cur.id == _order.id) found = cur;
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      if (found != null) {
+        setState(() => _order = found!);
+        unawaited(_refetchRoute());
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(I18n.t('driver.detail.order_not_found'))),
+        );
+      }
+    } catch (e) {
+      _showError(e);
+    } finally {
+      if (mounted) setState(() => _reloading = false);
+    }
   }
 
   Future<void> _doAction(Future<void> Function() fn, {required int newStatus}) async {
@@ -209,13 +411,10 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
       });
       // status o'zgargach yangi bosqich uchun route'ni qayta olamiz
       _refetchRoute();
-      // Auto-transition tracker — status==5 boshlanganda yoqamiz, boshqasiga o'tsa uchiramiz
+      // status==5 boshlanganda auto-transition flagini qayta tiklaymiz
+      // (GPS oqimi doimo ochiq turadi).
       if (newStatus == 5) {
         _autoTransitionTriggered = false;
-        _maybeStartAutoTransitionTracker();
-      } else {
-        await _gpsSub?.cancel();
-        _gpsSub = null;
       }
     } catch (e) {
       if (!mounted) return;
@@ -228,60 +427,78 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
   List<TimelineStep> _timelineStepsDriver(DriverOrder o) {
     final steps = <TimelineStep>[
       TimelineStep(
-        label: 'Yaratilgan',
+        label: I18n.t('order.detail.created'),
         iconData: Icons.add_circle_outline_rounded,
         timeIso: o.createdAt,
       ),
       TimelineStep(
-        label: 'Qabul qilingan',
+        label: I18n.t('order.status.accepted_short'),
         iconData: Icons.check_rounded,
         timeIso: o.acceptedAt,
       ),
       TimelineStep(
-        label: 'Pickup\'ga yetib keldi',
+        label: I18n.t('order.detail.arrived_pickup'),
         iconData: Icons.pin_drop_rounded,
         timeIso: o.arrivedPickupAt,
       ),
       TimelineStep(
-        label: 'Yuklash boshlandi',
+        label: I18n.t('order.detail.loading_started'),
         iconData: Icons.downloading_rounded,
         timeIso: o.loadingStartedAt,
       ),
       TimelineStep(
-        label: 'Yo\'lga chiqdi',
+        label: I18n.t('driver.detail.in_transit_step'),
         iconData: Icons.local_shipping_rounded,
         timeIso: o.inTransitAt,
       ),
       TimelineStep(
-        label: 'Delivery\'ga yetib keldi',
+        label: I18n.t('order.detail.arrived_delivery'),
         iconData: Icons.location_on_rounded,
         timeIso: o.arrivedDeliveryAt,
       ),
       TimelineStep(
-        label: 'Tushirish boshlandi',
+        label: I18n.t('order.detail.unloading_started'),
         iconData: Icons.unarchive_rounded,
         timeIso: o.unloadingStartedAt,
       ),
       TimelineStep(
-        label: 'Yetkazildi',
+        label: I18n.t('order.detail.delivered'),
         iconData: Icons.task_alt_rounded,
         timeIso: o.deliveredAt,
       ),
       TimelineStep(
-        label: 'Yakunlandi',
+        label: I18n.t('order.detail.finished'),
         iconData: Icons.verified_rounded,
         timeIso: o.completedAt,
       ),
     ];
     if ((o.cancelledAt ?? '').isNotEmpty) {
       steps.add(TimelineStep(
-        label: 'Bekor qilingan',
+        label: I18n.t('order.status.cancelled_short'),
         iconData: Icons.cancel_rounded,
         timeIso: o.cancelledAt,
-        note: o.cancelReason,
+        note: _renderCancelReason(o),
       ));
     }
     return steps;
+  }
+
+  /// Bekor qilingan buyurtmaning sababini ko'rinadigan satrga aylantiradi:
+  ///   - catalog sabab → joriy lokaldagi nom;
+  ///   - "Boshqa" → "<label>: <custom matn>";
+  ///   - faqat eski matn → shu matn.
+  String? _renderCancelReason(DriverOrder o) {
+    final info = o.cancelReasonInfo;
+    final raw = o.cancelReason?.trim();
+    if (info != null) {
+      final code = I18n.instance.code;
+      final label = code == 'ru' ? info.nameRu : info.nameUz;
+      if (info.isOther && raw != null && raw.isNotEmpty) {
+        return '$label: $raw';
+      }
+      return label;
+    }
+    return (raw != null && raw.isNotEmpty) ? raw : null;
   }
 
   double? _calcPenaltyPerHour(CargoTypeMini c) {
@@ -329,24 +546,47 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
   // ── Actions ─────────────────────────────────────────────────
 
   Future<void> _accept() async {
-    final pick = await Navigator.of(context).push<LocationPickerResult>(
-      MaterialPageRoute<LocationPickerResult>(
-        builder: (_) => LocationPickerPage(
-          title: 'Joriy joylashuvingizni tasdiqlang',
-          initialLatLng: widget.initialDriverLocation,
-        ),
-      ),
-    );
-    if (pick == null || !mounted) return;
+    // Joriy GPS lokatsiyasini avtomatik aniqlaymiz — pop-up tasdiqlash yo'q.
+    // Avval real GPS'dan one-shot fix olishga harakat qilamiz, agar bo'lmasa
+    // oqimdan kelgan oxirgi lokatsiya yoki initialDriverLocation'ga qaytamiz.
+    LatLng? acceptLoc = _currentDriverLocation ?? widget.initialDriverLocation;
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse) {
+        final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          final pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+          ).timeout(const Duration(seconds: 6));
+          acceptLoc = LatLng(pos.latitude, pos.longitude);
+          if (mounted) setState(() => _currentDriverLocation = acceptLoc);
+        }
+      }
+    } catch (_) {
+      // GPS olinmasa, mavjud fallback bilan davom etamiz
+    }
+
+    if (acceptLoc == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(I18n.t('driver.detail.location_unknown'))),
+      );
+      return;
+    }
+
     await _doAction(
       () => DriverApi.instance.acceptOrder(
         orderId: _order.id,
-        acceptLat: pick.latLng.latitude,
-        acceptLng: pick.latLng.longitude,
+        acceptLat: acceptLoc!.latitude,
+        acceptLng: acceptLoc.longitude,
       ),
       newStatus: 3,
     );
-    if (mounted) Navigator.of(context).pop(true);
+    // Qabul qilingach detail sahifasida qolamiz (route avtomat A gacha chiziladi)
   }
 
   Future<void> _arrivedPickup() async =>
@@ -362,14 +602,18 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
       _doAction(() => DriverApi.instance.delivered(_order.id), newStatus: 9);
 
   Future<void> _cancel() async {
-    final reason = await _askCancelReason();
-    if (reason == null || !mounted) return;
+    final picked = await _askCancelReason();
+    if (picked == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      await DriverApi.instance.cancelOrder(orderId: _order.id, reason: reason);
+      await DriverApi.instance.cancelOrder(
+        orderId: _order.id,
+        cancelReasonId: picked.reasonId,
+        customText: picked.customText,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Buyurtma bekor qilindi.')),
+        SnackBar(content: Text(I18n.t('driver.detail.order_cancelled_msg'))),
       );
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -379,10 +623,23 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
     }
   }
 
-  Future<String?> _askCancelReason() => showDialog<String>(
-        context: context,
-        builder: (ctx) => const _CancelReasonDialog(),
+  Future<_CancelReasonChoice?> _askCancelReason() async {
+    List<CancelReason> reasons;
+    try {
+      reasons = await DriverApi.instance.cancelReasons();
+    } catch (e) {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(I18n.t('order.cancel.load_failed'))),
       );
+      return null;
+    }
+    if (!mounted) return null;
+    return showDialog<_CancelReasonChoice>(
+      context: context,
+      builder: (ctx) => _CancelReasonDialog(reasons: reasons),
+    );
+  }
 
   // ── Build ───────────────────────────────────────────────────
 
@@ -392,16 +649,27 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final s = _order.status;
     final isFinal = s == 9 || s == 10 || s == 11 || s == 12;
+    final isActiveStage = s != null && s >= 3 && !isFinal;
 
     final p = _pickup;
     final d = _delivery;
     final hasAB = p != null && d != null;
 
-    final initialCenter = hasAB
-        ? LatLng((p.latitude + d.latitude) / 2, (p.longitude + d.longitude) / 2)
-        : (p ?? d ?? _toshkent);
+    // Faol bosqichlarda (Accepted+) driver pozitsiyasiga, undan oldin A↔B
+    // o'rtasiga markazlaymiz. Bu birinchi GPS kelmasa ham driver "atrofini"
+    // ko'rsatish uchun (turn-by-turn navigatsiya tuyg'usi).
+    final LatLng initialCenter;
+    if (isActiveStage && _currentDriverLocation != null) {
+      initialCenter = _currentDriverLocation!;
+    } else if (hasAB) {
+      initialCenter = LatLng((p.latitude + d.latitude) / 2, (p.longitude + d.longitude) / 2);
+    } else {
+      initialCenter = p ?? d ?? _toshkent;
+    }
 
-    final routePoints = _route?.points ?? (hasAB ? [p, d] : null);
+    // Faqat aniq OSRM route bo'lsa chizamiz. Default holat (status 2 yoki yo'q
+    // route) — faqat pinlar, A↔B to'g'ri chiziq emas (talab bo'yicha).
+    final routePoints = _route?.points;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -412,22 +680,65 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
         leading: _circleIconButton(Icons.arrow_back_rounded, () => Navigator.of(context).pop()),
         actions: [
           _circleIconButton(Icons.center_focus_strong_rounded, _fitMapToRoute),
+          _circleIconButton(
+            _reloading ? Icons.hourglass_top_rounded : Icons.refresh_rounded,
+            _reloading ? () {} : _reloadOrder,
+          ),
         ],
       ),
       body: AbsorbPointer(
         absorbing: _busy,
-        child: Stack(
+        child: NotificationListener<DraggableScrollableNotification>(
+          onNotification: (n) {
+            if ((n.extent - _sheetExtent).abs() > 0.005) {
+              setState(() => _sheetExtent = n.extent);
+            }
+            return false;
+          },
+          child: Stack(
           children: [
             Positioned.fill(
               child: FlutterMap(
                 mapController: _mapCtrl,
                 options: MapOptions(
                   initialCenter: initialCenter,
-                  initialZoom: 12,
+                  // Faol bosqichlarda navigatsiya zoom (16) — ko'cha darajasi;
+                  // boshqa bosqichlarda butun yo'lni ko'rsatish uchun keng (12).
+                  initialZoom: isActiveStage ? 16.0 : 12.0,
+                  // Heading-up — birinchi GPS fix'da `-heading`'ga moslanadi.
+                  initialRotation: 0,
                   minZoom: 4,
                   maxZoom: 18,
+                  // Foydalanuvchi 2 barmoq bilan map'ni aylantirishi mumkin.
+                  // Default flagAndAll keep rotate enabled.
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all,
+                  ),
                   onMapReady: () {
-                    WidgetsBinding.instance.addPostFrameCallback((_) => _fitMapToRoute());
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      // Faol bosqichda: drayverga (yoki A↔B markaziga) tushish
+                      // navigatsiya tuyg'usini buzmasin. Boshqa hollarda butun
+                      // marshrutni ko'rsatib kameraga sig'diramiz.
+                      if (!isActiveStage) {
+                        _fitMapToRoute();
+                      }
+                    });
+                  },
+                  // Foydalanuvchi qo'lda map'ni siljitsa auto-follow'ni
+                  // o'chiramiz; FAB tap (recenter) qaytadan yoqadi.
+                  // Dasturiy `moveAndRotate` ham hasGesture=false yuboradi,
+                  // shu sabab false ekanida ham himoya sifatida vaqt
+                  // markerini tekshiramiz.
+                  onPositionChanged: (camera, hasGesture) {
+                    if (hasGesture && _followDriver) {
+                      // 200ms ichida dasturiy chaqirilgan bo'lsa, o'tkazib yuboramiz.
+                      final last = _lastProgrammaticCameraChange;
+                      if (last != null &&
+                          DateTime.now().difference(last).inMilliseconds < 200) {
+                        return;
+                      }
+                      setState(() => _followDriver = false);
+                    }
                   },
                 ),
                 children: [
@@ -452,40 +763,88 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                     ),
                   MarkerLayer(
                     markers: [
+                      // A pin doim (mavjud bo'lsa). B pin — faqat InTransit/Unloading bosqichlari.
                       if (p != null) _routeMarker(p, isStart: true),
-                      if (d != null) _routeMarker(d, isStart: false),
-                      if ((s == 3 || s == 4) && _acceptPoint != null)
-                        _driverMarker(_acceptPoint!),
+                      if (d != null && (s == 6 || s == 7 || s == 8 || s == 9 || s == 10))
+                        _routeMarker(d, isStart: false),
+                      // Driver hozirgi joylashuvi — final holatlardan tashqari
+                      // doim ko'rinadi. Live GPS borda undan, bo'lmasa accept
+                      // payti saqlangan pozitsiya'dan foydalanamiz. Yuklash
+                      // bosqichida (s==5) ham ko'rsatamiz, lekin map heading-up
+                      // rotation faqat harakat bo'lganda yangilanadi (speed≥1).
+                      if (s != 9 && s != 10 && s != 11 && s != 12)
+                        _driverMarker(_currentDriverLocation ?? _acceptPoint ?? p ?? _toshkent),
                     ],
                   ),
                 ],
               ),
             ),
             if (_routeLoading)
-              const Positioned(
+              Positioned(
                 top: 100,
                 left: 0,
                 right: 0,
                 child: Center(
                   child: Card(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(
+                          const SizedBox(
                             width: 14,
                             height: 14,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
-                          SizedBox(width: 8),
-                          Text('Yo‘l hisoblanmoqda…'),
+                          const SizedBox(width: 8),
+                          Text(I18n.t('order.detail.route_calculating')),
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
+            // Navigatsiya HUD — top-center'da: tezlik / keyingi burilish /
+            // qolgan masofa. Faqat active driver bosqichlarida ko'rinadi.
+            if ((s == 3 || s == 4 || s == 6 || s == 7) && _route != null)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 56,
+                left: 16,
+                right: 16,
+                child: _NavHud(
+                  speedKmh: _currentSpeedKmh,
+                  nextTurnMeters: _route!.nextTurnMeters,
+                  nextTurnInstruction: _route!.nextTurnInstruction,
+                  remainingMeters: _route!.distanceMeters,
+                ),
+              ),
+            // Map'ning o'ng pastki burchagida joylashgan "current location" FAB.
+            // Bottom-sheet bilan birga harakatlanadi — har doim sheet'ning
+            // tepasidan biroz balandda turadi, ko'rinmay qolmasligi uchun.
+            // Follow-driver FAB — yoqilgan bo'lsa primaryContainer foni va
+            // to'la "my_location" iconi; o'chgan (foydalanuvchi qo'lda pan
+            // qilgan) bo'lsa neytral fon va "location_searching" iconi.
+            Positioned(
+              right: 16,
+              bottom: MediaQuery.of(context).size.height * _sheetExtent + 12,
+              child: Material(
+                color: _followDriver ? cs.primaryContainer : cs.surface,
+                shape: const CircleBorder(),
+                elevation: 4,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: _recenterToDriver,
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Icon(
+                      _followDriver ? Icons.my_location_rounded : Icons.location_searching_rounded,
+                      color: _followDriver ? cs.onPrimaryContainer : cs.primary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             DraggableScrollableSheet(
               initialChildSize: 0.5,
               minChildSize: 0.22,
@@ -533,7 +892,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        _order.orderNumber ?? 'Buyurtma #${_order.id}',
+                                        _order.orderNumber ?? I18n.t('customer.order_number_fallback', {'id': _order.id}),
                                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                               fontWeight: FontWeight.w800,
                                             ),
@@ -554,7 +913,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                           ),
                                     ),
                                     Text(
-                                      _order.currency ?? 'UZS',
+                                      _order.currency ?? I18n.t('common.uzs'),
                                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                             color: cs.onSurfaceVariant,
                                           ),
@@ -584,7 +943,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                 freeMinutes: _order.cargoType!.pickupFreeWaitMinutes,
                                 paidPrice: _order.cargoType!.pickupPaidWaitPrice,
                                 paidIntervalMin: _order.cargoType!.pickupPaidWaitIntervalMin,
-                                label: 'Yuklash — kutish vaqti',
+                                label: I18n.t('driver.detail.loading_wait_label'),
                               ),
                             if (s == 8 && _order.unloadingStartedAt != null && _order.cargoType != null)
                               _WaitCountdown(
@@ -592,7 +951,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                 freeMinutes: _order.cargoType!.deliveryFreeWaitMinutes,
                                 paidPrice: _order.cargoType!.deliveryPaidWaitPrice,
                                 paidIntervalMin: _order.cargoType!.deliveryPaidWaitIntervalMin,
-                                label: 'Tushirish — kutish vaqti',
+                                label: I18n.t('driver.detail.unloading_wait_label'),
                               ),
                             Container(
                               padding: const EdgeInsets.all(14),
@@ -605,7 +964,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                 children: [
                                   _AddressRow(
                                     isStart: true,
-                                    label: 'Olib ketish',
+                                    label: I18n.t('order.detail.address_pickup'),
                                     address: _order.pickupAddress ?? '—',
                                   ),
                                   const SizedBox(height: 8),
@@ -613,7 +972,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                   const SizedBox(height: 8),
                                   _AddressRow(
                                     isStart: false,
-                                    label: 'Yetkazish',
+                                    label: I18n.t('order.detail.address_delivery'),
                                     address: _order.deliveryAddress ?? '—',
                                   ),
                                 ],
@@ -625,23 +984,23 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                 Expanded(
                                   child: _StatTile(
                                     icon: Icons.straighten_rounded,
-                                    label: 'Masofa',
-                                    value: _order.distanceKm != null ? '${_order.distanceKm} km' : '—',
+                                    label: I18n.t('order.detail.distance_label'),
+                                    value: _order.distanceKm != null ? '${_order.distanceKm} ${I18n.t('common.km')}' : '—',
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: _StatTile(
                                     icon: Icons.scale_rounded,
-                                    label: 'Yuk',
-                                    value: _order.cargoWeightKg != null ? '${_order.cargoWeightKg} kg' : '—',
+                                    label: I18n.t('order.detail.cargo_label'),
+                                    value: _order.cargoWeightKg != null ? '${_order.cargoWeightKg} ${I18n.t('common.kg')}' : '—',
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: _StatTile(
                                     icon: Icons.category_outlined,
-                                    label: 'Tur',
+                                    label: I18n.t('order.detail.type_label'),
                                     value: _order.cargoType?.name ?? '—',
                                   ),
                                 ),
@@ -688,7 +1047,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Text(
-                                        'Mijoz "Finish" bossa, summa hamyoningizga o‘tadi.',
+                                        I18n.t('driver.detail.client_finish_hint'),
                                         style: TextStyle(color: cs.onTertiaryContainer, height: 1.35),
                                       ),
                                     ),
@@ -726,10 +1085,10 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                     children: [
                                       Icon(Icons.lock_outline_rounded, color: cs.onSurfaceVariant),
                                       const SizedBox(width: 10),
-                                      const Expanded(
+                                      Expanded(
                                         child: Text(
-                                          'Bu buyurtma bo‘yicha amallar mavjud emas.',
-                                          style: TextStyle(height: 1.4),
+                                          I18n.t('driver.detail.order_actions_unavailable'),
+                                          style: const TextStyle(height: 1.4),
                                         ),
                                       ),
                                     ],
@@ -742,7 +1101,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
                                 OutlinedButton.icon(
                                   onPressed: _busy ? null : _cancel,
                                   icon: const Icon(Icons.cancel_outlined),
-                                  label: const Text('Bekor qilish'),
+                                  label: Text(I18n.t('common.cancel')),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: cs.error,
                                     side: BorderSide(color: cs.error.withValues(alpha: 0.6)),
@@ -761,6 +1120,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -769,31 +1129,31 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
     switch (s) {
       case 2:
         return SlideButton(
-          label: 'Qabul qilish uchun suring',
+          label: I18n.t('driver.detail.accept_slide'),
           icon: Icons.check_rounded,
           onSlide: _accept,
         );
       case 3:
         return SlideButton(
-          label: 'Pickup\'ga keldim — suring',
+          label: I18n.t('driver.detail.arrived_pickup_slide'),
           icon: Icons.pin_drop_rounded,
           onSlide: _arrivedPickup,
         );
       case 5:
         return SlideButton(
-          label: 'Yo\'lga chiqdim — suring',
+          label: I18n.t('driver.detail.in_transit_slide'),
           icon: Icons.local_shipping_rounded,
           onSlide: _inTransit,
         );
       case 6:
         return SlideButton(
-          label: 'Delivery\'ga keldim — suring',
+          label: I18n.t('driver.detail.arrived_delivery_slide'),
           icon: Icons.location_on_rounded,
           onSlide: _arrivedDelivery,
         );
       case 8:
         return SlideButton(
-          label: 'Yuk tushirildi — suring',
+          label: I18n.t('driver.detail.delivered_slide'),
           icon: Icons.task_alt_rounded,
           onSlide: _delivered,
         );
@@ -863,23 +1223,182 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage> {
     );
   }
 
+  /// Driver marker — har doim ekran ustida "yuqoriga qarab" turadi: map
+  /// `-heading`'ga aylantirilgani uchun navigatsiya arrow (Icons.navigation)
+  /// avtomatik driver yo'nalishini ko'rsatadi. `rotate: true` flutter_map'ga
+  /// marker'ni map rotation'ni kompensatsiya qilib screen-aligned ushlashni
+  /// aytadi.
   Marker _driverMarker(LatLng point) {
     return Marker(
       point: point,
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       alignment: Alignment.center,
+      rotate: true, // map rotation'ga teskari aylan — har doim ekran fazasida.
       child: Container(
         decoration: BoxDecoration(
           color: AppPalette.teal,
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: 3),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 3)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3)),
           ],
         ),
-        child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 22),
+        child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 24),
       ),
+    );
+  }
+}
+
+/// Navigatsiya HUD — map ustida top-center'da turadigan yarim shaffof card.
+/// Driver tezligi, keyingi burilishgacha masofa va manzilgacha qolgan
+/// masofani ko'rsatadi.
+class _NavHud extends StatelessWidget {
+  const _NavHud({
+    required this.speedKmh,
+    required this.nextTurnMeters,
+    required this.nextTurnInstruction,
+    required this.remainingMeters,
+  });
+
+  final double speedKmh;
+  final double? nextTurnMeters;
+  final String? nextTurnInstruction;
+  final double remainingMeters;
+
+  /// OSRM maneuver modifier (`left`, `right`, `straight`, `slight left`, ...)
+  /// uchun mos ikon va o'zbekcha qisqa matn.
+  (IconData, String) _maneuverPresentation() {
+    final m = (nextTurnInstruction ?? '').toLowerCase();
+    if (m.contains('left')) return (Icons.turn_left_rounded, I18n.t('driver.detail.maneuver_left'));
+    if (m.contains('right')) return (Icons.turn_right_rounded, I18n.t('driver.detail.maneuver_right'));
+    if (m.contains('uturn')) return (Icons.u_turn_left_rounded, I18n.t('driver.detail.maneuver_uturn'));
+    if (m.contains('roundabout') || m.contains('rotary')) {
+      return (Icons.rotate_right_rounded, I18n.t('driver.detail.maneuver_roundabout'));
+    }
+    if (m.contains('arrive')) return (Icons.flag_rounded, I18n.t('driver.detail.maneuver_arrive'));
+    return (Icons.straight_rounded, I18n.t('driver.detail.maneuver_straight'));
+  }
+
+  String _fmtMeters(double m) {
+    if (m < 1000) return '${m.round()} m';
+    final km = m / 1000.0;
+    if (km < 10) return '${km.toStringAsFixed(1)} ${I18n.t('common.km')}';
+    return '${km.round()} ${I18n.t('common.km')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final (mIcon, mLabel) = _maneuverPresentation();
+    return Material(
+      color: cs.surface.withValues(alpha: 0.92),
+      elevation: 6,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            // Tezlik
+            _HudCell(
+              icon: Icons.speed_rounded,
+              big: '${speedKmh.round()}',
+              small: I18n.t('driver.detail.hud_speed_unit'),
+              color: cs.primary,
+            ),
+            _hudDivider(cs),
+            // Keyingi burilish
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(mIcon, color: cs.primary, size: 28),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        nextTurnMeters != null
+                            ? _fmtMeters(nextTurnMeters!)
+                            : '—',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        mLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: cs.onSurface.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            _hudDivider(cs),
+            // Qolgan masofa
+            _HudCell(
+              icon: Icons.flag_rounded,
+              big: _fmtMeters(remainingMeters),
+              small: I18n.t('driver.detail.hud_remaining_label'),
+              color: AppPalette.success,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hudDivider(ColorScheme cs) => Container(
+        width: 1,
+        height: 32,
+        margin: const EdgeInsets.symmetric(horizontal: 10),
+        color: cs.outlineVariant.withValues(alpha: 0.5),
+      );
+}
+
+class _HudCell extends StatelessWidget {
+  const _HudCell({
+    required this.icon,
+    required this.big,
+    required this.small,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String big;
+  final String small;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 22),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              big,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              small,
+              style: TextStyle(
+                fontSize: 11,
+                color: cs.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -947,24 +1466,24 @@ class _StageHint extends StatelessWidget {
     switch (status) {
       case 3:
       case 4:
-        text = 'A nuqtagacha ${distanceKm != null ? distanceKm!.toStringAsFixed(1) : '—'} km — pickup\'ga yetib boring';
+        text = I18n.t('driver.detail.stage_pickup', {'km': distanceKm != null ? distanceKm!.toStringAsFixed(1) : '—'});
         icon = Icons.pin_drop_rounded;
         break;
       case 5:
-        text = 'Pickup\'da yuklash bosqichi';
+        text = I18n.t('driver.detail.stage_loading');
         icon = Icons.downloading_rounded;
         break;
       case 6:
-        text = 'B nuqtagacha ${distanceKm != null ? distanceKm!.toStringAsFixed(1) : '—'} km — yetkazib boring';
+        text = I18n.t('driver.detail.stage_in_transit', {'km': distanceKm != null ? distanceKm!.toStringAsFixed(1) : '—'});
         icon = Icons.local_shipping_rounded;
         break;
       case 7:
       case 8:
-        text = 'Delivery\'da tushirish bosqichi';
+        text = I18n.t('driver.detail.stage_unloading');
         icon = Icons.unarchive_rounded;
         break;
       case 9:
-        text = 'Yuk yetkazildi — mijoz tasdiqlashini kutamiz';
+        text = I18n.t('driver.detail.stage_delivered_waiting');
         icon = Icons.hourglass_top_rounded;
         break;
       default:
@@ -1023,11 +1542,15 @@ class _WaitCountdown extends StatelessWidget {
     final priceNum = num.tryParse(paidPrice ?? '') ?? 0;
     final extraCost = paidIntervals * priceNum;
 
-    String fmtMMSS(int totalSec) {
+    String fmtHHMMSS(int totalSec) {
       final abs = totalSec.abs();
-      final mm = abs ~/ 60;
+      final hh = abs ~/ 3600;
+      final mm = (abs % 3600) ~/ 60;
       final ss = abs % 60;
-      return '${mm.toString().padLeft(2, '0')}:${ss.toString().padLeft(2, '0')}';
+      final sign = totalSec < 0 ? '-' : '';
+      return '$sign${hh.toString().padLeft(2, '0')}:'
+          '${mm.toString().padLeft(2, '0')}:'
+          '${ss.toString().padLeft(2, '0')}';
     }
 
     return Container(
@@ -1058,7 +1581,7 @@ class _WaitCountdown extends StatelessWidget {
                 ),
               ),
               Text(
-                fmtMMSS(remainingSec),
+                fmtHHMMSS(remainingSec),
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 18,
@@ -1071,8 +1594,8 @@ class _WaitCountdown extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             isPaid
-                ? 'Pullik kutish boshlangan. Qo\'shimcha: ${_money(extraCost.toString())} so\'m'
-                : 'Bepul kutish vaqti — $freeMinutes daq.',
+                ? I18n.t('order.detail.paid_waiting_started', {'amount': _money(extraCost.toString())})
+                : I18n.t('order.detail.free_waiting', {'minutes': freeMinutes}),
             style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7), fontSize: 12),
           ),
         ],
@@ -1260,7 +1783,7 @@ class _IncomeBreakdown extends StatelessWidget {
               Icon(Icons.account_balance_wallet_outlined, color: cs.primary, size: 18),
               const SizedBox(width: 8),
               Text(
-                'Foyda hisoboti',
+                I18n.t('order.price_breakdown'),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -1274,7 +1797,7 @@ class _IncomeBreakdown extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Taxminiy',
+                    I18n.t('driver.detail.estimate_badge'),
                     style: TextStyle(
                       color: cs.onTertiaryContainer,
                       fontSize: 10,
@@ -1286,26 +1809,26 @@ class _IncomeBreakdown extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _IncomeRow(
-            label: 'Buyurtma narxi',
+            label: I18n.t('order.total_price'),
             value: total,
             isMain: true,
           ),
           const SizedBox(height: 6),
           _IncomeRow(
-            label: 'Loyiha komissiyasi (${_formatPct(projectPct)})',
+            label: '${I18n.t('order.commission_project')} (${_formatPct(projectPct)})',
             value: -projectAmt,
             isDeduction: true,
           ),
           const SizedBox(height: 6),
           _IncomeRow(
-            label: 'Avtopark komissiyasi (${_formatPct(companyPct)})',
+            label: '${I18n.t('order.commission_avtopark')} (${_formatPct(companyPct)})',
             value: -companyAmt,
             isDeduction: true,
           ),
           if (penalty > 0) ...[
             const SizedBox(height: 6),
             _IncomeRow(
-              label: 'Kechikish jarimasi',
+              label: I18n.t('order.late_penalty'),
               value: -penalty,
               isDeduction: true,
             ),
@@ -1314,7 +1837,7 @@ class _IncomeBreakdown extends StatelessWidget {
           Divider(height: 1, color: cs.outlineVariant),
           const SizedBox(height: 10),
           _IncomeRow(
-            label: 'Sof foyda',
+            label: I18n.t('order.driver_earnings'),
             value: netIncome,
             isMain: true,
             highlight: true,
@@ -1364,7 +1887,7 @@ class _IncomeRow extends StatelessWidget {
           ),
         ),
         Text(
-          '${_formatMoney(value.toString())} so\'m',
+          '${_formatMoney(value.toString())} ${I18n.t('common.uzs_symbol')}',
           style: TextStyle(
             color: color,
             fontWeight: isMain ? FontWeight.w800 : FontWeight.w600,
@@ -1376,48 +1899,112 @@ class _IncomeRow extends StatelessWidget {
   }
 }
 
+/// Dialog natijasi — tanlangan sabab IDsi va (Boshqa tanlansa) custom matn.
+class _CancelReasonChoice {
+  const _CancelReasonChoice({required this.reasonId, this.customText});
+  final int reasonId;
+  final String? customText;
+}
+
 class _CancelReasonDialog extends StatefulWidget {
-  const _CancelReasonDialog();
+  const _CancelReasonDialog({required this.reasons});
+
+  final List<CancelReason> reasons;
 
   @override
   State<_CancelReasonDialog> createState() => _CancelReasonDialogState();
 }
 
 class _CancelReasonDialogState extends State<_CancelReasonDialog> {
-  final _ctrl = TextEditingController();
-  String? _err;
+  int? _selectedId;
+  final _otherCtrl = TextEditingController();
+  String? _pickErr;
+  String? _otherErr;
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _otherCtrl.dispose();
     super.dispose();
   }
 
+  bool get _selectedIsOther {
+    if (_selectedId == null) return false;
+    final r = widget.reasons.firstWhere(
+      (e) => e.id == _selectedId,
+      orElse: () => widget.reasons.first,
+    );
+    return r.isOther;
+  }
+
   void _submit() {
-    final v = _ctrl.text.trim();
-    if (v.length < 3) {
-      setState(() => _err = 'Sababni kamida 3 belgi kiriting');
+    if (_selectedId == null) {
+      setState(() => _pickErr = I18n.t('order.cancel.pick_required'));
       return;
     }
-    Navigator.pop(context, v);
+    String? custom;
+    if (_selectedIsOther) {
+      final v = _otherCtrl.text.trim();
+      if (v.length < 3) {
+        setState(() => _otherErr = I18n.t('order.cancel.other_required'));
+        return;
+      }
+      custom = v;
+    }
+    Navigator.pop(context, _CancelReasonChoice(reasonId: _selectedId!, customText: custom));
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Bekor qilish sababi'),
-      content: TextField(
-        controller: _ctrl,
-        autofocus: true,
-        maxLines: 3,
-        decoration: InputDecoration(labelText: 'Sabab *', errorText: _err),
-        onChanged: (_) {
-          if (_err != null) setState(() => _err = null);
-        },
+      title: Text(I18n.t('order.cancel.pick_title')),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final r in widget.reasons)
+                RadioListTile<int>(
+                  value: r.id,
+                  groupValue: _selectedId,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(r.displayName),
+                  onChanged: (v) => setState(() {
+                    _selectedId = v;
+                    _pickErr = null;
+                    if (!_selectedIsOther) _otherErr = null;
+                  }),
+                ),
+              if (_pickErr != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 12),
+                  child: Text(_pickErr!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
+                ),
+              if (_selectedIsOther)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TextField(
+                    controller: _otherCtrl,
+                    autofocus: true,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: I18n.t('order.cancel.other_hint'),
+                      errorText: _otherErr,
+                    ),
+                    onChanged: (_) {
+                      if (_otherErr != null) setState(() => _otherErr = null);
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Yopish')),
-        FilledButton(onPressed: _submit, child: const Text('Yuborish')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(I18n.t('common.close'))),
+        FilledButton(onPressed: _submit, child: Text(I18n.t('order.cancel.confirm_btn'))),
       ],
     );
   }

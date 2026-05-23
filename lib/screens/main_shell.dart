@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/api/api_exception.dart';
 import '../core/api/auth_api.dart';
+import '../core/i18n/i18n.dart';
 import '../core/session/session_store.dart';
 import '../core/theme/theme_controller.dart';
 import '../customer/customer_api.dart';
@@ -9,7 +10,6 @@ import '../customer/customer_models.dart';
 import '../customer/pages/customer_order_create_page.dart';
 import '../customer/pages/customer_order_detail_page.dart';
 import '../customer/pages/customer_physical_registration_page.dart';
-import '../customer/pages/customer_tariff_list_page.dart';
 import '../customer/pages/customer_wallet_topup_page.dart' as wallet_page;
 import '../driver/driver_api.dart';
 import '../driver/driver_models.dart';
@@ -44,14 +44,36 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
-  static const _titles = ['Bosh sahifa', 'Buyurtmalar', 'Hamyon', 'Profil'];
+class _MainShellState extends State<MainShell>
+    with I18nObserverMixin<MainShell> {
+  // Tab matnlari — joriy I18n locale bo'yicha hisoblanadi (getter).
+  List<String> get _titles => [
+        I18n.t('shell.tab_home'),
+        I18n.t('shell.tab_orders'),
+        I18n.t('shell.tab_wallet'),
+        I18n.t('shell.tab_profile'),
+      ];
 
   late String _mode;
   int _index = 0;
   int _refreshTick = 0;
   bool _hasRefresh = false;
   int? _userId;
+
+  /// Customer Buyurtmalar tab'i ichida tanlanadigan boshlang'ich tab
+  /// (0=Joriy, 1=Arxiv). Bosh sahifadagi Joriy/Arxiv ko'rsatkich kartasi
+  /// bosilganda yangilanadi va `CustomerOrdersBody` `key` o'zgarishi bilan
+  /// re-mount qilinib, boshlang'ich tab'ga o'tadi.
+  int _customerOrdersInitialTab = 0;
+  int _customerOrdersKey = 0;
+
+  void _openCustomerOrdersTab(int initialTab) {
+    setState(() {
+      _customerOrdersInitialTab = initialTab;
+      _customerOrdersKey++;
+      _index = 1;
+    });
+  }
 
   final _session = SessionStore();
 
@@ -101,6 +123,28 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _logout() async {
+    // Tasodifiy tap qilinishidan saqlash uchun avval tasdiqlash so'raymiz.
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(I18n.t('auth.logout')),
+        content: Text(I18n.t('auth.logout_confirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(I18n.t('common.cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(I18n.t('auth.logout')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
     await _session.clear();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -132,13 +176,11 @@ class _MainShellState extends State<MainShell> {
       final go = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Ro‘yxatdan o‘tish kerak'),
-          content: const Text(
-            'Yangi buyurtma berish uchun avval jismoniy ro‘yxatdan o‘ting va hisobingiz tasdiqlansin.',
-          ),
+          title: Text(I18n.t('customer.reg.required_title')),
+          content: Text(I18n.t('customer.reg.required_body')),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keyinroq')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ro‘yxatdan o‘tish')),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(I18n.t('common.later'))),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(I18n.t('customer.reg.register_btn'))),
           ],
         ),
       );
@@ -357,23 +399,39 @@ class _MainShellState extends State<MainShell> {
         actions: _mode == 'customer'
             ? [
                 IconButton(
-                  tooltip: 'Bildirishnomalar',
+                  tooltip: I18n.t('common.refresh'),
+                  onPressed: () {
+                    _syncFromStore();
+                    _bumpRefresh();
+                  },
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+                IconButton(
+                  tooltip: I18n.t('shell.notifications'),
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Bildirishnomalar tez orada qo‘shiladi.')),
+                      SnackBar(content: Text(I18n.t('shell.notifications_soon'))),
                     );
                   },
                   icon: const Icon(Icons.notifications_none_rounded),
                 ),
                 IconButton(
-                  tooltip: 'Chiqish',
+                  tooltip: I18n.t('auth.logout'),
                   onPressed: _logout,
                   icon: const Icon(Icons.logout_rounded),
                 ),
               ]
             : [
                 IconButton(
-                  tooltip: 'Chiqish',
+                  tooltip: I18n.t('common.refresh'),
+                  onPressed: () {
+                    _syncFromStore();
+                    _bumpRefresh();
+                  },
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+                IconButton(
+                  tooltip: I18n.t('auth.logout'),
                   onPressed: _logout,
                   icon: const Icon(Icons.logout_rounded),
                 ),
@@ -396,26 +454,26 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Bosh sahifa',
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home_rounded),
+            label: I18n.t('shell.tab_home'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.local_shipping_outlined),
-            selectedIcon: Icon(Icons.local_shipping_rounded),
-            label: 'Buyurtmalar',
+            icon: const Icon(Icons.local_shipping_outlined),
+            selectedIcon: const Icon(Icons.local_shipping_rounded),
+            label: I18n.t('shell.tab_orders'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-            label: 'Hamyon',
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: const Icon(Icons.account_balance_wallet_rounded),
+            label: I18n.t('shell.tab_wallet'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profil',
+            icon: const Icon(Icons.person_outline_rounded),
+            selectedIcon: const Icon(Icons.person_rounded),
+            label: I18n.t('shell.tab_profile'),
           ),
         ],
       ),
@@ -431,17 +489,11 @@ class _MainShellState extends State<MainShell> {
         refreshTick: _refreshTick,
         onRefreshParent: _syncFromStore,
         onCreateOrder: _openOrderCreate,
-        onTariffs: () {
-          if (!_hasRefresh) {
-            _toast('Tariflar uchun sessiya kerak.');
-            return;
-          }
-          Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(builder: (_) => const CustomerTariffListPage()),
-          );
-        },
+        onOpenOrders: _openCustomerOrdersTab,
       ),
       CustomerOrdersBody(
+        key: ValueKey<int>(_customerOrdersKey),
+        initialTab: _customerOrdersInitialTab,
         hasRefreshSession: _hasRefresh,
         refreshTick: _refreshTick,
         onOpenDetail: (o) {
@@ -524,13 +576,13 @@ class _MainShellState extends State<MainShell> {
 /// Theme toggle widget — profile sahifalari uchun.
 Widget themeSwitchTile() {
   return AnimatedBuilder(
-    animation: ThemeController.instance,
+    animation: Listenable.merge([ThemeController.instance, I18n.instance]),
     builder: (_, __) {
       final isDark = ThemeController.instance.mode == ThemeMode.dark;
       return SwitchListTile(
         secondary: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded),
-        title: const Text('Tungi rejim'),
-        subtitle: Text(isDark ? 'Yoqilgan' : 'O‘chirilgan'),
+        title: Text(I18n.t('settings.dark_mode')),
+        subtitle: Text(isDark ? I18n.t('settings.dark_mode_on') : I18n.t('settings.dark_mode_off')),
         value: isDark,
         onChanged: (v) => ThemeController.instance.setMode(
           v ? ThemeMode.dark : ThemeMode.light,

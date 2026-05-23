@@ -10,8 +10,10 @@ import '../../core/api/api_exception.dart';
 import '../../core/api/auth_api.dart';
 import '../../core/api/http_response_codec.dart';
 import '../../core/config/api_config.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../core/widgets/gradient_button.dart';
+import '../../core/widgets/offerta_link.dart';
 
 /// `POST /api/customer/registration/physical` (multipart, **temp** token).
 class CustomerPhysicalRegistrationPage extends StatefulWidget {
@@ -26,7 +28,8 @@ class CustomerPhysicalRegistrationPage extends StatefulWidget {
   State<CustomerPhysicalRegistrationPage> createState() => _CustomerPhysicalRegistrationPageState();
 }
 
-class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegistrationPage> {
+class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegistrationPage>
+    with I18nObserverMixin<CustomerPhysicalRegistrationPage> {
   late final TextEditingController _phoneCtrl;
   final _last = TextEditingController();
   final _first = TextEditingController();
@@ -68,7 +71,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
       initialDate: initial,
       firstDate: DateTime(now.year - 100),
       lastDate: DateTime(now.year - 14, now.month, now.day),
-      helpText: 'Tug‘ilgan sana',
+      helpText: I18n.t('customer.reg.birth_date'),
     );
     if (!mounted || picked == null) return;
     setState(() => _birthDate = picked);
@@ -102,7 +105,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
   Future<void> _submit() async {
     if (!_offerta) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Offertani qabul qiling.')),
+        SnackBar(content: Text(I18n.t('customer.reg.accept_offerta_first'))),
       );
       return;
     }
@@ -111,13 +114,13 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
         _middle.text.trim().isEmpty ||
         _birthDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Barcha maydonlarni to‘ldiring.')),
+        SnackBar(content: Text(I18n.t('customer.reg.fill_all_fields'))),
       );
       return;
     }
     if (_front == null || _back == null || _selfie == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('3 ta rasmni yuklang.')),
+        SnackBar(content: Text(I18n.t('customer.reg.upload_3_images'))),
       );
       return;
     }
@@ -126,7 +129,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
     if (!mounted) return;
     if (temp == null || temp.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Temp token yo‘q. Qayta kiring (OTP).')),
+        SnackBar(content: Text(I18n.t('customer.reg.no_temp_token'))),
       );
       return;
     }
@@ -160,9 +163,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
         if (!mounted) return;
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text(
-            'Ariza yuborildi, lekin server sessiya tokenini qaytarmadi. Iltimos, qayta kiring.',
-          )),
+          SnackBar(content: Text(I18n.t('customer.reg.no_session_returned'))),
         );
         return;
       }
@@ -180,14 +181,14 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
         if (!mounted) return;
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sessiya ochilmadi: ${e.firstFieldMessage}. Qayta urinib ko‘ring.')),
+          SnackBar(content: Text(I18n.t('customer.reg.session_open_failed', {'msg': e.firstFieldMessage}))),
         );
         return;
       } catch (e) {
         if (!mounted) return;
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Tarmoq xatosi: $e')),
+          SnackBar(content: Text(I18n.t('customer.reg.network_error_label', {'msg': '$e'}))),
         );
         return;
       }
@@ -195,7 +196,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ro‘yxatdan o‘tish muvaffaqiyatli.')),
+        SnackBar(content: Text(I18n.t('customer.reg.success_msg'))),
       );
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
@@ -205,7 +206,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Xato: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(I18n.t('customer.reg.error_label', {'msg': '$e'}))));
     }
   }
 
@@ -221,12 +222,12 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Kamera'),
+              title: Text(I18n.t('customer.reg.camera')),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Galereya'),
+              title: Text(I18n.t('customer.reg.gallery')),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
           ],
@@ -262,57 +263,81 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Jismoniy ro‘yxatdan o‘tish')),
+      appBar: AppBar(
+        title: Text(I18n.t('customer.reg.title')),
+        actions: [
+          IconButton(
+            tooltip: I18n.t('common.refresh'),
+            icon: const Icon(Icons.refresh_rounded),
+            // Form sahifasi — reload formani tozalaydi (telefon raqamidan boshqa).
+            onPressed: () {
+              _last.clear();
+              _first.clear();
+              _middle.clear();
+              setState(() {
+                _birthDate = null;
+                _docType = 1;
+                _offerta = false;
+                _front = null;
+                _back = null;
+                _selfie = null;
+              });
+            },
+          ),
+        ],
+      ),
       body: AbsorbPointer(
         absorbing: _loading,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text('Passport yoki haydovchilik guvohnomasi va offerta talab qilinadi.', style: TextStyle(height: 1.35)),
+            Text(I18n.t('customer.reg.intro'), style: const TextStyle(height: 1.35)),
             const SizedBox(height: 16),
-            TextField(controller: _last, decoration: const InputDecoration(labelText: 'Familiya *')),
-            TextField(controller: _first, decoration: const InputDecoration(labelText: 'Ism *')),
-            TextField(controller: _middle, decoration: const InputDecoration(labelText: 'Otasining ismi *')),
+            TextField(controller: _last, decoration: InputDecoration(labelText: I18n.t('customer.reg.last_name_required'))),
+            TextField(controller: _first, decoration: InputDecoration(labelText: I18n.t('customer.reg.first_name_required'))),
+            TextField(controller: _middle, decoration: InputDecoration(labelText: I18n.t('customer.reg.middle_name_required'))),
             const SizedBox(height: 8),
             InkWell(
               onTap: _pickBirthDate,
               child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Tug‘ilgan sana *',
-                  suffixIcon: Icon(Icons.calendar_today_rounded),
+                decoration: InputDecoration(
+                  labelText: I18n.t('customer.reg.birth_date_required'),
+                  suffixIcon: const Icon(Icons.calendar_today_rounded),
                 ),
-                child: Text(_birthDate == null ? 'Tanlanmagan' : _fmtDate(_birthDate!)),
+                child: Text(_birthDate == null ? I18n.t('customer.reg.not_picked') : _fmtDate(_birthDate!)),
               ),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: _phoneCtrl,
               readOnly: true,
-              decoration: const InputDecoration(labelText: 'Telefon'),
+              decoration: InputDecoration(labelText: I18n.t('customer.reg.phone_label')),
             ),
             const SizedBox(height: 8),
             DropdownMenu<int>(
               initialSelection: _docType,
               expandedInsets: EdgeInsets.zero,
-              label: const Text('Hujjat turi *'),
-              dropdownMenuEntries: const [
-                DropdownMenuEntry(value: 1, label: 'Passport'),
-                DropdownMenuEntry(value: 2, label: 'Haydovchilik guvohnomasi'),
+              label: Text(I18n.t('customer.reg.doc_type_required')),
+              dropdownMenuEntries: [
+                DropdownMenuEntry(value: 1, label: I18n.t('customer.reg.doc_passport')),
+                DropdownMenuEntry(value: 2, label: I18n.t('customer.reg.doc_driver_license')),
               ],
               onSelected: (v) => setState(() => _docType = v ?? 1),
             ),
             const SizedBox(height: 12),
-            _imgRow('Old tomon', _front, _pickFront),
-            _imgRow('Orqa tomon', _back, _pickBack),
-            _imgRow('Selfi', _selfie, _pickSelfie),
+            _imgRow(I18n.t('customer.reg.img_front'), _front, _pickFront),
+            _imgRow(I18n.t('customer.reg.img_back'), _back, _pickBack),
+            _imgRow(I18n.t('customer.reg.img_selfie'), _selfie, _pickSelfie),
             CheckboxListTile(
               value: _offerta,
               onChanged: (v) => setState(() => _offerta = v ?? false),
-              title: const Text('Offertani o‘qidim va qabul qilaman *'),
+              title: OffertaCheckboxTitle(
+                text: I18n.t('customer.reg.offerta_checkbox'),
+              ),
             ),
             const SizedBox(height: 16),
             GradientButton(
-              label: 'Yuborish',
+              label: I18n.t('customer.reg.submit_btn'),
               icon: Icons.send_rounded,
               loading: _loading,
               onPressed: _loading ? null : _submit,
@@ -349,7 +374,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
     return ListTile(
       leading: thumb,
       title: Text(label),
-      subtitle: Text(file?.name ?? 'Tanlanmagan'),
+      subtitle: Text(file?.name ?? I18n.t('customer.reg.not_picked')),
       trailing: IconButton(icon: const Icon(Icons.photo_camera_outlined), onPressed: onPick),
     );
   }

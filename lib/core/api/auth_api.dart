@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, Tar
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import '../i18n/i18n.dart';
 import 'api_exception.dart';
 import 'http_response_codec.dart';
 
@@ -64,10 +65,13 @@ String authDeviceInfo() {
 class AuthApi {
   const AuthApi();
 
-  static const _headers = {
-    'Accept': 'application/json',
-    'Content-Type': 'application/json',
-  };
+  // Joriy til `Accept-Language` orqali backend'ga uzatiladi — Laravel shu
+  // asosda validation va xato xabarlarini lokalizatsiya qiladi.
+  Map<String, String> get _headers => {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Accept-Language': I18n.instance.code,
+      };
 
   Future<OtpSendResult> otpSend(String phoneNumber) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/api/auth/otp-send');
@@ -136,6 +140,7 @@ class AuthApi {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'Accept-Language': I18n.instance.code,
         'Authorization': 'Bearer $refreshToken',
       },
       body: jsonEncode({'role': role}),
@@ -152,6 +157,7 @@ class AuthApi {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'Accept-Language': I18n.instance.code,
         'Authorization': 'Bearer $refreshToken',
       },
     );

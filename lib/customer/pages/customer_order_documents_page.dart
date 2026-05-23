@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/i18n/i18n.dart';
+import '../../core/widgets/refresh_icon_button.dart';
 import '../customer_api.dart';
 
 class CustomerOrderDocumentsPage extends StatefulWidget {
@@ -12,7 +14,8 @@ class CustomerOrderDocumentsPage extends StatefulWidget {
   State<CustomerOrderDocumentsPage> createState() => _CustomerOrderDocumentsPageState();
 }
 
-class _CustomerOrderDocumentsPageState extends State<CustomerOrderDocumentsPage> {
+class _CustomerOrderDocumentsPageState extends State<CustomerOrderDocumentsPage>
+    with I18nObserverMixin<CustomerOrderDocumentsPage> {
   late Future<Map<String, dynamic>> _future;
 
   @override
@@ -30,7 +33,12 @@ class _CustomerOrderDocumentsPageState extends State<CustomerOrderDocumentsPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Buyurtma hujjatlari')),
+      appBar: AppBar(
+        title: Text(I18n.t('order.documents_title')),
+        actions: [
+          AppBarRefreshButton(onPressed: _retry),
+        ],
+      ),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _future,
         builder: (context, snap) {
@@ -39,17 +47,19 @@ class _CustomerOrderDocumentsPageState extends State<CustomerOrderDocumentsPage>
           }
           if (snap.hasError) {
             final err = snap.error;
-            final msg = err is ApiException ? err.firstFieldMessage : 'Tarmoq xatosi: $err';
+            final msg = err is ApiException
+                ? err.firstFieldMessage
+                : I18n.t('docs.network_error_label', {'msg': '$err'});
             return _retryView(context, msg);
           }
           final map = snap.data;
           if (map == null) {
-            return _retryView(context, 'Ma’lumot topilmadi.');
+            return _retryView(context, I18n.t('docs.no_data_found'));
           }
           final raw = map['data'];
           final list = _flatten(raw);
           if (list.isEmpty) {
-            return _retryView(context, 'Hujjatlar bo‘sh.');
+            return _retryView(context, I18n.t('docs.empty'));
           }
           return RefreshIndicator(
             onRefresh: () async => _retry(),
@@ -78,7 +88,7 @@ class _CustomerOrderDocumentsPageState extends State<CustomerOrderDocumentsPage>
       children: [
         Text(msg, style: TextStyle(color: Theme.of(context).colorScheme.error)),
         const SizedBox(height: 12),
-        FilledButton.tonal(onPressed: _retry, child: const Text('Qayta urinish')),
+        FilledButton.tonal(onPressed: _retry, child: Text(I18n.t('common.retry'))),
       ],
     );
   }

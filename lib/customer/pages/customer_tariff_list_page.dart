@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/i18n/i18n.dart';
+import '../../core/widgets/refresh_icon_button.dart';
 import '../customer_api.dart';
 import '../customer_models.dart';
 
@@ -11,7 +13,8 @@ class CustomerTariffListPage extends StatefulWidget {
   State<CustomerTariffListPage> createState() => _CustomerTariffListPageState();
 }
 
-class _CustomerTariffListPageState extends State<CustomerTariffListPage> {
+class _CustomerTariffListPageState extends State<CustomerTariffListPage>
+    with I18nObserverMixin<CustomerTariffListPage> {
   List<TariffItem> _items = [];
   bool _loading = true;
   String? _error;
@@ -66,7 +69,12 @@ class _CustomerTariffListPageState extends State<CustomerTariffListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tariflar')),
+      appBar: AppBar(
+        title: Text(I18n.t('tariff.title')),
+        actions: [
+          AppBarRefreshButton(loading: _loading, onPressed: _loading ? null : _load),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading
@@ -77,7 +85,7 @@ class _CustomerTariffListPageState extends State<CustomerTariffListPage> {
                     padding: const EdgeInsets.all(24),
                     children: [
                       Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                      TextButton(onPressed: _load, child: const Text('Qayta urinish')),
+                      TextButton(onPressed: _load, child: Text(I18n.t('common.retry'))),
                     ],
                   )
                 : _items.isEmpty
@@ -86,12 +94,12 @@ class _CustomerTariffListPageState extends State<CustomerTariffListPage> {
                         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
                         children: [
                           Column(
-                            children: const [
-                              Icon(Icons.price_change_outlined, size: 56),
-                              SizedBox(height: 12),
-                              Text('Tariflar topilmadi', textAlign: TextAlign.center),
-                              SizedBox(height: 6),
-                              Text('Pastga tortib qayta urinib ko‘ring.',
+                            children: [
+                              const Icon(Icons.price_change_outlined, size: 56),
+                              const SizedBox(height: 12),
+                              Text(I18n.t('tariff.empty'), textAlign: TextAlign.center),
+                              const SizedBox(height: 6),
+                              Text(I18n.t('tariff.empty_subtitle'),
                                   textAlign: TextAlign.center),
                             ],
                           ),
@@ -107,7 +115,7 @@ class _CustomerTariffListPageState extends State<CustomerTariffListPage> {
                         child: ListTile(
                           title: Text(t.name),
                           subtitle: Text(
-                            '${_fmt(t.pricePerKm)} so‘m/km · min ${_fmt(t.minOrderPrice)} so‘m',
+                            I18n.t('tariff.row_subtitle', {'ppk': _fmt(t.pricePerKm), 'min': _fmt(t.minOrderPrice)}),
                           ),
                           isThreeLine: t.description != null && t.description!.isNotEmpty,
                           trailing: t.description != null && t.description!.isNotEmpty

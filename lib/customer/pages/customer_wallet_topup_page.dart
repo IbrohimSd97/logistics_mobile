@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/i18n/i18n.dart';
 import '../../core/widgets/gradient_button.dart';
 
 class CustomerWalletTopupPage extends StatefulWidget {
@@ -10,7 +11,8 @@ class CustomerWalletTopupPage extends StatefulWidget {
   State<CustomerWalletTopupPage> createState() => _CustomerWalletTopupPageState();
 }
 
-class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage> {
+class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
+    with I18nObserverMixin<CustomerWalletTopupPage> {
   final _formKey = GlobalKey<FormState>();
   final _card = TextEditingController();
   final _exp = TextEditingController();
@@ -46,13 +48,30 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Hamyonni to‘ldirish')),
+      appBar: AppBar(
+        title: Text(I18n.t('payment.topup_title')),
+        actions: [
+          IconButton(
+            tooltip: I18n.t('common.refresh'),
+            icon: const Icon(Icons.refresh_rounded),
+            // Form sahifasi — reload formani tozalaydi.
+            onPressed: () {
+              _formKey.currentState?.reset();
+              _card.clear();
+              _exp.clear();
+              _cvc.clear();
+              _amount.clear();
+              setState(() {});
+            },
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'VISA / MasterCard ma’lumotlarini kiriting. To‘lov xizmati keyingi versiyada ulanadi.',
-            style: TextStyle(height: 1.35),
+          Text(
+            I18n.t('payment.topup_intro'),
+            style: const TextStyle(height: 1.35),
           ),
           const SizedBox(height: 16),
           Form(
@@ -67,15 +86,15 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage> {
                     FilteringTextInputFormatter.digitsOnly,
                     LengthLimitingTextInputFormatter(10),
                   ],
-                  decoration: const InputDecoration(
-                    labelText: 'Summa (so‘m) *',
-                    hintText: '50000',
+                  decoration: InputDecoration(
+                    labelText: I18n.t('payment.amount_field'),
+                    hintText: I18n.t('payment.amount_hint'),
                   ),
                   validator: (v) {
                     final s = (v ?? '').trim();
                     final n = int.tryParse(s);
-                    if (n == null || n < 1000) return 'Kamida 1 000 so‘m';
-                    if (n > 100000000) return 'Juda katta summa';
+                    if (n == null || n < 1000) return I18n.t('payment.amount_min_1000');
+                    if (n > 100000000) return I18n.t('payment.amount_too_large');
                     return null;
                   },
                 ),
@@ -88,14 +107,14 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage> {
                     LengthLimitingTextInputFormatter(16),
                     _CardNumberFormatter(),
                   ],
-                  decoration: const InputDecoration(
-                    labelText: 'Karta raqami *',
-                    hintText: '0000 0000 0000 0000',
+                  decoration: InputDecoration(
+                    labelText: I18n.t('payment.card_number'),
+                    hintText: I18n.t('payment.card_number_hint'),
                   ),
                   validator: (v) {
                     final digits = (v ?? '').replaceAll(RegExp(r'\D'), '');
-                    if (digits.length != 16) return '16 xonali karta raqami kiriting';
-                    if (!_luhnOk(digits)) return 'Karta raqami noto‘g‘ri';
+                    if (digits.length != 16) return I18n.t('payment.card_16_digits');
+                    if (!_luhnOk(digits)) return I18n.t('payment.card_invalid');
                     return null;
                   },
                 ),
@@ -111,9 +130,9 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage> {
                           LengthLimitingTextInputFormatter(4),
                           _ExpiryFormatter(),
                         ],
-                        decoration: const InputDecoration(
-                          labelText: 'Amal qilish (MM/YY) *',
-                          hintText: '12/28',
+                        decoration: InputDecoration(
+                          labelText: I18n.t('payment.expiry_field'),
+                          hintText: I18n.t('payment.expiry_hint'),
                         ),
                         validator: _validateExpiry,
                       ),
@@ -128,13 +147,13 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage> {
                           LengthLimitingTextInputFormatter(4),
                         ],
                         obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'CVC *',
-                          hintText: '123',
+                        decoration: InputDecoration(
+                          labelText: I18n.t('payment.cvc_field'),
+                          hintText: I18n.t('payment.cvc_hint'),
                         ),
                         validator: (v) {
                           final s = (v ?? '').trim();
-                          if (s.length < 3 || s.length > 4) return '3-4 raqam';
+                          if (s.length < 3 || s.length > 4) return I18n.t('payment.cvc_3_4_digits');
                           return null;
                         },
                       ),
@@ -146,12 +165,12 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage> {
           ),
           const SizedBox(height: 20),
           GradientButton(
-            label: 'Davom etish',
+            label: I18n.t('payment.continue_btn'),
             icon: Icons.payment_rounded,
             onPressed: () {
               if (!(_formKey.currentState?.validate() ?? false)) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('To‘lov xizmati hali ulangan emas.')),
+                SnackBar(content: Text(I18n.t('payment.gateway_not_ready'))),
               );
             },
           ),
@@ -163,17 +182,17 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage> {
   String? _validateExpiry(String? v) {
     final s = (v ?? '').trim();
     final m = RegExp(r'^(\d{2})/(\d{2})$').firstMatch(s);
-    if (m == null) return 'MM/YY formatida kiriting';
+    if (m == null) return I18n.t('payment.expiry_format');
     final mm = int.parse(m.group(1)!);
     final yy = int.parse(m.group(2)!);
-    if (mm < 1 || mm > 12) return 'Oy 01..12 bo‘lsin';
+    if (mm < 1 || mm > 12) return I18n.t('payment.expiry_month_range');
     final fullYear = 2000 + yy;
     final now = DateTime.now();
     final lastDayOfMonth = DateTime(fullYear, mm + 1, 0);
     if (lastDayOfMonth.isBefore(DateTime(now.year, now.month, now.day))) {
-      return 'Karta muddati o‘tgan';
+      return I18n.t('payment.expiry_past');
     }
-    if (fullYear > now.year + 20) return 'Yil noto‘g‘ri';
+    if (fullYear > now.year + 20) return I18n.t('payment.expiry_year_invalid');
     return null;
   }
 }

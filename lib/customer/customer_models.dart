@@ -146,6 +146,14 @@ class CustomerOrder {
     this.completedAt,
     this.cancelledAt,
     this.cancelReason,
+    this.cancelReasonId,
+    this.cancelReasonInfo,
+    this.scheduledPickupAt,
+    this.projectCommissionPct,
+    this.projectCommissionAmount,
+    this.companyCommissionPct,
+    this.companyCommissionAmount,
+    this.driverIncomeAmount,
   });
 
   final int id;
@@ -180,6 +188,24 @@ class CustomerOrder {
   final String? completedAt;
   final String? cancelledAt;
   final String? cancelReason;
+  /// `cancel_reasons` jadvalidan tanlangan sabab IDsi (yangi flow).
+  /// Eski yozuvlarda NULL bo'ladi — bu holatda `cancelReason` matni
+  /// to'g'ridan-to'g'ri ko'rsatiladi.
+  final int? cancelReasonId;
+  /// Eager-loaded sabab nomi (uz/ru va is_other bayrog'i).
+  final CustomerOrderCancelReasonInfo? cancelReasonInfo;
+  /// Rejali buyurtma — kelajakdagi olib ketish vaqti. NULL bo'lsa zudlik bilan.
+  final String? scheduledPickupAt;
+  // ── Komissiya snapshot (Customer ko'rinishi uchun) ──
+  // Backend Order modeli orqali keladi. Project — loyiha (platforma) komissiyasi,
+  // Company — avtopark komissiyasi. Order yaratilganda project_* darhol o'rnatiladi,
+  // driver Accept qilganida company_* qo'shiladi. Settlement esa yakuniy summalarni
+  // qayta yozadi.
+  final String? projectCommissionPct;
+  final String? projectCommissionAmount;
+  final String? companyCommissionPct;
+  final String? companyCommissionAmount;
+  final String? driverIncomeAmount;
 
   static double? _double(Object? v) {
     if (v == null) return null;
@@ -223,38 +249,107 @@ class CustomerOrder {
       completedAt: m['completed_at']?.toString(),
       cancelledAt: m['cancelled_at']?.toString(),
       cancelReason: m['cancel_reason']?.toString(),
+      cancelReasonId: _int(m['cancel_reason_id']),
+      cancelReasonInfo: CustomerOrderCancelReasonInfo.fromMap(m['cancel_reason_info'] as Map<String, dynamic>?),
+      scheduledPickupAt: m['scheduled_pickup_at']?.toString(),
+      projectCommissionPct: m['project_commission_pct']?.toString(),
+      projectCommissionAmount: m['project_commission_amount']?.toString(),
+      companyCommissionPct: m['company_commission_pct']?.toString(),
+      companyCommissionAmount: m['company_commission_amount']?.toString(),
+      driverIncomeAmount: m['driver_income_amount']?.toString(),
+    );
+  }
+}
+
+/// Order detail javobidagi `cancel_reason_info` nested object — sabab
+/// catalog qatori (eager-loaded). Client joriy localega ko'ra `displayName`
+/// ni ko'rsatadi; `isOther=true` bo'lsa `cancelReason` matnini izoh sifatida
+/// qo'shadi.
+class CustomerOrderCancelReasonInfo {
+  const CustomerOrderCancelReasonInfo({
+    required this.id,
+    required this.code,
+    required this.nameUz,
+    required this.nameRu,
+    required this.isOther,
+  });
+
+  final int id;
+  final String code;
+  final String nameUz;
+  final String nameRu;
+  final bool isOther;
+
+  static CustomerOrderCancelReasonInfo? fromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
+    final id = _int(m['id']);
+    if (id == null) return null;
+    return CustomerOrderCancelReasonInfo(
+      id: id,
+      code: m['code']?.toString() ?? '',
+      nameUz: m['name_uz']?.toString() ?? '',
+      nameRu: m['name_ru']?.toString() ?? '',
+      isOther: m['is_other'] == true,
     );
   }
 }
 
 class WalletSnapshot {
-  const WalletSnapshot({this.balance, this.currency = 'UZS'});
+  const WalletSnapshot({this.balance, this.currency = 'UZS', this.ownerType});
 
   final String? balance;
   final String? currency;
+  /// 1=driver, 2=customer, 3=app, 4=avtopark, 5=customer_company.
+  /// Korporativ (5) bo'lsa UI top-up tugmalarini yashiradi (faqat admin to'ldiradi).
+  final int? ownerType;
+
+  bool get isCorporate => ownerType == 5;
 
   static WalletSnapshot? fromData(dynamic data) {
     if (data is! Map<String, dynamic>) return null;
+    final ot = data['owner_type'];
     return WalletSnapshot(
       balance: data['balance']?.toString() ?? data['available_balance']?.toString(),
       currency: data['currency']?.toString() ?? 'UZS',
+      ownerType: ot is int ? ot : (ot != null ? int.tryParse(ot.toString()) : null),
     );
   }
 }
 
 class WalletTransaction {
-  const WalletTransaction({this.title, this.amount, this.createdAt, this.raw});
+  const WalletTransaction({
+    this.title,
+    this.amount,
+    this.createdAt,
+    this.transactionType,
+    this.orderId,
+    this.raw,
+  });
 
+  /// Raw description (backend tilida saqlangan) — fallback faqat.
   final String? title;
   final String? amount;
   final String? createdAt;
+  /// 1=Topup, 2=OrderPayment, 3=OrderSettlement, 4=Compensation, 5=Refund.
+  /// Mobile tomonda I18n.t bilan tarjima qilinadi.
+  final int? transactionType;
+  final int? orderId;
   final Map<String, dynamic>? raw;
+
+  static int? _intOf(Object? v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
+  }
 
   static WalletTransaction fromMap(Map<String, dynamic> m) {
     return WalletTransaction(
       title: m['type']?.toString() ?? m['description']?.toString() ?? m['note']?.toString(),
       amount: m['amount']?.toString(),
       createdAt: m['created_at']?.toString(),
+      transactionType: _intOf(m['transaction_type']),
+      orderId: _intOf(m['order_id']),
       raw: m,
     );
   }
@@ -278,6 +373,60 @@ class CreateOrderResult {
   final String? basePrice;
   final String? totalPrice;
   final String? currency;
+}
+
+/// Customer billing info — shaxsiy + (mavjud bo'lsa) kompaniya hamyon.
+/// `GET /api/customer/wallet/billing-info`.
+class CustomerBillingInfo {
+  const CustomerBillingInfo({
+    required this.isCompanyStaff,
+    required this.personalBalance,
+    required this.personalCurrency,
+    required this.billingSource,
+    this.companyId,
+    this.companyName,
+    this.companyTaxNumber,
+    this.companyBalance,
+    this.companyCurrency,
+    this.recentCompanyTx = const [],
+  });
+
+  final bool isCompanyStaff;
+  final String personalBalance;
+  final String personalCurrency;
+  /// 'personal' yoki 'company' — qaysi hamyondan yechiladi.
+  final String billingSource;
+  final int? companyId;
+  final String? companyName;
+  final String? companyTaxNumber;
+  final String? companyBalance;
+  final String? companyCurrency;
+  final List<WalletTransaction> recentCompanyTx;
+
+  bool get isCorporateBilling => billingSource == 'company';
+
+  static CustomerBillingInfo? fromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
+    final personal = m['personal_wallet'] as Map<String, dynamic>?;
+    final company = m['company'] as Map<String, dynamic>?;
+    final companyWallet = m['company_wallet'] as Map<String, dynamic>?;
+    final txList = (m['recent_company_tx'] as List?) ?? const [];
+    return CustomerBillingInfo(
+      isCompanyStaff: m['is_company_staff'] == true,
+      personalBalance: personal?['balance']?.toString() ?? '0',
+      personalCurrency: personal?['currency']?.toString() ?? 'UZS',
+      billingSource: m['billing_source']?.toString() ?? 'personal',
+      companyId: _int(company?['id']),
+      companyName: company?['name']?.toString(),
+      companyTaxNumber: company?['tax_number']?.toString(),
+      companyBalance: companyWallet?['balance']?.toString(),
+      companyCurrency: companyWallet?['currency']?.toString(),
+      recentCompanyTx: txList
+          .whereType<Map<String, dynamic>>()
+          .map(WalletTransaction.fromMap)
+          .toList(),
+    );
+  }
 }
 
 class WalletPaymentResult {
@@ -317,6 +466,40 @@ int? _int(Object? v) {
   if (v is int) return v;
   if (v is num) return v.toInt();
   return int.tryParse(v.toString());
+}
+
+/// Driver'ning oxirgi GPS lokatsiyasi (customer real-vaqt tracking uchun).
+/// `recordedAt` — oxirgi yangilangan vaqt; `ageSeconds` — server hisobi
+/// (NOW() - recorded_at), UI'da "X soniya oldin" ko'rsatish uchun qulay.
+class DriverLiveLocation {
+  const DriverLiveLocation({
+    required this.driverId,
+    required this.latitude,
+    required this.longitude,
+    required this.recordedAt,
+    required this.ageSeconds,
+  });
+
+  final int driverId;
+  final double latitude;
+  final double longitude;
+  final String recordedAt;
+  final int ageSeconds;
+
+  static DriverLiveLocation? fromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
+    final id = _int(m['driver_id']);
+    final lat = double.tryParse('${m['latitude']}');
+    final lng = double.tryParse('${m['longitude']}');
+    if (id == null || lat == null || lng == null) return null;
+    return DriverLiveLocation(
+      driverId: id,
+      latitude: lat,
+      longitude: lng,
+      recordedAt: (m['recorded_at'] ?? '').toString(),
+      ageSeconds: _int(m['age_seconds']) ?? 0,
+    );
+  }
 }
 
 int? _intFromAny(Object? v) {

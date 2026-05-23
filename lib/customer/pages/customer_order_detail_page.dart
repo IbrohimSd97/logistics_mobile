@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/api/cancel_reasons_api.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/widgets/deadline_banner.dart';
 import '../../core/widgets/order_timeline.dart';
@@ -13,6 +16,7 @@ import '../../core/widgets/osrm_route.dart';
 import '../../core/widgets/slide_button.dart';
 import '../customer_api.dart';
 import '../customer_models.dart';
+import 'customer_order_create_page.dart';
 
 class CustomerOrderDetailPage extends StatefulWidget {
   const CustomerOrderDetailPage({super.key, required this.order});
@@ -23,15 +27,34 @@ class CustomerOrderDetailPage extends StatefulWidget {
   State<CustomerOrderDetailPage> createState() => _CustomerOrderDetailPageState();
 }
 
-class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
+class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
+    with I18nObserverMixin<CustomerOrderDetailPage> {
   static const _toshkent = LatLng(41.311081, 69.240562);
 
   bool _busy = false;
+  bool _reloading = false;
   late CustomerOrder _order;
   final MapController _mapCtrl = MapController();
   OsrmRoute? _route;
   bool _routeLoading = false;
   Timer? _ticker;
+
+  /// Driver'ning oxirgi GPS pozitsiyasi (backend'dan har 15 soniyada poll
+  /// qilinadi). null bo'lsa eski statik `_acceptPoint` ishlatiladi.
+  LatLng? _liveDriverLocation;
+  Timer? _driverPollTimer;
+  static const Duration _driverPollInterval = Duration(seconds: 15);
+
+  /// Driver yo'nalishi (gradus) — ketma-ket polling natijalaridan hisoblanadi.
+  /// Map'ni `-heading`'ga aylantirib heading-up rejimini amalga oshirish uchun.
+  double _driverHeading = 0;
+  LatLng? _prevDriverPollLoc;
+
+  /// Customer xaritada driverga ergashish rejimi — driver pozitsiyasi
+  /// yangilanganda map markazlashadi va aylanadi. Foydalanuvchi pan qilsa
+  /// off bo'ladi; recenter FAB qaytadan yoqadi.
+  bool _followDriver = true;
+  DateTime? _lastProgrammaticCameraChange;
 
   @override
   void initState() {
@@ -41,13 +64,112 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
+    _startDriverLocationPolling();
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _driverPollTimer?.cancel();
     _mapCtrl.dispose();
     super.dispose();
+  }
+
+  /// Driver ko'rinishi kerak bo'lgan bosqichlarda har 15 soniyada
+  /// backend'dan oxirgi lokatsiyani so'raymiz. Final/oldingi statuslarda
+  /// poll qilmaymiz — bekorga server'ga so'rov yuborilmasin.
+  void _startDriverLocationPolling() {
+    _driverPollTimer?.cancel();
+    // Darhol bir marta tortib olamiz, keyin har interval'da takrorlaymiz.
+    _fetchDriverLocation();
+    _driverPollTimer = Timer.periodic(_driverPollInterval, (_) {
+      if (!mounted) return;
+      _fetchDriverLocation();
+    });
+  }
+
+  /// Rejali buyurtmada olib ketish vaqti hali kelmagan bo'lsa true.
+  /// Bu paytda customer driverning joylashuvini ko'rmasligi kerak
+  /// (privacy + foydasiz — driver hali harakatga chiqmagan).
+  bool get _isScheduledBeforePickup {
+    final iso = _order.scheduledPickupAt;
+    if (iso == null) return false;
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return false;
+    return dt.isAfter(DateTime.now());
+  }
+
+  Future<void> _fetchDriverLocation() async {
+    final s = _order.status;
+    // Driver yo'lda bo'ladigan bosqichlar
+    final isActive = s == 3 || s == 4 || s == 5 || s == 6 || s == 7 || s == 8;
+    // Rejali buyurtmada vaqt kelmaguncha driver locationi ko'rinmasin —
+    // server poll'lariga ham hojat yo'q.
+    if (!isActive || _isScheduledBeforePickup) {
+      if (_liveDriverLocation != null) {
+        setState(() => _liveDriverLocation = null);
+      }
+      return;
+    }
+    try {
+      final loc = await CustomerApi.instance.driverLocation(_order.id);
+      if (!mounted) return;
+      if (loc != null) {
+        final newLoc = LatLng(loc.latitude, loc.longitude);
+
+        // Ikki poll orasidagi yo'nalish (bearing) — driver harakat qilgandagina
+        // heading saqlanadi. Juda kichik siljish — GPS shovqini deb e'tibordan
+        // qoldiramiz.
+        if (_prevDriverPollLoc != null) {
+          final distance = _haversine(_prevDriverPollLoc!, newLoc);
+          if (distance >= 10) {
+            _driverHeading = _bearingDegrees(_prevDriverPollLoc!, newLoc);
+            _prevDriverPollLoc = newLoc;
+          }
+        } else {
+          _prevDriverPollLoc = newLoc;
+        }
+
+        setState(() => _liveDriverLocation = newLoc);
+
+        // Heading-up follow: faol bosqichda map'ni driver'ga moslab
+        // `-heading`'ga aylantiramiz.
+        if (_followDriver && isActive) {
+          try {
+            final z = _mapCtrl.camera.zoom;
+            final targetZoom = z < 13 ? 15.0 : z;
+            _lastProgrammaticCameraChange = DateTime.now();
+            _mapCtrl.moveAndRotate(newLoc, targetZoom, -_driverHeading);
+          } catch (_) {
+            // map hali ready emas
+          }
+        }
+      }
+    } catch (_) {
+      // Sokin — keyingi tick qayta urinadi.
+    }
+  }
+
+  /// Ikki nuqta orasidagi yo'nalish (gradus, 0=N).
+  static double _bearingDegrees(LatLng from, LatLng to) {
+    final lat1 = from.latitude * math.pi / 180;
+    final lat2 = to.latitude * math.pi / 180;
+    final dLng = (to.longitude - from.longitude) * math.pi / 180;
+    final y = math.sin(dLng) * math.cos(lat2);
+    final x = math.cos(lat1) * math.sin(lat2)
+        - math.sin(lat1) * math.cos(lat2) * math.cos(dLng);
+    return ((math.atan2(y, x) * 180 / math.pi) + 360) % 360;
+  }
+
+  static double _haversine(LatLng a, LatLng b) {
+    const r = 6371000.0;
+    final dLat = (b.latitude - a.latitude) * math.pi / 180;
+    final dLng = (b.longitude - a.longitude) * math.pi / 180;
+    final h = math.sin(dLat / 2) * math.sin(dLat / 2)
+        + math.cos(a.latitude * math.pi / 180)
+            * math.cos(b.latitude * math.pi / 180)
+            * math.sin(dLng / 2) * math.sin(dLng / 2);
+    return 2 * r * math.asin(math.min(1.0, math.sqrt(h)));
   }
 
   LatLng? get _pickup => (_order.pickupLat != null && _order.pickupLng != null)
@@ -64,11 +186,14 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
 
   (LatLng?, LatLng?) get _stageRoute {
     final s = _order.status;
-    if (s == 3 || s == 4) {
-      return (_acceptPoint ?? _pickup, _pickup);
+    // Customer ko'rinishi — har doim A→B (olib ketish → yetkazib berish) yo'lini
+    // chizamiz. Driver pozitsiyasi alohida marker bilan ko'rsatiladi, ammo
+    // undan A gacha yo'l chizilmaydi (chunki bu customerga ortiqcha shovqin).
+    // Loading/Unloading bosqichlarida (5, 8) ham A↔B saqlanadi (yo'l yashirilmas).
+    if (s == 9 || s == 10 || s == 11 || s == 12) {
+      // Yakunlangan/bekor qilingan — sentimental sifatida A↔B saqlanadi.
+      return (_pickup, _delivery);
     }
-    if (s == 5 || s == 7 || s == 8 || s == 9) return (null, null);
-    if (s == 6) return (_pickup, _delivery);
     return (_pickup, _delivery);
   }
 
@@ -86,6 +211,15 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
       _routeLoading = false;
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _fitMapToRoute());
+  }
+
+  /// Ichki map'ni A (pickup) nuqtaga markazlaydi va yaqinlashtiradi.
+  /// Tashqi navigatsiya ilovasini ochmaydi — foydalanuvchi shu app ichida
+  /// nuqtani aniq ko'rishi uchun.
+  void _navigateToPickup() {
+    final p = _pickup;
+    if (p == null) return;
+    _mapCtrl.move(p, 16.0);
   }
 
   void _fitMapToRoute() {
@@ -110,29 +244,29 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
   String _statusLabel(int? s) {
     switch (s) {
       case 1:
-        return 'Yangi';
+        return I18n.t('order.status.new');
       case 2:
-        return 'Faol';
+        return I18n.t('order.status.active');
       case 3:
-        return 'Qabul qilindi';
+        return I18n.t('order.status.accepted_full');
       case 4:
-        return 'Pickup’da';
+        return I18n.t('order.status.pickup_at');
       case 5:
-        return 'Yuklanmoqda';
+        return I18n.t('order.status.loading_short');
       case 6:
-        return 'Yo‘lda';
+        return I18n.t('order.status.in_transit_short');
       case 7:
-        return 'Delivery’da';
+        return I18n.t('order.status.delivery_at');
       case 8:
-        return 'Tushirilmoqda';
+        return I18n.t('order.status.unloading');
       case 9:
-        return 'Yetkazildi';
+        return I18n.t('order.status.delivered_short');
       case 10:
-        return 'Yakunlandi';
+        return I18n.t('order.status.finished_short');
       case 11:
-        return 'Bekor qilingan';
+        return I18n.t('order.status.cancelled_short');
       case 12:
-        return 'Muvaffaqiyatsiz';
+        return I18n.t('order.status.failed_short');
       default:
         return '—';
     }
@@ -160,65 +294,85 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
   List<TimelineStep> _timelineStepsCustomer(CustomerOrder o) {
     final steps = <TimelineStep>[
       TimelineStep(
-        label: 'Yaratilgan',
+        label: I18n.t('order.detail.created'),
         iconData: Icons.add_circle_outline_rounded,
         timeIso: o.createdAt,
       ),
       TimelineStep(
-        label: 'Qabul qilindi',
+        label: I18n.t('order.detail.accepted'),
         iconData: Icons.check_rounded,
         timeIso: o.acceptedAt,
       ),
       TimelineStep(
-        label: 'Pickup\'ga yetib keldi',
+        label: I18n.t('order.detail.arrived_pickup'),
         iconData: Icons.pin_drop_rounded,
         timeIso: o.arrivedPickupAt,
       ),
       TimelineStep(
-        label: 'Yuklash boshlandi',
+        label: I18n.t('order.detail.loading_started'),
         iconData: Icons.downloading_rounded,
         timeIso: o.loadingStartedAt,
       ),
       TimelineStep(
-        label: 'Yo\'lda',
+        label: I18n.t('order.detail.in_transit_label'),
         iconData: Icons.local_shipping_rounded,
         timeIso: o.inTransitAt,
       ),
       TimelineStep(
-        label: 'Delivery\'ga yetib keldi',
+        label: I18n.t('order.detail.arrived_delivery'),
         iconData: Icons.location_on_rounded,
         timeIso: o.arrivedDeliveryAt,
       ),
       TimelineStep(
-        label: 'Tushirish boshlandi',
+        label: I18n.t('order.detail.unloading_started'),
         iconData: Icons.unarchive_rounded,
         timeIso: o.unloadingStartedAt,
       ),
       TimelineStep(
-        label: 'Yetkazildi',
+        label: I18n.t('order.detail.delivered'),
         iconData: Icons.task_alt_rounded,
         timeIso: o.deliveredAt,
       ),
       TimelineStep(
-        label: 'Yakunlandi',
+        label: I18n.t('order.detail.finished'),
         iconData: Icons.verified_rounded,
         timeIso: o.completedAt,
       ),
     ];
     if ((o.cancelledAt ?? '').isNotEmpty) {
       steps.add(TimelineStep(
-        label: 'Bekor qilingan',
+        label: I18n.t('order.detail.cancelled'),
         iconData: Icons.cancel_rounded,
         timeIso: o.cancelledAt,
-        note: o.cancelReason,
+        note: _renderCancelReason(o),
       ));
     }
     return steps;
   }
 
+  /// Bekor qilingan buyurtmaning sababini ko'rinadigan satrga aylantiradi:
+  /// - catalog sabab tanlangan bo'lsa joriy lokaldagi nom;
+  /// - "Boshqa" tanlangan bo'lsa: "<label>: <custom matn>";
+  /// - faqat eski matn bo'lsa (cancel_reason_id=NULL): shu matnning o'zi.
+  String? _renderCancelReason(CustomerOrder o) {
+    final info = o.cancelReasonInfo;
+    final raw = o.cancelReason?.trim();
+    if (info != null) {
+      final code = I18n.instance.code;
+      final label = code == 'ru' ? info.nameRu : info.nameUz;
+      if (info.isOther && raw != null && raw.isNotEmpty) {
+        return '$label: $raw';
+      }
+      return label;
+    }
+    return (raw != null && raw.isNotEmpty) ? raw : null;
+  }
+
   void _showError(Object e) {
     if (!mounted) return;
-    final msg = e is ApiException ? e.firstFieldMessage : 'Tarmoq xatosi: $e';
+    final msg = e is ApiException
+        ? e.firstFieldMessage
+        : I18n.t('order.detail.network_error_label', {'msg': '$e'});
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
@@ -228,7 +382,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
       await CustomerApi.instance.finishOrder(_order.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Buyurtma yakunlandi.')),
+        SnackBar(content: Text(I18n.t('order.detail.order_finished_msg'))),
       );
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -239,13 +393,17 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
   }
 
   Future<void> _cancel() async {
-    final reason = await _askCancelReason();
-    if (reason == null || !mounted) return;
+    final picked = await _askCancelReason();
+    if (picked == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      await CustomerApi.instance.cancelOrder(_order.id, reason: reason);
+      await CustomerApi.instance.cancelOrder(
+        _order.id,
+        cancelReasonId: picked.reasonId,
+        customText: picked.customText,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bekor qilindi.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(I18n.t('order.detail.cancelled_msg'))));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -254,11 +412,89 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
     }
   }
 
-  Future<String?> _askCancelReason() {
-    return showDialog<String>(
+  Future<_CancelReasonChoice?> _askCancelReason() async {
+    // Sabablar ro'yxatini avval yuklab olamiz (cache'lanadi). Network xato
+    // bo'lsa snackbar bilan xabar va dialog ochilmaydi.
+    List<CancelReason> reasons;
+    try {
+      reasons = await CustomerApi.instance.cancelReasons();
+    } catch (e) {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(I18n.t('order.cancel.load_failed'))),
+      );
+      return null;
+    }
+    if (!mounted) return null;
+    return showDialog<_CancelReasonChoice>(
       context: context,
-      builder: (ctx) => const _CancelReasonDialog(),
+      builder: (ctx) => _CancelReasonDialog(reasons: reasons),
     );
+  }
+
+  /// Buyurtmani takrorlash — order create page'ni shu order ma'lumotlari bilan
+  /// to'ldirilgan holda ochadi. Detail page yopiladi va orders tab'iga qaytadi.
+  void _repeatOrder() {
+    Navigator.of(context).pushReplacement<void, void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CustomerOrderCreatePage(
+          prefillCargoTypeId: _order.cargoType?.id,
+          prefillPickupAddress: _order.pickupAddress,
+          prefillPickupLat: _order.pickupLat,
+          prefillPickupLng: _order.pickupLng,
+          prefillDeliveryAddress: _order.deliveryAddress,
+          prefillDeliveryLat: _order.deliveryLat,
+          prefillDeliveryLng: _order.deliveryLng,
+          prefillCargoWeightKg: _order.cargoWeightKg,
+          prefillComment: _order.comment,
+        ),
+      ),
+    );
+  }
+
+  /// Buyurtmani server'dan qayta yuklash — current va archive ro'yxatlarini
+  /// chaqirib, mos ID'ni topadi. Backend hozircha alohida `GET orders/{id}`
+  /// endpoint chiqarmagani uchun shu yo'l ishlatiladi. Ma'lumotni yangilab
+  /// route'ni va driver location'ni qayta ishga tushiramiz.
+  Future<void> _reloadOrder() async {
+    if (_reloading) return;
+    setState(() => _reloading = true);
+    try {
+      final list = await Future.wait<List<CustomerOrder>>([
+        CustomerApi.instance.currentOrders(),
+        CustomerApi.instance.archiveOrders(),
+      ]);
+      final all = <CustomerOrder>[...list[0], ...list[1]];
+      CustomerOrder? found;
+      for (final o in all) {
+        if (o.id == _order.id) {
+          found = o;
+          break;
+        }
+      }
+      if (!mounted) return;
+      if (found != null) {
+        setState(() => _order = found!);
+        await _refetchRoute();
+        unawaited(_fetchDriverLocation());
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(I18n.t('order.detail.not_found'))),
+        );
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.firstFieldMessage)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${I18n.t('common.network_error')}: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _reloading = false);
+    }
   }
 
   Widget _circleIconButton(IconData icon, VoidCallback onTap) {
@@ -322,22 +558,26 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
     );
   }
 
+  /// Driver markeri customer xaritasi uchun. Map heading-up'ga aylantirilgan
+  /// bo'lsa, `rotate: true` orqali marker screen-aligned ushlanadi va
+  /// navigatsiya arrow doim "yuqori = oldinga" ko'rinadi.
   Marker _driverMarker(LatLng point) {
     return Marker(
       point: point,
-      width: 40,
-      height: 40,
+      width: 44,
+      height: 44,
       alignment: Alignment.center,
+      rotate: true,
       child: Container(
         decoration: BoxDecoration(
           color: AppPalette.teal,
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: 3),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 3)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3)),
           ],
         ),
-        child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 22),
+        child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 24),
       ),
     );
   }
@@ -364,6 +604,10 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
         leading: _circleIconButton(Icons.arrow_back_rounded, () => Navigator.of(context).pop()),
         actions: [
           _circleIconButton(Icons.center_focus_strong_rounded, _fitMapToRoute),
+          _circleIconButton(
+            _reloading ? Icons.hourglass_top_rounded : Icons.refresh_rounded,
+            _reloading ? () {} : _reloadOrder,
+          ),
         ],
       ),
       body: AbsorbPointer(
@@ -376,10 +620,26 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                 options: MapOptions(
                   initialCenter: initialCenter,
                   initialZoom: 12,
+                  initialRotation: 0,
                   minZoom: 4,
                   maxZoom: 18,
+                  // Rotation gesture'lari yoqilgan — foydalanuvchi 2 barmoq
+                  // bilan o'zi map'ni aylantirishi mumkin.
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all,
+                  ),
                   onMapReady: () {
                     WidgetsBinding.instance.addPostFrameCallback((_) => _fitMapToRoute());
+                  },
+                  onPositionChanged: (camera, hasGesture) {
+                    if (hasGesture && _followDriver) {
+                      final last = _lastProgrammaticCameraChange;
+                      if (last != null &&
+                          DateTime.now().difference(last).inMilliseconds < 200) {
+                        return;
+                      }
+                      setState(() => _followDriver = false);
+                    }
                   },
                 ),
                 children: [
@@ -406,28 +666,86 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                     markers: [
                       if (p != null) _routeMarker(p, isStart: true),
                       if (d != null) _routeMarker(d, isStart: false),
-                      if ((s == 3 || s == 4) && _acceptPoint != null) _driverMarker(_acceptPoint!),
+                      // Driver markeri — real-vaqt poll'dan kelgan lokatsiya
+                      // ustunlik qiladi, fallback — accept_lat/lng (statik).
+                      // Faqat driver yo'lda bo'lgan bosqichlarda ko'rsatamiz.
+                      // Rejali buyurtmada olib ketish vaqti kelmaguncha
+                      // driver locationi customerga ko'rinmaydi.
+                      if ((s == 3 || s == 4 || s == 6 || s == 7 || s == 8) &&
+                          !_isScheduledBeforePickup &&
+                          (_liveDriverLocation ?? _acceptPoint) != null)
+                        _driverMarker((_liveDriverLocation ?? _acceptPoint)!),
                     ],
                   ),
                 ],
               ),
             ),
             if (_routeLoading)
-              const Positioned(
+              Positioned(
                 top: 100,
                 left: 0,
                 right: 0,
                 child: Center(
                   child: Card(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
-                          SizedBox(width: 8),
-                          Text('Yo‘l hisoblanmoqda…'),
+                          const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                          const SizedBox(width: 8),
+                          Text(I18n.t('order.detail.route_calculating')),
                         ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            // "A nuqtaga yo'l boshlash" tugmasi — map'ning o'ng pastida,
+            // pastki sheet ustida (sheet'ning minimal balandligi ~0.22 ekran +
+            // navigatsiya bezab). Foydalanuvchi tezda tashqi maps ilovasini ochadi.
+            if (_pickup != null)
+              Positioned(
+                right: 14,
+                bottom: MediaQuery.of(context).size.height * 0.22 + 14,
+                child: SafeArea(
+                  child: FloatingActionButton.extended(
+                    heroTag: 'nav_to_pickup',
+                    onPressed: _navigateToPickup,
+                    icon: const Icon(Icons.directions_rounded),
+                    label: Text(I18n.t('order.detail.nav_to_a')),
+                  ),
+                ),
+              ),
+            // Driver mavjud va faol bosqichda bo'lsa — follow-driver FAB
+            // (turn-by-turn rejimi yoqilgan/o'chgan vizual ko'rsatkichi).
+            if ((s == 3 || s == 4 || s == 6 || s == 7 || s == 8) &&
+                !_isScheduledBeforePickup &&
+                _liveDriverLocation != null)
+              Positioned(
+                right: 14,
+                bottom: MediaQuery.of(context).size.height * 0.22 + 84,
+                child: Material(
+                  color: _followDriver ? cs.primaryContainer : cs.surface,
+                  shape: const CircleBorder(),
+                  elevation: 4,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () {
+                      _lastProgrammaticCameraChange = DateTime.now();
+                      _mapCtrl.moveAndRotate(
+                        _liveDriverLocation!, 15, -_driverHeading,
+                      );
+                      if (!_followDriver) {
+                        setState(() => _followDriver = true);
+                      }
+                    },
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Icon(
+                        _followDriver ? Icons.my_location_rounded : Icons.location_searching_rounded,
+                        color: _followDriver ? cs.onPrimaryContainer : cs.primary,
                       ),
                     ),
                   ),
@@ -480,7 +798,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        _order.orderNumber ?? 'Buyurtma #${_order.id}',
+                                        _order.orderNumber ?? I18n.t('customer.order_number_fallback', {'id': _order.id}),
                                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                               fontWeight: FontWeight.w800,
                                             ),
@@ -501,7 +819,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                                           ),
                                     ),
                                     Text(
-                                      _order.currency ?? 'UZS',
+                                      _order.currency ?? I18n.t('common.uzs'),
                                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                             color: cs.onSurfaceVariant,
                                           ),
@@ -511,6 +829,12 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                               ],
                             ),
                             const SizedBox(height: 14),
+                            if (_order.scheduledPickupAt != null) ...[
+                              _ScheduledPickupBanner(
+                                scheduledAtIso: _order.scheduledPickupAt!,
+                              ),
+                              const SizedBox(height: 10),
+                            ],
                             if (_order.deliveryDeadlineAt != null && (s ?? 0) >= 3)
                               DeadlineBanner(
                                 deadlineAtIso: _order.deliveryDeadlineAt!,
@@ -528,7 +852,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                                 freeMinutes: _order.cargoType!.pickupFreeWaitMinutes,
                                 paidPrice: _order.cargoType!.pickupPaidWaitPrice,
                                 paidIntervalMin: _order.cargoType!.pickupPaidWaitIntervalMin,
-                                label: 'Yuklash kutish vaqti',
+                                label: I18n.t('order.detail.loading_wait_label'),
                               ),
                             if (s == 8 && _order.unloadingStartedAt != null && _order.cargoType != null)
                               _WaitCountdown(
@@ -536,7 +860,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                                 freeMinutes: _order.cargoType!.deliveryFreeWaitMinutes,
                                 paidPrice: _order.cargoType!.deliveryPaidWaitPrice,
                                 paidIntervalMin: _order.cargoType!.deliveryPaidWaitIntervalMin,
-                                label: 'Tushirish kutish vaqti',
+                                label: I18n.t('order.detail.unloading_wait_label'),
                               ),
                             Container(
                               padding: const EdgeInsets.all(14),
@@ -549,7 +873,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                                 children: [
                                   _AddressRow(
                                     isStart: true,
-                                    label: 'Olib ketish',
+                                    label: I18n.t('order.detail.address_pickup'),
                                     address: _order.pickupAddress ?? '—',
                                   ),
                                   const SizedBox(height: 8),
@@ -557,7 +881,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                                   const SizedBox(height: 8),
                                   _AddressRow(
                                     isStart: false,
-                                    label: 'Yetkazish',
+                                    label: I18n.t('order.detail.address_delivery'),
                                     address: _order.deliveryAddress ?? '—',
                                   ),
                                 ],
@@ -569,28 +893,34 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                                 Expanded(
                                   child: _StatTile(
                                     icon: Icons.straighten_rounded,
-                                    label: 'Masofa',
-                                    value: _order.distanceKm != null ? '${_order.distanceKm} km' : '—',
+                                    label: I18n.t('order.detail.distance_label'),
+                                    value: _order.distanceKm != null ? '${_order.distanceKm} ${I18n.t('common.km')}' : '—',
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: _StatTile(
                                     icon: Icons.scale_rounded,
-                                    label: 'Yuk',
-                                    value: _order.cargoWeightKg != null ? '${_order.cargoWeightKg} kg' : '—',
+                                    label: I18n.t('order.detail.cargo_label'),
+                                    value: _order.cargoWeightKg != null ? '${_order.cargoWeightKg} ${I18n.t('common.kg')}' : '—',
                                   ),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: _StatTile(
                                     icon: Icons.category_outlined,
-                                    label: 'Tur',
+                                    label: I18n.t('order.detail.type_label'),
                                     value: _order.cargoType?.name ?? '—',
                                   ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 14),
+                            // Narx tafsilotlari: jami, loyiha komissiyasi va avtopark
+                            // komissiyasi (foiz + summa). Driver Accept qilmaguncha
+                            // company_* qiymatlari 0; project_* esa order yaratilganda
+                            // belgilanadi (Project default 5%).
+                            _PriceBreakdownCard(order: _order),
                             if ((_order.comment ?? '').isNotEmpty) ...[
                               const SizedBox(height: 14),
                               Container(
@@ -634,33 +964,49 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
                           child: SafeArea(
                             top: false,
                             child: _isFinal
-                                ? Container(
-                                    padding: const EdgeInsets.all(14),
-                                    decoration: BoxDecoration(
-                                      color: cs.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: const Row(
-                                      children: [
-                                        Icon(Icons.lock_outline_rounded),
-                                        SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text('Bu buyurtma yopiq.',
-                                              style: TextStyle(height: 1.4)),
+                                ? Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: cs.surfaceContainerHighest,
+                                          borderRadius: BorderRadius.circular(14),
                                         ),
-                                      ],
-                                    ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.lock_outline_rounded),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(I18n.t('order.detail.order_closed'),
+                                                  style: const TextStyle(height: 1.4)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      // Buyurtmani takrorlash — order create page'ni
+                                      // shu order ma'lumotlari bilan to'ldirib ochadi.
+                                      FilledButton.icon(
+                                        onPressed: _repeatOrder,
+                                        icon: const Icon(Icons.repeat_rounded),
+                                        label: Text(I18n.t('order.detail.repeat_order')),
+                                        style: FilledButton.styleFrom(
+                                          minimumSize: const Size.fromHeight(48),
+                                        ),
+                                      ),
+                                    ],
                                   )
                                 : _canFinish
                                     ? SlideButton(
-                                        label: 'Yakunlash uchun suring',
+                                        label: I18n.t('order.detail.finish_slide'),
                                         icon: Icons.task_alt_rounded,
                                         onSlide: _finish,
                                       )
                                     : OutlinedButton.icon(
                                         onPressed: _busy ? null : _cancel,
                                         icon: const Icon(Icons.cancel_outlined),
-                                        label: const Text('Bekor qilish'),
+                                        label: Text(I18n.t('order.detail.cancel_btn')),
                                         style: OutlinedButton.styleFrom(
                                           foregroundColor: cs.error,
                                           side: BorderSide(color: cs.error.withValues(alpha: 0.6)),
@@ -676,6 +1022,109 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Rejali olib ketish vaqti banner — order.scheduled_pickup_at bo'lsa
+/// detail sahifa tepasida (DeadlineBanner'dan oldin) ko'rsatiladi.
+/// Sana, soat va countdown bir qarashda ko'rinadi.
+class _ScheduledPickupBanner extends StatefulWidget {
+  const _ScheduledPickupBanner({required this.scheduledAtIso});
+
+  final String scheduledAtIso;
+
+  @override
+  State<_ScheduledPickupBanner> createState() => _ScheduledPickupBannerState();
+}
+
+class _ScheduledPickupBannerState extends State<_ScheduledPickupBanner> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    // Countdown bir daqiqada bir marta yangilansin (60 sek aniqlik yetarli).
+    _tick = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  String _fmtFull(DateTime dt) {
+    final two = (int v) => v.toString().padLeft(2, '0');
+    return '${dt.year}-${two(dt.month)}-${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}';
+  }
+
+  String _countdown(DateTime target) {
+    final diff = target.difference(DateTime.now());
+    if (diff.isNegative) return I18n.t('order.detail.countdown_passed');
+    if (diff.inDays >= 1) {
+      final hh = diff.inHours.remainder(24);
+      return I18n.t('order.detail.countdown_days_hours', {'d': diff.inDays, 'h': hh});
+    }
+    if (diff.inHours >= 1) {
+      return I18n.t('order.detail.countdown_hours_minutes',
+          {'h': diff.inHours, 'm': diff.inMinutes.remainder(60)});
+    }
+    return I18n.t('order.detail.countdown_minutes', {'m': diff.inMinutes});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dt = DateTime.tryParse(widget.scheduledAtIso)?.toLocal();
+    if (dt == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.event_rounded, color: cs.onPrimaryContainer),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  I18n.t('order.detail.scheduled_pickup_label'),
+                  style: TextStyle(
+                    color: cs.onPrimaryContainer.withValues(alpha: 0.85),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _fmtFull(dt),
+                  style: TextStyle(
+                    color: cs.onPrimaryContainer,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            _countdown(dt),
+            style: TextStyle(
+              color: cs.onPrimaryContainer,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -758,11 +1207,15 @@ class _WaitCountdown extends StatelessWidget {
     final priceNum = num.tryParse(paidPrice ?? '') ?? 0;
     final extraCost = paidIntervals * priceNum;
 
-    String fmtMMSS(int totalSec) {
+    String fmtHHMMSS(int totalSec) {
       final abs = totalSec.abs();
-      final mm = abs ~/ 60;
+      final hh = abs ~/ 3600;
+      final mm = (abs % 3600) ~/ 60;
       final ss = abs % 60;
-      return '${mm.toString().padLeft(2, '0')}:${ss.toString().padLeft(2, '0')}';
+      final sign = totalSec < 0 ? '-' : '';
+      return '$sign${hh.toString().padLeft(2, '0')}:'
+          '${mm.toString().padLeft(2, '0')}:'
+          '${ss.toString().padLeft(2, '0')}';
     }
 
     return Container(
@@ -790,7 +1243,7 @@ class _WaitCountdown extends StatelessWidget {
                 child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
               Text(
-                fmtMMSS(remainingSec),
+                fmtHHMMSS(remainingSec),
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 18,
@@ -803,8 +1256,8 @@ class _WaitCountdown extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             isPaid
-                ? 'Pullik kutish boshlangan. Qo\'shimcha: ${_money(extraCost.toString())} so\'m'
-                : 'Bepul kutish vaqti — $freeMinutes daq.',
+                ? I18n.t('order.detail.paid_waiting_started', {'amount': _money(extraCost.toString())})
+                : I18n.t('order.detail.free_waiting', {'minutes': freeMinutes}),
             style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7), fontSize: 12),
           ),
         ],
@@ -941,48 +1394,112 @@ class _StatTile extends StatelessWidget {
   }
 }
 
+/// Dialog natijasi — tanlangan sabab IDsi va (Boshqa tanlansa) custom matn.
+class _CancelReasonChoice {
+  const _CancelReasonChoice({required this.reasonId, this.customText});
+  final int reasonId;
+  final String? customText;
+}
+
 class _CancelReasonDialog extends StatefulWidget {
-  const _CancelReasonDialog();
+  const _CancelReasonDialog({required this.reasons});
+
+  final List<CancelReason> reasons;
 
   @override
   State<_CancelReasonDialog> createState() => _CancelReasonDialogState();
 }
 
 class _CancelReasonDialogState extends State<_CancelReasonDialog> {
-  final _ctrl = TextEditingController();
-  String? _err;
+  int? _selectedId;
+  final _otherCtrl = TextEditingController();
+  String? _pickErr;
+  String? _otherErr;
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _otherCtrl.dispose();
     super.dispose();
   }
 
+  bool get _selectedIsOther {
+    if (_selectedId == null) return false;
+    final r = widget.reasons.firstWhere(
+      (e) => e.id == _selectedId,
+      orElse: () => widget.reasons.first,
+    );
+    return r.isOther;
+  }
+
   void _submit() {
-    final v = _ctrl.text.trim();
-    if (v.length < 3) {
-      setState(() => _err = 'Sababni kamida 3 belgi kiriting');
+    if (_selectedId == null) {
+      setState(() => _pickErr = I18n.t('order.cancel.pick_required'));
       return;
     }
-    Navigator.pop(context, v);
+    String? custom;
+    if (_selectedIsOther) {
+      final v = _otherCtrl.text.trim();
+      if (v.length < 3) {
+        setState(() => _otherErr = I18n.t('order.cancel.other_required'));
+        return;
+      }
+      custom = v;
+    }
+    Navigator.pop(context, _CancelReasonChoice(reasonId: _selectedId!, customText: custom));
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Bekor qilish sababi'),
-      content: TextField(
-        controller: _ctrl,
-        autofocus: true,
-        maxLines: 3,
-        decoration: InputDecoration(labelText: 'Sabab *', errorText: _err),
-        onChanged: (_) {
-          if (_err != null) setState(() => _err = null);
-        },
+      title: Text(I18n.t('order.cancel.pick_title')),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final r in widget.reasons)
+                RadioListTile<int>(
+                  value: r.id,
+                  groupValue: _selectedId,
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(r.displayName),
+                  onChanged: (v) => setState(() {
+                    _selectedId = v;
+                    _pickErr = null;
+                    if (!_selectedIsOther) _otherErr = null;
+                  }),
+                ),
+              if (_pickErr != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 12),
+                  child: Text(_pickErr!, style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12)),
+                ),
+              if (_selectedIsOther)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: TextField(
+                    controller: _otherCtrl,
+                    autofocus: true,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: I18n.t('order.cancel.other_hint'),
+                      errorText: _otherErr,
+                    ),
+                    onChanged: (_) {
+                      if (_otherErr != null) setState(() => _otherErr = null);
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Yopish')),
-        FilledButton(onPressed: _submit, child: const Text('Yuborish')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(I18n.t('common.close'))),
+        FilledButton(onPressed: _submit, child: Text(I18n.t('order.cancel.confirm_btn'))),
       ],
     );
   }
@@ -1001,4 +1518,147 @@ String _formatMoney(String? raw) {
     buf.write(s[k]);
   }
   return neg ? '-$buf' : buf.toString();
+}
+
+String _formatPct(num pct) {
+  if (pct == 0) return '0%';
+  return '${pct.toStringAsFixed(pct.truncateToDouble() == pct ? 0 : 1)}%';
+}
+
+/// Customer order detail uchun narx tafsiloti karta:
+/// jami, loyiha komissiyasi, avtopark komissiyasi va (mavjud bo'lsa) jarima.
+/// Foiz va summa har biri ko'rinadi — agar summa hali yo'q (driver hali
+/// Accept qilmagan) bo'lsa, foizdan total bilan hisoblab ko'rsatamiz.
+class _PriceBreakdownCard extends StatelessWidget {
+  const _PriceBreakdownCard({required this.order});
+
+  final CustomerOrder order;
+
+  num _n(String? s) => num.tryParse(s ?? '') ?? 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final currency = order.currency ?? I18n.t('common.uzs');
+
+    final total = _n(order.totalPrice);
+    final projectPct = _n(order.projectCommissionPct);
+    final companyPct = _n(order.companyCommissionPct);
+    final projectAmt = order.projectCommissionAmount != null
+        ? _n(order.projectCommissionAmount)
+        : (total * projectPct / 100);
+    final companyAmt = order.companyCommissionAmount != null
+        ? _n(order.companyCommissionAmount)
+        : (total * companyPct / 100);
+    final penalty = _n(order.latePenaltyAmount);
+
+    return AnimatedBuilder(
+      animation: I18n.instance,
+      builder: (_, __) {
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: cs.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.receipt_long_outlined, size: 18, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    I18n.t('order.price_breakdown'),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _BreakdownRow(
+                label: I18n.t('order.total_price'),
+                value: total,
+                currency: currency,
+                isMain: true,
+              ),
+              const SizedBox(height: 6),
+              _BreakdownRow(
+                label: '${I18n.t('order.commission_project')} (${_formatPct(projectPct)})',
+                value: projectAmt,
+                currency: currency,
+                muted: true,
+              ),
+              const SizedBox(height: 6),
+              _BreakdownRow(
+                label: '${I18n.t('order.commission_avtopark')} (${_formatPct(companyPct)})',
+                value: companyAmt,
+                currency: currency,
+                muted: true,
+              ),
+              if (penalty > 0) ...[
+                const SizedBox(height: 6),
+                _BreakdownRow(
+                  label: I18n.t('order.late_penalty'),
+                  value: penalty,
+                  currency: currency,
+                  isDeduction: true,
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BreakdownRow extends StatelessWidget {
+  const _BreakdownRow({
+    required this.label,
+    required this.value,
+    required this.currency,
+    this.isMain = false,
+    this.isDeduction = false,
+    this.muted = false,
+  });
+
+  final String label;
+  final num value;
+  final String currency;
+  final bool isMain;
+  final bool isDeduction;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = isDeduction
+        ? cs.error
+        : (muted ? cs.onSurfaceVariant : cs.onSurface);
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: muted ? cs.onSurfaceVariant : cs.onSurface,
+              fontWeight: isMain ? FontWeight.w700 : FontWeight.w500,
+              fontSize: isMain ? 14 : 13,
+            ),
+          ),
+        ),
+        Text(
+          '${_formatMoney(value.toString())} $currency',
+          style: TextStyle(
+            color: color,
+            fontWeight: isMain ? FontWeight.w800 : FontWeight.w600,
+            fontSize: isMain ? 14 : 13,
+          ),
+        ),
+      ],
+    );
+  }
 }

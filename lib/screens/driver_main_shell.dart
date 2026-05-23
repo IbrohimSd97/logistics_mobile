@@ -9,6 +9,9 @@ import 'package:latlong2/latlong.dart';
 import '../core/api/api_exception.dart';
 import '../core/api/auth_api.dart';
 import '../core/api/cargo_types_api.dart';
+import '../core/i18n/i18n.dart';
+import '../core/i18n/language_picker.dart';
+import '../core/i18n/wallet_tx_labels.dart';
 import '../core/session/session_store.dart';
 import '../core/theme/theme_controller.dart';
 import '../customer/customer_api.dart';
@@ -36,9 +39,16 @@ class DriverMainShell extends StatefulWidget {
   State<DriverMainShell> createState() => _DriverMainShellState();
 }
 
-class _DriverMainShellState extends State<DriverMainShell> {
+class _DriverMainShellState extends State<DriverMainShell>
+    with I18nObserverMixin<DriverMainShell> {
   int _index = 0;
-  static const _titles = ['Bosh sahifa', 'Buyurtmalar', 'Hamyon', 'Profil'];
+  // Tab matnlari — joriy I18n locale bo'yicha hisoblanadi (getter).
+  List<String> get _titles => [
+        I18n.t('shell.tab_home'),
+        I18n.t('shell.tab_orders'),
+        I18n.t('shell.tab_wallet'),
+        I18n.t('shell.tab_profile'),
+      ];
   int _refreshTick = 0;
 
   void _bumpRefresh() {
@@ -47,6 +57,28 @@ class _DriverMainShellState extends State<DriverMainShell> {
   }
 
   Future<void> _logout() async {
+    // Tasodifiy tap qilinishidan saqlash uchun avval tasdiqlash so'raymiz.
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(I18n.t('auth.logout')),
+        content: Text(I18n.t('auth.logout_confirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(I18n.t('common.cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(I18n.t('auth.logout')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
     await SessionStore().clear();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -86,7 +118,7 @@ class _DriverMainShellState extends State<DriverMainShell> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tarmoq xatosi: $e')),
+        SnackBar(content: Text(I18n.t('driver.network_error_label', {'msg': '$e'}))),
       );
       return;
     }
@@ -102,7 +134,7 @@ class _DriverMainShellState extends State<DriverMainShell> {
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Temp token: $e')),
+          SnackBar(content: Text(I18n.t('driver.temp_token_label', {'msg': '$e'}))),
         );
         return;
       }
@@ -110,7 +142,7 @@ class _DriverMainShellState extends State<DriverMainShell> {
     if (!mounted) return;
     if (temp == null || temp.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sessiya topilmadi.')),
+        SnackBar(content: Text(I18n.t('driver.session_not_found_short'))),
       );
       return;
     }
@@ -139,7 +171,12 @@ class _DriverMainShellState extends State<DriverMainShell> {
         title: Text(_titles[_index]),
         actions: [
           IconButton(
-            tooltip: 'Chiqish',
+            tooltip: I18n.t('common.refresh'),
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _bumpRefresh,
+          ),
+          IconButton(
+            tooltip: I18n.t('auth.logout'),
             icon: const Icon(Icons.logout_rounded),
             onPressed: _logout,
           ),
@@ -176,26 +213,26 @@ class _DriverMainShellState extends State<DriverMainShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Bosh sahifa',
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home_rounded),
+            label: I18n.t('shell.tab_home'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.local_shipping_outlined),
-            selectedIcon: Icon(Icons.local_shipping_rounded),
-            label: 'Buyurtmalar',
+            icon: const Icon(Icons.local_shipping_outlined),
+            selectedIcon: const Icon(Icons.local_shipping_rounded),
+            label: I18n.t('shell.tab_orders'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
-            label: 'Hamyon',
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: const Icon(Icons.account_balance_wallet_rounded),
+            label: I18n.t('shell.tab_wallet'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profil',
+            icon: const Icon(Icons.person_outline_rounded),
+            selectedIcon: const Icon(Icons.person_rounded),
+            label: I18n.t('shell.tab_profile'),
           ),
         ],
       ),
@@ -226,15 +263,77 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
   String? _error;
   DriverOrder? _current;
   List<DriverOrder> _active = [];
+  /// Rejali buyurtmalar — kelajakdagi olib ketish vaqti bilan,
+  /// radius'siz alohida bo'limda ko'rinadi. Joriy buyurtma bo'lsa ham
+  /// ko'rinadi (driver oldinga rejalashtirishi uchun).
+  List<DriverOrder> _scheduled = [];
+
+  /// Feed tab indeksi: 0 = Joriy (radius), 1 = Reja.
+  int _feedTabIndex = 0;
 
   /// Foydalanuvchi map picker orqali tanlagan joylashuv.
   LatLng? _pickedLocation;
   String? _pickedAddress;
 
+  /// Onlayn'da bo'lgan davrda har 1 daqiqada GPS olib backend'ga yuboradi.
+  /// Bu bilan customer real vaqtda driver harakatini ko'rishi mumkin va
+  /// driver_locations jadvalida kuzatuv tarixi to'planadi.
+  Timer? _locationPushTimer;
+  static const Duration _locationPushInterval = Duration(minutes: 1);
+
   @override
   void initState() {
     super.initState();
     _loadCurrent();
+    // Hot-reload yoki widget qayta yaratilganda agar driver allaqachon
+    // onlayn bo'lib qolgan bo'lsa, push timer'ni qayta ishga tushiramiz.
+    if (_online) _startLocationPushTimer();
+  }
+
+  @override
+  void dispose() {
+    _locationPushTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Onlayn bo'lganda chaqiriladi — har 1 daqiqada GPS lokatsiyasini
+  /// backend'ga POST qiladi. Avval ishga tushgan timer bo'lsa to'xtatamiz.
+  void _startLocationPushTimer() {
+    _locationPushTimer?.cancel();
+    _locationPushTimer = Timer.periodic(_locationPushInterval, (_) {
+      _pushCurrentLocation();
+    });
+  }
+
+  void _stopLocationPushTimer() {
+    _locationPushTimer?.cancel();
+    _locationPushTimer = null;
+  }
+
+  /// Joriy GPS pozitsiyani olib backend'ga yuboradi (sokin — UI'da xato
+  /// chiqarmaydi; tarmoq xatosi log'lanadi va keyingi tick urinib ko'radi).
+  Future<void> _pushCurrentLocation() async {
+    if (!_online) return;
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) return;
+      if (permission == LocationPermission.deniedForever) return;
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        ),
+      );
+      await DriverApi.instance.saveLocation(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      );
+    } catch (_) {
+      // Sokin — keyingi tick'da qayta urinamiz.
+    }
   }
 
   @override
@@ -252,16 +351,42 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
     });
     try {
       final cur = await DriverApi.instance.currentOrder();
+      // Backend bilan online holatni sinxronlash: buyurtma yakunlanganda
+      // server avtomat went_online_at'ni qayta qo'yadi — mobile UI ham
+      // shu holatni ko'rsatishi kerak.
+      bool serverOnline = _online;
+      try {
+        final status = await DriverApi.instance.driverStatus();
+        serverOnline = status.isOnline;
+      } catch (_) {
+        // Status endpointi yaroqsiz bo'lsa lokal holat saqlanadi.
+      }
+
       if (!mounted) return;
       setState(() {
         _current = cur;
+        _online = serverOnline;
         _busy = false;
       });
-      // Agar joriy order yo'q bo'lsa va online bo'lsa, active feed yuklaymiz
-      if (cur == null && _online) {
-        _loadActive();
-      } else if (cur == null) {
-        setState(() => _active = []);
+
+      // Agar driver onlinega qaytarilgan bo'lsa-yu lokatsiya timer'i
+      // o'chgan bo'lsa — qayta yoqamiz.
+      if (serverOnline && _locationPushTimer == null) {
+        _startLocationPushTimer();
+      } else if (!serverOnline) {
+        _stopLocationPushTimer();
+      }
+
+      // Online bo'lsa har doim ikkala feed yuklanadi: radius active va rejali.
+      // Joriy buyurtma bo'lsa ham — rejali kelajak buyurtmalari ko'rinishi kerak
+      // (driver oldinga rejalashtirishi uchun).
+      if (serverOnline) {
+        unawaited(_loadActive());
+      } else {
+        setState(() {
+          _active = [];
+          _scheduled = [];
+        });
       }
     } catch (e) {
       if (!mounted) return;
@@ -280,6 +405,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         await DriverApi.instance.clearCargoPreferences();
       } catch (_) {}
       if (!mounted) return;
+      _stopLocationPushTimer();
       setState(() {
         _online = false;
         _active = [];
@@ -305,12 +431,18 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         _busy = false;
         _error = e.firstFieldMessage;
       });
+      // 409 (active order bor) — foydalanuvchi uchun aniq snackbar
+      if (e.statusCode == 409) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.firstFieldMessage)),
+        );
+      }
       return;
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Tarmoq xatosi: $e';
+        _error = I18n.t('driver.network_error_label', {'msg': '$e'});
       });
       return;
     }
@@ -337,7 +469,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         if (!mounted) return;
         setState(() {
           _busy = false;
-          _error = 'Joylashuv ruxsati berilmadi.';
+          _error = I18n.t('driver.location_permission_denied');
         });
         return;
       }
@@ -345,7 +477,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         if (!mounted) return;
         setState(() {
           _busy = false;
-          _error = 'Joylashuv doimiy rad etilgan. Sozlamalardan ruxsat bering.';
+          _error = I18n.t('driver.location_permission_denied_forever');
         });
         return;
       }
@@ -355,7 +487,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         if (!mounted) return;
         setState(() {
           _busy = false;
-          _error = 'Qurilmada joylashuv xizmati o\'chirilgan. Yoqing va qayta urining.';
+          _error = I18n.t('driver.location_service_disabled');
         });
         return;
       }
@@ -381,12 +513,16 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         _busy = false;
       });
 
+      // Onlayn bo'lgandan keyin har 1 daqiqada GPS lokatsiyasini backend'ga
+      // yuborib turamiz — customer realtime tracking uchun.
+      _startLocationPushTimer();
+
       if (asOnline) {
         await _loadActive();
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Joylashuv yangilandi.')),
+          SnackBar(content: Text(I18n.t('driver.location_updated'))),
         );
       }
     } on ApiException catch (e) {
@@ -399,7 +535,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'GPS xatosi: $e';
+        _error = I18n.t('driver.gps_error', {'msg': '$e'});
       });
     }
   }
@@ -424,10 +560,15 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
       _error = null;
     });
     try {
-      final list = await DriverApi.instance.activeOrders();
+      // Ikkala feed parallel: radius bo'yicha + rejali.
+      final results = await Future.wait([
+        DriverApi.instance.activeOrders(),
+        DriverApi.instance.scheduledOrders(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _active = list;
+        _active = results[0];
+        _scheduled = results[1];
         _busy = false;
       });
     } on ApiException catch (e) {
@@ -440,7 +581,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'Tarmoq xatosi: $e';
+        _error = I18n.t('driver.network_error_label', {'msg': '$e'});
       });
     }
   }
@@ -450,11 +591,11 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
   String _formatDistance(double? meters, String? km) {
     if (meters != null) {
       if (meters >= 1000) {
-        return '${(meters / 1000).toStringAsFixed(1)} km';
+        return '${(meters / 1000).toStringAsFixed(1)} ${I18n.t('common.km')}';
       }
       return '${meters.round()} m';
     }
-    if (km != null) return '$km km';
+    if (km != null) return '$km ${I18n.t('common.km')}';
     return '—';
   }
 
@@ -472,47 +613,22 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
         children: [
           if (_current != null) ...[
-            Text('Joriy buyurtma', style: theme.textTheme.titleMedium),
+            Row(
+              children: [
+                Icon(Icons.local_shipping_rounded, size: 18, color: cs.primary),
+                const SizedBox(width: 6),
+                Text(I18n.t('driver.current_order'), style: theme.textTheme.titleMedium),
+              ],
+            ),
             const SizedBox(height: 8),
-            Card(
-              color: cs.primaryContainer,
-              child: InkWell(
-                onTap: () => widget.onOpenDetail(_current!, _pickedLocation),
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _current!.orderNumber ?? 'Buyurtma #${_current!.id}',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: cs.onPrimaryContainer,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text('Holat: ${_statusLabel(_current!.status)}',
-                          style: TextStyle(color: cs.onPrimaryContainer)),
-                      Text('Jami: ${_formatMoney(_current!.totalPrice)} ${_current!.currency ?? 'UZS'}',
-                          style: TextStyle(color: cs.onPrimaryContainer)),
-                      if (_current!.pickupAddress != null)
-                        Text('A: ${_current!.pickupAddress}',
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: cs.onPrimaryContainer)),
-                      if (_current!.deliveryAddress != null)
-                        Text('B: ${_current!.deliveryAddress}',
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: cs.onPrimaryContainer)),
-                      const SizedBox(height: 6),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Icon(Icons.chevron_right_rounded, color: cs.onPrimaryContainer),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            // Joriy buyurtma — feed kartochkasi bilan bir xil dizayn
+            // (sarlavha + status + narx + A→B + masofa + chevron). Driver
+            // ko'rinishida `_pickedLocation` GPS asosida A gacha masofani
+            // ham ko'rsatadi.
+            _DriverFeedOrderCard(
+              order: _current!,
+              driverLocation: _pickedLocation,
+              onTap: () => widget.onOpenDetail(_current!, _pickedLocation),
             ),
             const SizedBox(height: 16),
           ],
@@ -535,7 +651,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _online ? 'Onlayn' : 'Oflayn',
+                              _online ? I18n.t('driver.online') : I18n.t('driver.offline'),
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: _online ? cs.onTertiaryContainer : cs.onSurfaceVariant,
@@ -544,8 +660,10 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
                             const SizedBox(height: 2),
                             Text(
                               _online
-                                  ? '5 km radiusdagi buyurtmalar ko‘rinadi.'
-                                  : 'Onlayn bo‘lish uchun GPS joylashuvingiz avtomat olinadi.',
+                                  ? (_pickedAddress ?? I18n.t('driver.location_pending'))
+                                  : I18n.t('driver.online_hint'),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: _online ? cs.onTertiaryContainer : cs.onSurfaceVariant,
                                 height: 1.35,
@@ -560,28 +678,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
                       ),
                     ],
                   ),
-                  if (_online && _pickedAddress != null) ...[
-                    const Divider(height: 20),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.location_on_rounded,
-                            size: 18, color: cs.onTertiaryContainer),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            _pickedAddress!,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: cs.onTertiaryContainer,
-                              height: 1.35,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  if (_online) ...[
                     const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerRight,
@@ -589,7 +686,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
                         onPressed:
                             _busy ? null : () => _sendCurrentGpsLocation(asOnline: false),
                         icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: const Text('Joylashuvni yangilash'),
+                        label: Text(I18n.t('driver.refresh_location')),
                       ),
                     ),
                   ],
@@ -606,51 +703,78 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
                 title: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
                 trailing: FilledButton.tonal(
                   onPressed: _online ? _loadActive : _loadCurrent,
-                  child: const Text('Qayta'),
+                  child: Text(I18n.t('driver.retry_btn_short')),
                 ),
               ),
             ),
           const SizedBox(height: 12),
-          if (_current == null) ...[
-            Text('Yangi buyurtmalar', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              _online
-                  ? '5 km radiusdagi, mashina sig‘imingizga mos.'
-                  : 'Buyurtmalarni ko‘rish uchun onlayn bo‘ling.',
-              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          // ── Joriy / Reja tabbar ──
+          // Ikkala tab har doim ko'rinadi. Joriy — radius bo'yicha yangi
+          // buyurtmalar (joriy bandlikda yashiriladi). Reja — rejali
+          // buyurtmalar (joriy bilan band bo'lsa ham ko'rinadi).
+          if (_online) ...[
+            _DriverFeedTabsHeader(
+              activeCount: _current == null ? _active.length : 0,
+              scheduledCount: _scheduled.length,
+              activeIsBusy: _current != null,
+              selectedIndex: _feedTabIndex,
+              onSelect: (i) => setState(() => _feedTabIndex = i),
             ),
-            const SizedBox(height: 8),
-            if (_online && _active.isEmpty && !_busy)
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.inbox_outlined),
-                  title: const Text('Hozircha buyurtma yo‘q'),
-                  subtitle: const Text('Pastga torting yoki keyinroq qaytib keling.'),
-                ),
-              )
-            else
-              ..._active.map((o) => Card(
-                    child: ListTile(
-                      title: Text(o.orderNumber ?? 'Buyurtma #${o.id}'),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Masofa: ${_formatDistance(o.distanceM, o.distanceKm)}'),
-                          if (o.pickupAddress != null)
-                            Text('A: ${o.pickupAddress}',
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
-                          if (o.deliveryAddress != null)
-                            Text('B: ${o.deliveryAddress}',
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
-                          Text('${_formatMoney(o.totalPrice)} ${o.currency ?? 'UZS'} · ${o.cargoWeightKg ?? '—'} kg'),
-                        ],
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      isThreeLine: true,
-                      onTap: () => widget.onOpenDetail(o, _pickedLocation),
+            const SizedBox(height: 12),
+            if (_feedTabIndex == 0) ...[
+              // Joriy (radius)
+              if (_current != null)
+                Card(
+                  color: cs.tertiaryContainer,
+                  child: ListTile(
+                    leading: Icon(Icons.info_outline_rounded, color: cs.onTertiaryContainer),
+                    title: Text(
+                      I18n.t('driver.busy_with_current'),
+                      style: TextStyle(color: cs.onTertiaryContainer, fontWeight: FontWeight.w700),
                     ),
-                  )),
+                    subtitle: Text(
+                      I18n.t('driver.busy_with_current_subtitle'),
+                      style: TextStyle(color: cs.onTertiaryContainer),
+                    ),
+                  ),
+                )
+              else if (_active.isEmpty && !_busy)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.inbox_outlined),
+                    title: Text(I18n.t('driver.no_orders_now')),
+                    subtitle: Text(I18n.t('driver.archive_subtitle_empty')),
+                  ),
+                )
+              else
+                ..._active.map((o) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _DriverFeedOrderCard(
+                        order: o,
+                        driverLocation: _pickedLocation,
+                        onTap: () => widget.onOpenDetail(o, _pickedLocation),
+                      ),
+                    )),
+            ] else ...[
+              // Reja
+              if (_scheduled.isEmpty && !_busy)
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.event_busy_rounded),
+                    title: Text(I18n.t('driver.no_scheduled_orders')),
+                    subtitle: Text(I18n.t('driver.no_scheduled_orders_subtitle')),
+                  ),
+                )
+              else
+                ..._scheduled.map((o) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _DriverFeedOrderCard(
+                        order: o,
+                        driverLocation: _pickedLocation,
+                        onTap: () => widget.onOpenDetail(o, _pickedLocation),
+                      ),
+                    )),
+            ],
           ],
         ],
       ),
@@ -708,7 +832,7 @@ class DriverOrdersArchiveBodyState extends State<DriverOrdersArchiveBody> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Tarmoq xatosi: $e';
+        _error = I18n.t('driver.network_error_label', {'msg': '$e'});
       });
     }
   }
@@ -721,7 +845,7 @@ class DriverOrdersArchiveBodyState extends State<DriverOrdersArchiveBody> {
         padding: const EdgeInsets.all(24),
         children: [
           Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          TextButton(onPressed: _load, child: const Text('Qayta urinish')),
+          TextButton(onPressed: _load, child: Text(I18n.t('common.retry'))),
         ],
       );
     }
@@ -731,10 +855,10 @@ class DriverOrdersArchiveBodyState extends State<DriverOrdersArchiveBody> {
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
-          children: const [
-            Icon(Icons.inventory_2_outlined, size: 56),
-            SizedBox(height: 12),
-            Text('Arxiv bo‘sh', textAlign: TextAlign.center),
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 56),
+            const SizedBox(height: 12),
+            Text(I18n.t('driver.archive_empty'), textAlign: TextAlign.center),
           ],
         ),
       );
@@ -792,7 +916,7 @@ class _DriverOrderCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      order.orderNumber ?? 'Buyurtma #${order.id}',
+                      order.orderNumber ?? I18n.t('customer.order_number_fallback', {'id': order.id}),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
@@ -806,7 +930,7 @@ class _DriverOrderCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${_formatMoney(order.totalPrice)} ${order.currency ?? 'UZS'}',
+                '${_formatMoney(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')}',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: cs.primary,
@@ -1013,6 +1137,8 @@ class DriverWalletBody extends StatefulWidget {
 class DriverWalletBodyState extends State<DriverWalletBody> {
   DriverWalletSnapshot? _w;
   List<DriverWalletTx> _tx = [];
+  /// Fleet driver bo'lsa avtopark ma'lumoti — null oddiy independent driver.
+  DriverFleetInfo? _fleet;
   bool _loading = true;
   String? _error;
 
@@ -1034,12 +1160,16 @@ class DriverWalletBodyState extends State<DriverWalletBody> {
       _error = null;
     });
     try {
-      final w = await DriverApi.instance.wallet();
-      final t = await DriverApi.instance.walletTransactions();
+      final results = await Future.wait([
+        DriverApi.instance.wallet(),
+        DriverApi.instance.walletTransactions(),
+        DriverApi.instance.fleetInfo(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _w = w;
-        _tx = t;
+        _w = results[0] as DriverWalletSnapshot;
+        _tx = results[1] as List<DriverWalletTx>;
+        _fleet = results[2] as DriverFleetInfo?;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -1052,7 +1182,7 @@ class DriverWalletBodyState extends State<DriverWalletBody> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Tarmoq xatosi: $e';
+        _error = I18n.t('driver.network_error_label', {'msg': '$e'});
       });
     }
   }
@@ -1073,52 +1203,111 @@ class DriverWalletBodyState extends State<DriverWalletBody> {
               child: ListTile(
                 leading: Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
                 title: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
-                trailing: FilledButton.tonal(onPressed: _load, child: const Text('Retry')),
+                trailing: FilledButton.tonal(onPressed: _load, child: Text(I18n.t('common.retry_short'))),
               ),
             ),
-          Card(
-            color: cs.primaryContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Daromad balansi',
-                      style: theme.textTheme.titleMedium?.copyWith(color: cs.onPrimaryContainer)),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${_formatMoney(_w?.balance)} ${_w?.currency ?? 'UZS'}',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: cs.onPrimaryContainer,
+          // Fleet driver — avtopark hamyoni va balans ko'rsatilmaydi.
+          // Faqat shaxsiy tushumlar tarixi (pastda) ko'rinadi.
+          if (_fleet != null && _fleet!.isFleet) ...[
+            // Hech narsa: balans va wallet ham ko'rsatilmaydi.
+          ] else
+            // Independent driver — shaxsiy hamyon asosiy.
+            Card(
+              color: cs.primaryContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(I18n.t('driver.fleet_earnings_balance'),
+                        style: theme.textTheme.titleMedium?.copyWith(color: cs.onPrimaryContainer)),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_formatMoney(_w?.balance)} ${_w?.currency ?? I18n.t('common.uzs')}',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: cs.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // "Pul yechib olish" tugmasi faqat independent driver'ga ko'rinadi.
+          // Fleet driverda yechib olish avtopark tomonidan amalga oshiriladi.
+          if (!(_fleet?.isFleet ?? false)) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(I18n.t('driver.withdraw_not_ready'))),
+                );
+              },
+              icon: const Icon(Icons.payments_outlined),
+              label: Text(I18n.t('driver.withdraw_card_btn')),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Text(
+            (_fleet?.isFleet ?? false) ? I18n.t('driver.income_section') : I18n.t('driver.tx_section'),
+            style: theme.textTheme.titleSmall,
+          ),
+          if ((_fleet?.isFleet ?? false)) ...[
+            if (_fleet!.recentMyEarnings.isEmpty)
+              Card(child: ListTile(title: Text(I18n.t('driver.fleet_no_earnings'))))
+            else
+              ..._fleet!.recentMyEarnings.map((e) => Card(
+                    child: ListTile(
+                      leading: Icon(Icons.local_shipping_outlined, color: cs.primary),
+                      title: Text(walletTxLabel(
+                        transactionType: e.transactionType,
+                        rawDescription: e.title,
+                        amount: double.tryParse(e.amount ?? ''),
+                      )),
+                      subtitle: Text([
+                        if (e.orderId != null)
+                          I18n.t('wallet.tx.order_ref', {'number': e.orderId}),
+                        if ((e.createdAt ?? '').isNotEmpty) e.createdAt!,
+                      ].join(' · ')),
+                      trailing: Text(
+                        '+${_formatMoney(e.amount)}',
+                        style: TextStyle(fontWeight: FontWeight.w700, color: Colors.green.shade700),
+                      ),
+                    ),
+                  )),
+          ] else if (_tx.isEmpty)
+            Card(child: ListTile(title: Text(I18n.t('driver.no_tx'))))
+          else
+            ..._tx.map((e) {
+              final isNeg = e.amount?.startsWith('-') ?? false;
+              return Card(
+                child: ListTile(
+                  leading: Icon(
+                    isNeg
+                        ? Icons.arrow_circle_up_outlined
+                        : Icons.arrow_circle_down_outlined,
+                    color: isNeg ? Colors.redAccent : Colors.green.shade700,
+                  ),
+                  title: Text(walletTxLabel(
+                    transactionType: e.transactionType,
+                    rawDescription: e.title,
+                    amount: double.tryParse(e.amount ?? ''),
+                  )),
+                  subtitle: Text([
+                    if (e.orderId != null)
+                      I18n.t('wallet.tx.order_ref', {'number': e.orderId}),
+                    if ((e.createdAt ?? '').isNotEmpty) e.createdAt!,
+                  ].join(' · ')),
+                  trailing: Text(
+                    _formatMoney(e.amount),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: isNeg ? Colors.redAccent : Colors.green.shade700,
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Yechib olish funksiyasi keyingi versiyada.')),
+                ),
               );
-            },
-            icon: const Icon(Icons.payments_outlined),
-            label: const Text('Pul yechib olish (kartaga)'),
-          ),
-          const SizedBox(height: 20),
-          Text('Tranzaksiyalar', style: theme.textTheme.titleSmall),
-          if (_tx.isEmpty)
-            const Card(child: ListTile(title: Text('Hozircha yozuvlar yo‘q')))
-          else
-            ..._tx.map((e) => Card(
-                  child: ListTile(
-                    title: Text(e.title ?? '—'),
-                    subtitle: Text(e.createdAt ?? ''),
-                    trailing: Text(_formatMoney(e.amount)),
-                  ),
-                )),
+            }),
         ],
       ),
     );
@@ -1171,7 +1360,7 @@ class DriverProfileBody extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Haydovchi',
+                  Text(I18n.t('driver.role_title'),
                       style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                   Text(phoneDisplay,
                       style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
@@ -1199,8 +1388,12 @@ class DriverProfileBody extends StatelessWidget {
                   final isDark = ThemeController.instance.mode == ThemeMode.dark;
                   return SwitchListTile(
                     secondary: Icon(isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded),
-                    title: const Text('Tungi rejim'),
-                    subtitle: Text(isDark ? 'Yoqilgan' : 'O‘chirilgan'),
+                    title: Text(I18n.t('settings.dark_mode')),
+                    subtitle: Text(
+                      isDark
+                          ? I18n.t('settings.dark_mode_on')
+                          : I18n.t('settings.dark_mode_off'),
+                    ),
                     value: isDark,
                     onChanged: (v) => ThemeController.instance.setMode(
                       v ? ThemeMode.dark : ThemeMode.light,
@@ -1209,18 +1402,20 @@ class DriverProfileBody extends StatelessWidget {
                 },
               ),
               const Divider(height: 1),
-              const ListTile(
-                leading: Icon(Icons.security_rounded),
-                title: Text('Xavfsizlik'),
-                subtitle: Text('Tokenlar qurilmada saqlanadi.'),
+              const LanguagePickerTile(),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.security_rounded),
+                title: Text(I18n.t('settings.security')),
+                subtitle: Text(I18n.t('settings.security_subtitle')),
               ),
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.help_outline_rounded),
-                title: const Text('Yordam'),
+                title: Text(I18n.t('settings.help')),
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('ALIX Logistics — haydovchi.')),
+                    SnackBar(content: Text(I18n.t('driver.help_about_driver'))),
                   );
                 },
               ),
@@ -1231,7 +1426,7 @@ class DriverProfileBody extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: onLogout,
           icon: const Icon(Icons.logout_rounded),
-          label: const Text('Chiqish'),
+          label: Text(I18n.t('auth.logout')),
           style: OutlinedButton.styleFrom(
             foregroundColor: cs.error,
             side: BorderSide(color: cs.error.withValues(alpha: 0.6)),
@@ -1248,29 +1443,29 @@ class DriverProfileBody extends StatelessWidget {
 String statusLabelDriver(int? s) {
   switch (s) {
     case 1:
-      return 'Yangi';
+      return I18n.t('order.status.new');
     case 2:
-      return 'Faol';
+      return I18n.t('order.status.active');
     case 3:
-      return 'Qabul qilingan';
+      return I18n.t('order.status.accepted_short');
     case 4:
-      return 'Pickup’ga keldi';
+      return I18n.t('order.status.pickup_arrived_short');
     case 5:
-      return 'Yuklanmoqda';
+      return I18n.t('order.status.loading_short');
     case 6:
-      return 'Yo‘lda';
+      return I18n.t('order.status.in_transit_short');
     case 7:
-      return 'Delivery’ga keldi';
+      return I18n.t('order.status.delivery_arrived_short');
     case 8:
-      return 'Tushirilmoqda';
+      return I18n.t('order.status.unloading');
     case 9:
-      return 'Yetkazildi';
+      return I18n.t('order.status.delivered_short');
     case 10:
-      return 'Yakunlandi';
+      return I18n.t('order.status.finished_short');
     case 11:
-      return 'Bekor qilingan';
+      return I18n.t('order.status.cancelled_short');
     case 12:
-      return 'Muvaffaqiyatsiz';
+      return I18n.t('order.status.failed_short');
     default:
       return '—';
   }
@@ -1289,6 +1484,138 @@ String _formatMoney(String? raw) {
     buf.write(s[k]);
   }
   return neg ? '-$buf' : buf.toString();
+}
+
+/// "Rejali buyurtma" karta — kelajakdagi olib ketish vaqti va countdown.
+/// Driver radius'siz alohida bo'limda ko'radi.
+class _ScheduledOrderCard extends StatelessWidget {
+  const _ScheduledOrderCard({
+    required this.order,
+    required this.onTap,
+    required this.formatMoney,
+  });
+
+  final DriverOrder order;
+  final VoidCallback onTap;
+  final String Function(String?) formatMoney;
+
+  /// Kun.oy HH:mm — qisqa va o'qish oson, badge'ga sig'adi.
+  String _shortDateTime(DateTime dt) {
+    final two = (int v) => v.toString().padLeft(2, '0');
+    return '${two(dt.day)}.${two(dt.month)} ${two(dt.hour)}:${two(dt.minute)}';
+  }
+
+  /// Kelajakdagi vaqtgacha qancha qolganini odamga tushunarli ko'rinishda.
+  String _countdown(DateTime target) {
+    final diff = target.difference(DateTime.now());
+    if (diff.isNegative) return I18n.t('driver.time_passed');
+    final h = diff.inHours;
+    final m = diff.inMinutes.remainder(60);
+    if (h >= 24) {
+      final d = diff.inDays;
+      final hh = diff.inHours.remainder(24);
+      return I18n.t('driver.days_hours_left', {'d': d, 'h': hh});
+    }
+    if (h >= 1) return I18n.t('driver.hours_minutes_left', {'h': h, 'm': m});
+    return I18n.t('driver.minutes_left', {'m': diff.inMinutes});
+  }
+
+  /// Address matni "lat,lng" formatda bo'lsa (reverse-geocode muvaffaqiyatsiz
+  /// bo'lganda fallback), uni "Koordinata: …" deb tepalashtirib chiqaramiz —
+  /// haqiqiy manzilday ko'rinmasin.
+  String _displayAddress(String raw) {
+    final t = raw.trim();
+    final looksLikeCoord = RegExp(r'^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$').hasMatch(t);
+    if (looksLikeCoord) {
+      return I18n.t('driver.coords_label', {'value': t});
+    }
+    return t;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    DateTime? scheduled;
+    if (order.scheduledPickupAt != null) {
+      scheduled = DateTime.tryParse(order.scheduledPickupAt!)?.toLocal();
+    }
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      order.orderNumber ?? I18n.t('customer.order_number_fallback', {'id': order.id}),
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  if (scheduled != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.event_rounded, size: 13, color: cs.onPrimaryContainer),
+                              const SizedBox(width: 4),
+                              Text(
+                                _shortDateTime(scheduled),
+                                style: TextStyle(
+                                  color: cs.onPrimaryContainer,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _countdown(scheduled),
+                            style: TextStyle(
+                              color: cs.onPrimaryContainer.withValues(alpha: 0.85),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (order.pickupAddress != null)
+                Text('A: ${_displayAddress(order.pickupAddress!)}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (order.deliveryAddress != null)
+                Text('B: ${_displayAddress(order.deliveryAddress!)}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 4),
+              Text(
+                '${formatMoney(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')} · ${order.cargoWeightKg ?? '—'} ${I18n.t('common.kg')}',
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Yuk turi multi-select bottom sheet — driver onlayn bo'lganda chiqadi.
@@ -1356,7 +1683,7 @@ class _CargoTypesPickerSheetState extends State<_CargoTypesPickerSheet> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Qaysi yuk turlarini olasiz?',
+                    I18n.t('driver.cargo_picker_title'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -1368,7 +1695,7 @@ class _CargoTypesPickerSheetState extends State<_CargoTypesPickerSheet> {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Bir nechtasini tanlash mumkin. Faqat tanlangan turlardagi buyurtmalar ko‘rinadi.',
+                I18n.t('driver.cargo_picker_subtitle'),
                 style: TextStyle(color: cs.onSurfaceVariant, height: 1.35),
               ),
             ),
@@ -1403,7 +1730,7 @@ class _CargoTypesPickerSheetState extends State<_CargoTypesPickerSheet> {
                       subtitle: c.description != null
                           ? Text(c.description!,
                               maxLines: 2, overflow: TextOverflow.ellipsis)
-                          : Text('${c.pricePerKm ?? '—'} so‘m/km'),
+                          : Text(I18n.t('driver.price_per_km', {'value': c.pricePerKm ?? '—'})),
                       controlAffinity: ListTileControlAffinity.trailing,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -1417,7 +1744,7 @@ class _CargoTypesPickerSheetState extends State<_CargoTypesPickerSheet> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => Navigator.pop(context, <int>[]),
-                    child: const Text('Bekor qilish'),
+                    child: Text(I18n.t('common.cancel')),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1427,7 +1754,7 @@ class _CargoTypesPickerSheetState extends State<_CargoTypesPickerSheet> {
                     onPressed: _selected.isEmpty
                         ? null
                         : () => Navigator.pop(context, _selected.toList()),
-                    child: Text('Tanlash (${_selected.length})'),
+                    child: Text(I18n.t('driver.cargo_select_count', {'count': _selected.length})),
                   ),
                 ),
               ],
@@ -1460,7 +1787,7 @@ class DriverRoleSegmented extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Rejim', style: Theme.of(context).textTheme.titleSmall),
+            Text(I18n.t('customer.mode_label'), style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(4),
@@ -1473,7 +1800,7 @@ class DriverRoleSegmented extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _RoleSeg(
-                      label: 'Customer',
+                      label: I18n.t('customer.role_customer_segment'),
                       icon: Icons.person_outline_rounded,
                       selected: current == 'customer',
                       onTap: () => onSelect('customer'),
@@ -1482,7 +1809,7 @@ class DriverRoleSegmented extends StatelessWidget {
                   const SizedBox(width: 4),
                   Expanded(
                     child: _RoleSeg(
-                      label: 'Haydovchi',
+                      label: I18n.t('customer.role_driver_segment'),
                       icon: Icons.local_shipping_outlined,
                       selected: current == 'driver',
                       onTap: () => onSelect('driver'),
@@ -1545,6 +1872,385 @@ class _RoleSeg extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Driver home feed tab boshqaruvi — ikkita pill ("Joriy", "Reja"), har
+/// birining yonida count badge. Joriy bandlikda Joriy tabning sonini
+/// yashiramiz (chunki radius feed ko'rsatilmaydi).
+class _DriverFeedTabsHeader extends StatelessWidget {
+  const _DriverFeedTabsHeader({
+    required this.activeCount,
+    required this.scheduledCount,
+    required this.activeIsBusy,
+    required this.selectedIndex,
+    required this.onSelect,
+  });
+
+  final int activeCount;
+  final int scheduledCount;
+  final bool activeIsBusy;
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _FeedTabPill(
+            label: I18n.t('driver.feed_current'),
+            count: activeIsBusy ? null : activeCount,
+            selected: selectedIndex == 0,
+            onTap: () => onSelect(0),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _FeedTabPill(
+            label: I18n.t('driver.feed_plan'),
+            count: scheduledCount,
+            selected: selectedIndex == 1,
+            onTap: () => onSelect(1),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedTabPill extends StatelessWidget {
+  const _FeedTabPill({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int? count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? cs.primary : cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? cs.onPrimary : cs.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (count != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? cs.onPrimary.withValues(alpha: 0.2)
+                        : cs.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      color: selected ? cs.onPrimary : cs.primary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Driver feed uchun buyurtma karta — customer order list dizayni bilan
+/// (sarlavha + status chip, katta narx, A→B manzillar, masofa va vaqt
+/// oralig'i). Driver pozitsiyasi berilgan bo'lsa undan A nuqtagacha
+/// masofa hisoblanib ko'rsatiladi.
+class _DriverFeedOrderCard extends StatelessWidget {
+  const _DriverFeedOrderCard({
+    required this.order,
+    required this.driverLocation,
+    required this.onTap,
+  });
+
+  final DriverOrder order;
+  final LatLng? driverLocation;
+  final VoidCallback onTap;
+
+  double? _distanceToPickupMeters() {
+    final lat = order.pickupLat;
+    final lng = order.pickupLng;
+    if (lat == null || lng == null || driverLocation == null) return null;
+    return Geolocator.distanceBetween(
+      driverLocation!.latitude,
+      driverLocation!.longitude,
+      lat,
+      lng,
+    );
+  }
+
+  String _formatDistanceShort(double meters) {
+    if (meters >= 1000) {
+      return '${(meters / 1000).toStringAsFixed(meters >= 10000 ? 0 : 1)} km';
+    }
+    return '${meters.round()} m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final s = order.status;
+    final distM = _distanceToPickupMeters();
+
+    return Material(
+      color: cs.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: cs.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      order.orderNumber ?? I18n.t('customer.order_number_fallback', {'id': order.id}),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (order.scheduledPickupAt != null) ...[
+                    const SizedBox(width: 6),
+                    _DriverScheduledBadge(scheduledAtIso: order.scheduledPickupAt!),
+                  ],
+                  const SizedBox(width: 8),
+                  _DriverMiniStatusChip(status: s),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${_formatMoney(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')}',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: cs.primary,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              _DriverAbRow(isStart: true, label: 'A', address: order.pickupAddress ?? '—'),
+              const SizedBox(height: 6),
+              _DriverAbRow(isStart: false, label: 'B', address: order.deliveryAddress ?? '—'),
+              const SizedBox(height: 12),
+              Divider(height: 1, color: cs.outlineVariant),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.my_location_rounded, size: 16, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text(
+                    distM != null
+                        ? I18n.t('driver.distance_to_a', {'value': _formatDistanceShort(distM)})
+                        : I18n.t('driver.distance_to_a_unknown'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(Icons.scale_rounded, size: 16, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${order.cargoWeightKg ?? '—'} ${I18n.t('common.kg')}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverAbRow extends StatelessWidget {
+  const _DriverAbRow({
+    required this.isStart,
+    required this.label,
+    required this.address,
+  });
+
+  final bool isStart;
+  final String label;
+  final String address;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = isStart ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 10,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            address,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: cs.onSurface,
+              fontWeight: FontWeight.w600,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DriverMiniStatusChip extends StatelessWidget {
+  const _DriverMiniStatusChip({required this.status});
+
+  final int? status;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    Color bg;
+    Color fg;
+    switch (status) {
+      case 2:
+        bg = const Color(0xFFFBBF24);
+        fg = const Color(0xFF111827);
+        break;
+      case 3:
+      case 4:
+      case 5:
+      case 6:
+      case 7:
+      case 8:
+        bg = cs.primary;
+        fg = cs.onPrimary;
+        break;
+      case 9:
+      case 10:
+        bg = const Color(0xFF10B981);
+        fg = Colors.white;
+        break;
+      case 11:
+      case 12:
+        bg = cs.errorContainer;
+        fg = cs.onErrorContainer;
+        break;
+      default:
+        bg = cs.surfaceContainerHigh;
+        fg = cs.onSurface;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        statusLabelDriver(status),
+        style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 11),
+      ),
+    );
+  }
+}
+
+class _DriverScheduledBadge extends StatelessWidget {
+  const _DriverScheduledBadge({required this.scheduledAtIso});
+
+  final String scheduledAtIso;
+
+  String _short(DateTime dt) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(dt.day)}.${two(dt.month)} ${two(dt.hour)}:${two(dt.minute)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dt = DateTime.tryParse(scheduledAtIso)?.toLocal();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event_rounded, size: 12, color: cs.onPrimaryContainer),
+          const SizedBox(width: 4),
+          Text(
+            dt != null ? _short(dt) : I18n.t('customer.scheduled_badge_short'),
+            style: TextStyle(
+              color: cs.onPrimaryContainer,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+            ),
+          ),
+        ],
       ),
     );
   }

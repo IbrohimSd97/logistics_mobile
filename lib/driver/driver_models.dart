@@ -237,11 +237,14 @@ class DriverOrder {
     this.completedAt,
     this.cancelledAt,
     this.cancelReason,
+    this.cancelReasonId,
+    this.cancelReasonInfo,
     this.projectCommissionPct,
     this.companyCommissionPct,
     this.projectCommissionAmount,
     this.companyCommissionAmount,
     this.driverIncomeAmount,
+    this.scheduledPickupAt,
   });
 
   final int id;
@@ -277,11 +280,17 @@ class DriverOrder {
   final String? completedAt;
   final String? cancelledAt;
   final String? cancelReason;
+  /// `cancel_reasons.id` (yangi flow). Eski yozuvlarda NULL.
+  final int? cancelReasonId;
+  /// Eager-loaded sabab nomi (uz/ru + is_other).
+  final DriverOrderCancelReasonInfo? cancelReasonInfo;
   final String? projectCommissionPct;
   final String? companyCommissionPct;
   final String? projectCommissionAmount;
   final String? companyCommissionAmount;
   final String? driverIncomeAmount;
+  /// Rejali buyurtma — kelajakdagi olib ketish vaqti. NULL bo'lsa zudlik bilan.
+  final String? scheduledPickupAt;
 
   static double? _double(Object? v) {
     if (v == null) return null;
@@ -326,11 +335,46 @@ class DriverOrder {
       completedAt: m['completed_at']?.toString(),
       cancelledAt: m['cancelled_at']?.toString(),
       cancelReason: m['cancel_reason']?.toString(),
+      cancelReasonId: _int(m['cancel_reason_id']),
+      cancelReasonInfo: DriverOrderCancelReasonInfo.fromMap(m['cancel_reason_info'] as Map<String, dynamic>?),
       projectCommissionPct: m['project_commission_pct']?.toString(),
       companyCommissionPct: m['company_commission_pct']?.toString(),
       projectCommissionAmount: m['project_commission_amount']?.toString(),
       companyCommissionAmount: m['company_commission_amount']?.toString(),
       driverIncomeAmount: m['driver_income_amount']?.toString(),
+      scheduledPickupAt: m['scheduled_pickup_at']?.toString(),
+    );
+  }
+}
+
+/// Order detail javobidagi `cancel_reason_info` nested object (eager-loaded
+/// catalog row). Client joriy localega ko'ra `name_uz`/`name_ru` dan birini
+/// ko'rsatadi; `isOther=true` bo'lsa custom matn izoh sifatida qo'shiladi.
+class DriverOrderCancelReasonInfo {
+  const DriverOrderCancelReasonInfo({
+    required this.id,
+    required this.code,
+    required this.nameUz,
+    required this.nameRu,
+    required this.isOther,
+  });
+
+  final int id;
+  final String code;
+  final String nameUz;
+  final String nameRu;
+  final bool isOther;
+
+  static DriverOrderCancelReasonInfo? fromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
+    final id = _int(m['id']);
+    if (id == null) return null;
+    return DriverOrderCancelReasonInfo(
+      id: id,
+      code: m['code']?.toString() ?? '',
+      nameUz: m['name_uz']?.toString() ?? '',
+      nameRu: m['name_ru']?.toString() ?? '',
+      isOther: m['is_other'] == true,
     );
   }
 }
@@ -350,18 +394,118 @@ class DriverWalletSnapshot {
   }
 }
 
-class DriverWalletTx {
-  const DriverWalletTx({this.title, this.amount, this.createdAt});
+/// Driver'ning hozirgi online holati va saqlangan cargo turlari snapshot'i.
+/// `GET /api/driver/me/status` orqali olinadi.
+class DriverStatusSnapshot {
+  const DriverStatusSnapshot({
+    required this.isOnline,
+    required this.cargoTypeIds,
+    this.wentOnlineAt,
+  });
 
+  final bool isOnline;
+  final List<int> cargoTypeIds;
+  final String? wentOnlineAt;
+
+  static DriverStatusSnapshot fromMap(Map<String, dynamic> m) {
+    final rawIds = m['cargo_type_ids'];
+    final ids = <int>[];
+    if (rawIds is List) {
+      for (final e in rawIds) {
+        final v = _int(e);
+        if (v != null) ids.add(v);
+      }
+    }
+    return DriverStatusSnapshot(
+      isOnline: m['is_online'] == true,
+      cargoTypeIds: ids,
+      wentOnlineAt: m['went_online_at']?.toString(),
+    );
+  }
+}
+
+/// Driver fleet (avtopark) ma'lumotini olib keladi.
+/// `GET /api/driver/wallet/fleet-info`.
+class DriverFleetInfo {
+  const DriverFleetInfo({
+    required this.isFleet,
+    required this.personalBalance,
+    required this.personalCurrency,
+    this.avtoparkId,
+    this.avtoparkName,
+    this.avtoparkCommissionPct,
+    this.avtoparkBalance,
+    this.avtoparkCurrency,
+    this.myTotalToAvtopark,
+    this.recentMyEarnings = const [],
+  });
+
+  final bool isFleet;
+  final String personalBalance;
+  final String personalCurrency;
+  final int? avtoparkId;
+  final String? avtoparkName;
+  final String? avtoparkCommissionPct;
+  final String? avtoparkBalance;
+  final String? avtoparkCurrency;
+  final String? myTotalToAvtopark;
+  final List<DriverWalletTx> recentMyEarnings;
+
+  static DriverFleetInfo? fromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
+    final personal = m['personal_wallet'] as Map<String, dynamic>?;
+    final avtopark = m['avtopark'] as Map<String, dynamic>?;
+    final avWallet = m['avtopark_wallet'] as Map<String, dynamic>?;
+    final earnings = (m['recent_my_earnings'] as List?) ?? const [];
+    return DriverFleetInfo(
+      isFleet: m['is_fleet'] == true,
+      personalBalance: personal?['balance']?.toString() ?? '0',
+      personalCurrency: personal?['currency']?.toString() ?? 'UZS',
+      avtoparkId: _int(avtopark?['id']),
+      avtoparkName: avtopark?['name']?.toString(),
+      avtoparkCommissionPct: avtopark?['commission_pct']?.toString(),
+      avtoparkBalance: avWallet?['balance']?.toString(),
+      avtoparkCurrency: avWallet?['currency']?.toString(),
+      myTotalToAvtopark: m['my_total_to_avtopark']?.toString(),
+      recentMyEarnings: earnings
+          .whereType<Map<String, dynamic>>()
+          .map(DriverWalletTx.fromMap)
+          .toList(),
+    );
+  }
+}
+
+class DriverWalletTx {
+  const DriverWalletTx({
+    this.title,
+    this.amount,
+    this.createdAt,
+    this.transactionType,
+    this.orderId,
+  });
+
+  /// Raw description (backend tilida saqlangan) — fallback faqat.
   final String? title;
   final String? amount;
   final String? createdAt;
+  /// 1=Topup, 2=OrderPayment, 3=OrderSettlement, 4=Compensation, 5=Refund.
+  final int? transactionType;
+  final int? orderId;
+
+  static int? _intOf(Object? v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
+  }
 
   static DriverWalletTx fromMap(Map<String, dynamic> m) {
     return DriverWalletTx(
       title: m['type']?.toString() ?? m['description']?.toString() ?? m['note']?.toString(),
       amount: m['amount']?.toString(),
       createdAt: m['created_at']?.toString(),
+      transactionType: _intOf(m['transaction_type']),
+      orderId: _intOf(m['order_id']),
     );
   }
 }

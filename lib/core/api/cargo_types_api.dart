@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'api_exception.dart';
 import 'http_response_codec.dart';
 import '../config/api_config.dart';
+import '../i18n/i18n.dart';
 
 class CargoType {
   const CargoType({
@@ -67,7 +68,10 @@ class CargoTypesApi {
   /// GET /api/cargo-types — autentifikatsiyasiz.
   Future<List<CargoType>> list() async {
     final url = Uri.parse('${ApiConfig.baseUrl}/api/cargo-types');
-    final res = await http.get(url, headers: const {'Accept': 'application/json'});
+    final res = await http.get(url, headers: {
+      'Accept': 'application/json',
+      'Accept-Language': I18n.instance.code,
+    });
     final map = decodeJsonEnvelopeOrThrow(res);
     final raw = map['data'];
     if (raw is! List) return const [];

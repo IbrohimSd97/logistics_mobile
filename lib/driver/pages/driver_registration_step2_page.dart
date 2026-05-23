@@ -6,7 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/widgets/gradient_button.dart';
+import '../../core/widgets/offerta_link.dart';
 import '../driver_api.dart';
 import '../driver_models.dart';
 import 'driver_registration_step3_page.dart';
@@ -25,7 +27,8 @@ class DriverRegistrationStep2Page extends StatefulWidget {
   State<DriverRegistrationStep2Page> createState() => _DriverRegistrationStep2PageState();
 }
 
-class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Page> {
+class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Page>
+    with I18nObserverMixin<DriverRegistrationStep2Page> {
   final _formKey = GlobalKey<FormState>();
   final _vehicleName = TextEditingController();
   final _plate = TextEditingController();
@@ -92,7 +95,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       if (!mounted) return;
       setState(() {
         _loadingTariffs = false;
-        _tariffsError = 'Tarmoq xatosi: $e';
+        _tariffsError = I18n.t('driver.reg.network_error_label', {'msg': '$e'});
       });
     }
   }
@@ -104,7 +107,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       initialDate: _regIssuedDate ?? DateTime(now.year - 3, 1, 1),
       firstDate: DateTime(now.year - 50),
       lastDate: DateTime(now.year, now.month, now.day),
-      helpText: 'Tex. passport berilgan sana',
+      helpText: I18n.t('driver.reg.helper_techpassport_issued'),
     );
     if (!mounted || picked == null) return;
     setState(() => _regIssuedDate = picked);
@@ -122,12 +125,12 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Kamera'),
+              title: Text(I18n.t('driver.reg.camera')),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Galereya'),
+              title: Text(I18n.t('driver.reg.gallery')),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
           ],
@@ -146,19 +149,19 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_tariff == null) {
-      _toast('Tarif tanlang.');
+      _toast(I18n.t('driver.reg.select_tariff'));
       return;
     }
     if (_regFront == null || _regBack == null || _vFront == null || _vSide == null || _vBack == null) {
-      _toast('5 ta majburiy rasmni yuklang.');
+      _toast(I18n.t('driver.reg.upload_5_required'));
       return;
     }
     if (_hasTrailer && (_tFront == null || _tBack == null || _trailerPlate.text.trim().isEmpty)) {
-      _toast('Pritsep ma‘lumotlari to‘liq emas.');
+      _toast(I18n.t('driver.reg.trailer_incomplete'));
       return;
     }
     if (!_offerta) {
-      _toast('Offertani qabul qiling.');
+      _toast(I18n.t('driver.reg.accept_offerta'));
       return;
     }
     setState(() => _submitting = true);
@@ -202,7 +205,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      _toast('Tarmoq xatosi: $e');
+      _toast(I18n.t('driver.reg.network_error_label', {'msg': '$e'}));
     }
   }
 
@@ -210,7 +213,21 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Step 2 — Mashina ma‘lumotlari'),
+        title: Text(I18n.t('driver.reg.step2_appbar')),
+        actions: [
+          IconButton(
+            tooltip: I18n.t('common.refresh'),
+            icon: _loadingTariffs
+                ? const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+            // Tariflar ro'yxatini qaytadan tortib olamiz (tanlangan tarif saqlanadi
+            // agar yangi ro'yxatda ham mavjud bo'lsa). Form maydonlari tegmaydi.
+            onPressed: (_submitting || _loadingTariffs) ? null : _loadTariffs,
+          ),
+        ],
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(4),
           child: LinearProgressIndicator(value: 2 / 3),
@@ -234,14 +251,14 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                         color: Theme.of(context).colorScheme.onErrorContainer),
                     title: Text(_tariffsError!,
                         style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer)),
-                    trailing: FilledButton.tonal(onPressed: _loadTariffs, child: const Text('Retry')),
+                    trailing: FilledButton.tonal(onPressed: _loadTariffs, child: Text(I18n.t('common.retry_short'))),
                   ),
                 )
               else
                 DropdownMenu<DriverTariffItem>(
                   initialSelection: _tariff,
                   expandedInsets: EdgeInsets.zero,
-                  label: const Text('Tarif *'),
+                  label: Text(I18n.t('driver.reg.tariff_required')),
                   dropdownMenuEntries: _tariffs
                       .map((t) => DropdownMenuEntry(value: t, label: t.name))
                       .toList(),
@@ -250,19 +267,19 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
               const SizedBox(height: 12),
               TextFormField(
                 controller: _vehicleName,
-                decoration: const InputDecoration(labelText: 'Mashina rusumi *', hintText: 'Isuzu NQR'),
-                validator: (v) => (v ?? '').trim().isEmpty ? 'Kerak' : null,
+                decoration: InputDecoration(labelText: I18n.t('driver.reg.vehicle_name_required'), hintText: I18n.t('driver.reg.vehicle_name_hint')),
+                validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
               ),
               TextFormField(
                 controller: _plate,
                 textCapitalization: TextCapitalization.characters,
                 inputFormatters: [LengthLimitingTextInputFormatter(20)],
-                decoration: const InputDecoration(labelText: 'Davlat raqami *', hintText: '01A123BC'),
-                validator: (v) => (v ?? '').trim().isEmpty ? 'Kerak' : null,
+                decoration: InputDecoration(labelText: I18n.t('driver.reg.plate_required'), hintText: I18n.t('driver.reg.plate_hint')),
+                validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
               ),
               TextFormField(
                 controller: _color,
-                decoration: const InputDecoration(labelText: 'Rangi'),
+                decoration: InputDecoration(labelText: I18n.t('driver.reg.color_label')),
               ),
               TextFormField(
                 controller: _capacityKg,
@@ -271,19 +288,19 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                   LengthLimitingTextInputFormatter(8),
                 ],
-                decoration: const InputDecoration(
-                  labelText: 'Yuk ko‘tarish sig‘imi (kg) *',
-                  hintText: '3000',
+                decoration: InputDecoration(
+                  labelText: I18n.t('driver.reg.capacity_kg_required'),
+                  hintText: I18n.t('driver.reg.capacity_hint'),
                 ),
                 validator: (v) {
                   final s = (v ?? '').trim();
                   final n = double.tryParse(s);
-                  if (n == null || n <= 0) return 'Musbat son kiriting';
+                  if (n == null || n <= 0) return I18n.t('driver.reg.capacity_positive_required');
                   return null;
                 },
               ),
               const SizedBox(height: 16),
-              Text('Tex. passport',
+              Text(I18n.t('driver.reg.techpassport_section'),
                   style: Theme.of(context).textTheme.titleSmall),
               Row(
                 children: [
@@ -291,8 +308,8 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                     child: TextFormField(
                       controller: _regSeries,
                       textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(labelText: 'Seriya *', hintText: 'AAA'),
-                      validator: (v) => (v ?? '').trim().isEmpty ? 'Kerak' : null,
+                      decoration: InputDecoration(labelText: I18n.t('driver.reg.series_required'), hintText: I18n.t('driver.reg.techpassport_series_hint')),
+                      validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -302,8 +319,8 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                       controller: _regNumber,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: const InputDecoration(labelText: 'Raqam *', hintText: '0000000'),
-                      validator: (v) => (v ?? '').trim().isEmpty ? 'Kerak' : null,
+                      decoration: InputDecoration(labelText: I18n.t('driver.reg.number_required'), hintText: I18n.t('driver.reg.number_hint')),
+                      validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
                     ),
                   ),
                 ],
@@ -312,54 +329,54 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
               InkWell(
                 onTap: _pickIssued,
                 child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Tex. passport berilgan sana',
-                    suffixIcon: Icon(Icons.calendar_today_rounded),
+                  decoration: InputDecoration(
+                    labelText: I18n.t('driver.reg.techpassport_issued_label'),
+                    suffixIcon: const Icon(Icons.calendar_today_rounded),
                   ),
-                  child: Text(_regIssuedDate == null ? 'Tanlanmagan' : _fmtDate(_regIssuedDate!)),
+                  child: Text(_regIssuedDate == null ? I18n.t('driver.reg.not_picked') : _fmtDate(_regIssuedDate!)),
                 ),
               ),
               const SizedBox(height: 8),
               CheckboxListTile(
                 value: _hasTrailer,
                 onChanged: (v) => setState(() => _hasTrailer = v ?? false),
-                title: const Text('Pritsep bor'),
+                title: Text(I18n.t('driver.reg.has_trailer')),
                 contentPadding: EdgeInsets.zero,
               ),
               if (_hasTrailer) ...[
                 TextFormField(
                   controller: _trailerPlate,
                   textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(labelText: 'Pritsep davlat raqami *'),
+                  decoration: InputDecoration(labelText: I18n.t('driver.reg.trailer_plate_required')),
                 ),
-                _imgRow('Pritsep tex. passport — old *', _tFront, () async {
+                _imgRow(I18n.t('driver.reg.img_trailer_front'), _tFront, () async {
                   final f = await _pick();
                   if (f != null) setState(() => _tFront = f);
                 }),
-                _imgRow('Pritsep tex. passport — orqa *', _tBack, () async {
+                _imgRow(I18n.t('driver.reg.img_trailer_back'), _tBack, () async {
                   final f = await _pick();
                   if (f != null) setState(() => _tBack = f);
                 }),
               ],
               const SizedBox(height: 16),
-              Text('Rasmlar', style: Theme.of(context).textTheme.titleSmall),
-              _imgRow('Tex. passport — old *', _regFront, () async {
+              Text(I18n.t('driver.reg.images_section'), style: Theme.of(context).textTheme.titleSmall),
+              _imgRow(I18n.t('driver.reg.img_techpass_front'), _regFront, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _regFront = f);
               }),
-              _imgRow('Tex. passport — orqa *', _regBack, () async {
+              _imgRow(I18n.t('driver.reg.img_techpass_back'), _regBack, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _regBack = f);
               }),
-              _imgRow('Mashina — old *', _vFront, () async {
+              _imgRow(I18n.t('driver.reg.img_vehicle_front'), _vFront, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _vFront = f);
               }),
-              _imgRow('Mashina — yon *', _vSide, () async {
+              _imgRow(I18n.t('driver.reg.img_vehicle_side'), _vSide, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _vSide = f);
               }),
-              _imgRow('Mashina — orqa *', _vBack, () async {
+              _imgRow(I18n.t('driver.reg.img_vehicle_back'), _vBack, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _vBack = f);
               }),
@@ -368,11 +385,13 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                 value: _offerta,
                 onChanged: (v) => setState(() => _offerta = v ?? false),
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Loyiha offertasini o‘qidim va qabul qilaman *'),
+                title: OffertaCheckboxTitle(
+                  text: I18n.t('driver.reg.project_offerta_text'),
+                ),
               ),
               const SizedBox(height: 16),
               GradientButton(
-                label: 'Keyingi: Egalik va yuridik holat',
+                label: I18n.t('driver.reg.next_ownership_btn'),
                 icon: Icons.arrow_forward_rounded,
                 loading: _submitting,
                 onPressed: (_submitting || !_offerta) ? null : _submit,
@@ -411,7 +430,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       contentPadding: EdgeInsets.zero,
       leading: thumb,
       title: Text(label),
-      subtitle: Text(f?.name ?? 'Tanlanmagan',
+      subtitle: Text(f?.name ?? I18n.t('driver.reg.not_picked'),
           maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: IconButton(icon: const Icon(Icons.photo_camera_outlined), onPressed: onPick),
     );

@@ -6,6 +6,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+import '../i18n/i18n.dart';
 import '../theme/app_palette.dart';
 import 'gradient_button.dart';
 
@@ -41,6 +42,13 @@ class LocationPickerResult {
 
 class _LocationPickerPageState extends State<LocationPickerPage> {
   static const _toshkent = LatLng(41.311081, 69.240562);
+
+  /// O'zbekiston chegarasi (taxminiy bounding box). Xarita ham, manzil qidiruvi
+  /// ham faqat shu hududga cheklangan.
+  static final _uzbekistanBounds = LatLngBounds(
+    const LatLng(37.0, 55.9), // janubi-g'arbiy burchak
+    const LatLng(45.7, 73.2), // shimoli-sharqiy burchak
+  );
 
   final _mapCtrl = MapController();
   final _searchCtrl = TextEditingController();
@@ -114,8 +122,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     }
     setState(() => _searching = true);
     try {
+      // `countrycodes=uz` — qidiruv natijalari faqat O'zbekiston ichidan.
       final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeQueryComponent(q)}&format=json&limit=6&accept-language=uz,ru,en',
+        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeQueryComponent(q)}'
+        '&format=json&limit=6&accept-language=uz,ru,en'
+        '&countrycodes=uz',
       );
       final res = await http.get(url, headers: {'User-Agent': _userAgent});
       if (!mounted) return;
@@ -156,6 +167,20 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   void _confirm() {
+    // Reverse-geocode hali tugamagan bo'lsa rad qilamiz —
+    // shunda buyurtmaga koordinata emas, haqiqiy manzil yoziladi.
+    if (_resolving) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Manzil aniqlanmoqda, biroz kuting...')),
+      );
+      return;
+    }
+    if (_address.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Manzil aniqlanmadi. Kartani biroz suring va qayta urinib ko\'ring.')),
+      );
+      return;
+    }
     Navigator.of(context).pop(
       LocationPickerResult(latLng: _center, address: _address),
     );
@@ -167,7 +192,23 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          IconButton(
+            tooltip: I18n.t('common.refresh'),
+            icon: const Icon(Icons.refresh_rounded),
+            // Map'ni boshlang'ich markazga qaytaradi va qidiruvni tozalaydi.
+            onPressed: () {
+              _searchCtrl.clear();
+              final reset = widget.initialLatLng ?? _toshkent;
+              _center = reset;
+              setState(() => _address = widget.initialAddress ?? '');
+              _mapCtrl.move(reset, 13);
+            },
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           FlutterMap(
@@ -175,8 +216,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             options: MapOptions(
               initialCenter: _center,
               initialZoom: 13,
-              minZoom: 4,
+              minZoom: 5,
               maxZoom: 18,
+              // Xarita faqat O'zbekiston hududida — tashqariga surib/uzoqlashtirib bo'lmaydi.
+              cameraConstraint: CameraConstraint.contain(bounds: _uzbekistanBounds),
               onPositionChanged: (camera, hasGesture) {
                 if (!hasGesture) return;
                 _center = camera.center;

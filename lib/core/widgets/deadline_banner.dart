@@ -44,6 +44,13 @@ class DeadlineBanner extends StatelessWidget {
     final isLate = reference.isAfter(deadline);
     final diff = isLate ? reference.difference(deadline) : deadline.difference(reference);
 
+    // SLA tier'iga yaxlitlash: agar SLA snapshot mavjud bo'lsa, qolgan
+    // soatni keyingi SLA qadamigacha yumalaqlaymiz. Misol: SLA=24, qoldi=22h
+    // → "24 soat"; qoldi=30h → "48 soat"; qoldi=50h → "72 soat".
+    final int? roundedHours = !isLate && slaHours != null && slaHours! > 0
+        ? _ceilToTier(diff, slaHours!)
+        : null;
+
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
@@ -105,7 +112,9 @@ class DeadlineBanner extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      _fmtDuration(diff, isLate: isLate),
+                      roundedHours != null
+                          ? '$roundedHours soat'
+                          : _fmtDuration(diff, isLate: isLate),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: fg,
@@ -124,6 +133,17 @@ class DeadlineBanner extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Qolgan vaqtni SLA qadamiga (masalan, 24 soatga) yumalaqlaymiz.
+  /// Misol: sla=24, d=22h → 24; d=24h00m → 24; d=24h01m → 48; d=49h → 72.
+  int _ceilToTier(Duration d, int sla) {
+    // Soniyalardan SLA qadamiga ceiling ko'tarish (har qanday qoldiq → keyingi tier)
+    final totalSecs = d.inSeconds;
+    final tierSecs = sla * 3600;
+    if (totalSecs <= 0) return sla;
+    final tiers = (totalSecs + tierSecs - 1) ~/ tierSecs;
+    return tiers * sla;
   }
 
   String _fmtDuration(Duration d, {required bool isLate}) {

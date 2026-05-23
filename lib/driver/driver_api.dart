@@ -7,8 +7,10 @@ import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/api/api_exception.dart';
+import '../core/api/cancel_reasons_api.dart';
 import '../core/api/http_response_codec.dart';
 import '../core/config/api_config.dart';
+import '../core/i18n/i18n.dart';
 import '../core/session/session_store.dart';
 import 'driver_models.dart';
 
@@ -37,11 +39,13 @@ class DriverApi {
   Map<String, String> _jsonAuth(String token) => {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
+        'Accept-Language': I18n.instance.code,
         'Authorization': 'Bearer $token',
       };
 
   Map<String, String> _multiAuth(String token) => {
         'Accept': 'application/json',
+        'Accept-Language': I18n.instance.code,
         'Authorization': 'Bearer $token',
       };
 
@@ -81,7 +85,10 @@ class DriverApi {
   /// GET /api/driver/avtoparks/lists (no auth required by routes)
   Future<List<AvtoparkItem>> avtoparksList() async {
     final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/avtoparks/lists');
-    final res = await http.get(url, headers: const {'Accept': 'application/json'});
+    final res = await http.get(url, headers: {
+      'Accept': 'application/json',
+      'Accept-Language': I18n.instance.code,
+    });
     final map = _decode(res);
     final list = mapListFrom(map['data']);
     return list.map(AvtoparkItem.fromMap).whereType<AvtoparkItem>().toList();
@@ -90,7 +97,10 @@ class DriverApi {
   /// GET /api/driver/tariff/lists (no auth required by routes)
   Future<List<DriverTariffItem>> tariffsList() async {
     final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/tariff/lists');
-    final res = await http.get(url, headers: const {'Accept': 'application/json'});
+    final res = await http.get(url, headers: {
+      'Accept': 'application/json',
+      'Accept-Language': I18n.instance.code,
+    });
     final map = _decode(res);
     final list = mapListFrom(map['data']);
     return list.map(DriverTariffItem.fromMap).whereType<DriverTariffItem>().toList();
@@ -271,6 +281,21 @@ class DriverApi {
     _decode(res);
   }
 
+  /// GET /api/driver/me/status — driver online holati va saqlangan cargo turlari.
+  /// Mobile state'ni server bilan sinxronlash uchun (masalan, buyurtma
+  /// yakunlangandan keyin backend driverni avtomat online qilgan bo'ladi).
+  Future<DriverStatusSnapshot> driverStatus() async {
+    final token = await _requireRefresh();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/me/status');
+    final res = await http.get(url, headers: _jsonAuth(token));
+    final map = _decode(res);
+    final data = map['data'];
+    if (data is! Map<String, dynamic>) {
+      return const DriverStatusSnapshot(isOnline: false, cargoTypeIds: []);
+    }
+    return DriverStatusSnapshot.fromMap(data);
+  }
+
   // ────────────────────────────── location ──────────────────────────────
 
   /// POST /api/driver/current-location (auth.refresh)
@@ -296,6 +321,18 @@ class DriverApi {
     return DriverWalletSnapshot.fromMap(map['data']) ?? const DriverWalletSnapshot();
   }
 
+  /// GET /api/driver/wallet/fleet-info — agar driver avtoparkka biriktirilgan
+  /// bo'lsa avtopark hamyon balansi va shu driver tushgan tushumlar tarixi.
+  Future<DriverFleetInfo?> fleetInfo() async {
+    final token = await _requireRefresh();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/wallet/fleet-info');
+    final res = await http.get(url, headers: _jsonAuth(token));
+    final map = _decode(res);
+    final data = map['data'];
+    if (data is! Map<String, dynamic>) return null;
+    return DriverFleetInfo.fromMap(data);
+  }
+
   /// GET /api/driver/wallet/transactions
   Future<List<DriverWalletTx>> walletTransactions() async {
     final token = await _requireRefresh();
@@ -312,6 +349,18 @@ class DriverApi {
   Future<List<DriverOrder>> activeOrders() async {
     final token = await _requireRefresh();
     final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/orders/active-list');
+    final res = await http.get(url, headers: _jsonAuth(token));
+    final map = _decode(res);
+    final list = mapListFrom(map['data']);
+    return list.map(DriverOrder.fromMap).whereType<DriverOrder>().toList();
+  }
+
+  /// GET /api/driver/orders/scheduled-list — rejali buyurtmalar (radius'siz).
+  /// Faqat kelajakdagi olib ketish vaqti bo'lgan va driver cargo preferences'iga
+  /// mos orderlarni qaytaradi, eng yaqin vaqtli birinchi.
+  Future<List<DriverOrder>> scheduledOrders() async {
+    final token = await _requireRefresh();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/orders/scheduled-list');
     final res = await http.get(url, headers: _jsonAuth(token));
     final map = _decode(res);
     final list = mapListFrom(map['data']);
@@ -379,18 +428,36 @@ class DriverApi {
   Future<void> delivered(int orderId) => _statusEndpoint('delivered', orderId);
 
   /// POST /api/driver/orders/cancel
-  Future<void> cancelOrder({required int orderId, String? reason}) async {
+  ///
+  /// `cancelReasonId` — `cancel_reasons` jadvalidan tanlangan ID (majburiy).
+  /// `customText` — "Boshqa" tanlanganda (`is_other=true`) majburiy izoh,
+  /// boshqa sabablar uchun e'tiborga olinmaydi.
+  Future<void> cancelOrder({required int orderId, required int cancelReasonId, String? customText}) async {
     final token = await _requireRefresh();
     final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/orders/cancel');
+    final body = <String, dynamic>{
+      'order_id': orderId,
+      'cancel_reason_id': cancelReasonId,
+    };
+    if (customText != null && customText.trim().isNotEmpty) {
+      body['cancel_reason'] = customText.trim();
+    }
     final res = await http.post(
       url,
       headers: _jsonAuth(token),
-      body: jsonEncode({
-        'order_id': orderId,
-        if (reason != null && reason.isNotEmpty) 'cancel_reason': reason,
-      }),
+      body: jsonEncode(body),
     );
     _decode(res);
+  }
+
+  /// GET /api/driver/cancel-reasons — cancel dialogi catalog (cache'lanadi).
+  List<CancelReason>? _cancelReasonsCache;
+  Future<List<CancelReason>> cancelReasons({bool reload = false}) async {
+    if (!reload && _cancelReasonsCache != null) return _cancelReasonsCache!;
+    final api = CancelReasonsApi.driver(tokenFn: _requireRefresh);
+    final list = await api.list();
+    _cancelReasonsCache = list;
+    return list;
   }
 
   /// GET /api/driver/orders/{orderId}/documents

@@ -6,8 +6,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/auth_api.dart';
+import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../core/widgets/gradient_button.dart';
+import '../../core/widgets/offerta_link.dart';
 import '../driver_api.dart';
 import '../driver_models.dart';
 
@@ -25,7 +27,8 @@ class DriverRegistrationStep3Page extends StatefulWidget {
   State<DriverRegistrationStep3Page> createState() => _DriverRegistrationStep3PageState();
 }
 
-class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Page> {
+class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Page>
+    with I18nObserverMixin<DriverRegistrationStep3Page> {
   /// 1=O'zimniki, 2=Boshqa hujjat asosida
   int _ownership = 1;
   XFile? _ownershipFile;
@@ -72,7 +75,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
       if (!mounted) return;
       setState(() {
         _loadingAvtoparks = false;
-        _avtoparksError = 'Tarmoq xatosi: $e';
+        _avtoparksError = I18n.t('driver.reg.network_error_label', {'msg': '$e'});
       });
     }
   }
@@ -90,12 +93,12 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           ListTile(
             leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('Kamera'),
+            title: Text(I18n.t('driver.reg.camera')),
             onTap: () => Navigator.pop(ctx, ImageSource.camera),
           ),
           ListTile(
             leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Galereya'),
+            title: Text(I18n.t('driver.reg.gallery')),
             onTap: () => Navigator.pop(ctx, ImageSource.gallery),
           ),
         ]),
@@ -109,21 +112,21 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   /// Step3 backend `mimes:pdf` kutadi. Hozirgi UX: foydalanuvchiga "PDF rasm sifatida yuklash"ni so'raymiz —
   /// haqiqiy PDF picker keyingi versiyada (file_picker package).
   Future<XFile?> _pickPdfPlaceholder() async {
-    _toast('PDF tanlash hozircha qo‘llab-quvvatlanmaydi. Galereyadan rasm tanlang yoki bu maydonni keyin yangilang.');
+    _toast(I18n.t('driver.reg.pdf_not_supported_yet'));
     return _pickImage();
   }
 
   Future<void> _submit() async {
     if (_ownership == 2 && _ownershipFile == null) {
-      _toast('Egalik hujjatini yuklang.');
+      _toast(I18n.t('driver.reg.upload_ownership_doc'));
       return;
     }
     if ((_legalType == 1 || _legalType == 2) && _legalPdf == null) {
-      _toast('Yuridik hujjat (PDF) ni yuklang.');
+      _toast(I18n.t('driver.reg.upload_legal_pdf'));
       return;
     }
     if (_avtopark != null && !_companyOfferta) {
-      _toast('Avtopark offertasini qabul qiling.');
+      _toast(I18n.t('driver.reg.accept_avtopark_offerta'));
       return;
     }
 
@@ -142,7 +145,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
       // Step3 yangi temp_token qaytaradi → exchange-token → refresh_token → session saqlash
       final newTemp = r.tempToken;
       if (newTemp == null || newTemp.isEmpty) {
-        _toast('Server yangi token qaytarmadi.');
+        _toast(I18n.t('driver.reg.server_no_token'));
         setState(() => _submitting = false);
         return;
       }
@@ -170,7 +173,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      _toast('Tarmoq xatosi: $e');
+      _toast(I18n.t('driver.reg.network_error_label', {'msg': '$e'}));
     }
   }
 
@@ -178,7 +181,19 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Step 3 — Egalik va yuridik holat'),
+        title: Text(I18n.t('driver.reg.step3_appbar')),
+        actions: [
+          IconButton(
+            tooltip: I18n.t('common.refresh'),
+            icon: _loadingAvtoparks
+                ? const SizedBox(
+                    width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+            onPressed: (_submitting || _loadingAvtoparks) ? null : _loadAvtoparks,
+          ),
+        ],
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(4),
           child: LinearProgressIndicator(value: 3 / 3),
@@ -189,63 +204,63 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('Mashina egaligi *',
+            Text(I18n.t('driver.reg.ownership_title'),
                 style: Theme.of(context).textTheme.titleSmall),
             RadioListTile<int>(
               value: 1,
               groupValue: _ownership,
-              title: const Text('O‘zimniki'),
-              subtitle: const Text('Hujjat talab qilinmaydi'),
+              title: Text(I18n.t('driver.reg.ownership_own')),
+              subtitle: Text(I18n.t('driver.reg.ownership_own_subtitle')),
               onChanged: (v) => setState(() => _ownership = v ?? 1),
               contentPadding: EdgeInsets.zero,
             ),
             RadioListTile<int>(
               value: 2,
               groupValue: _ownership,
-              title: const Text('Boshqa hujjat asosida'),
-              subtitle: const Text('Dovernost yoki ijara shartnomasi'),
+              title: Text(I18n.t('driver.reg.ownership_other')),
+              subtitle: Text(I18n.t('driver.reg.ownership_other_subtitle')),
               onChanged: (v) => setState(() => _ownership = v ?? 1),
               contentPadding: EdgeInsets.zero,
             ),
             if (_ownership == 2)
-              _fileRow('Egalik hujjati *', _ownershipFile, () async {
+              _fileRow(I18n.t('driver.reg.ownership_doc'), _ownershipFile, () async {
                 final f = await _pickImage();
                 if (f != null) setState(() => _ownershipFile = f);
               }),
             const Divider(height: 32),
-            Text('Yuridik holat *',
+            Text(I18n.t('driver.reg.legal_title'),
                 style: Theme.of(context).textTheme.titleSmall),
             RadioListTile<int>(
               value: 1,
               groupValue: _legalType,
-              title: const Text('YATT'),
-              subtitle: const Text('Guvohnoma PDF talab qilinadi'),
+              title: Text(I18n.t('driver.reg.legal_yatt')),
+              subtitle: Text(I18n.t('driver.reg.legal_yatt_subtitle')),
               onChanged: (v) => setState(() => _legalType = v ?? 3),
               contentPadding: EdgeInsets.zero,
             ),
             RadioListTile<int>(
               value: 2,
               groupValue: _legalType,
-              title: const Text('O‘z-o‘zini band qilish'),
-              subtitle: const Text('Guvohnoma PDF talab qilinadi'),
+              title: Text(I18n.t('driver.reg.legal_self_employed')),
+              subtitle: Text(I18n.t('driver.reg.legal_self_employed_subtitle')),
               onChanged: (v) => setState(() => _legalType = v ?? 3),
               contentPadding: EdgeInsets.zero,
             ),
             RadioListTile<int>(
               value: 3,
               groupValue: _legalType,
-              title: const Text('Jismoniy shaxs'),
-              subtitle: const Text('Hujjat talab qilinmaydi'),
+              title: Text(I18n.t('driver.reg.legal_individual')),
+              subtitle: Text(I18n.t('driver.reg.legal_individual_subtitle')),
               onChanged: (v) => setState(() => _legalType = v ?? 3),
               contentPadding: EdgeInsets.zero,
             ),
             if (_legalType == 1 || _legalType == 2)
-              _fileRow('Guvohnoma (PDF) *', _legalPdf, () async {
+              _fileRow(I18n.t('driver.reg.legal_pdf'), _legalPdf, () async {
                 final f = await _pickPdfPlaceholder();
                 if (f != null) setState(() => _legalPdf = f);
               }),
             const Divider(height: 32),
-            Text('Avtopark tanlash (ixtiyoriy)',
+            Text(I18n.t('driver.reg.avtopark_title'),
                 style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             if (_loadingAvtoparks)
@@ -258,18 +273,18 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
                       color: Theme.of(context).colorScheme.onErrorContainer),
                   title: Text(_avtoparksError!,
                       style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer)),
-                  trailing: FilledButton.tonal(onPressed: _loadAvtoparks, child: const Text('Retry')),
+                  trailing: FilledButton.tonal(onPressed: _loadAvtoparks, child: Text(I18n.t('common.retry_short'))),
                 ),
               )
             else
               DropdownMenu<AvtoparkItem?>(
                 initialSelection: _avtopark,
                 expandedInsets: EdgeInsets.zero,
-                label: const Text('Avtopark'),
+                label: Text(I18n.t('driver.reg.avtopark_label')),
                 dropdownMenuEntries: [
-                  const DropdownMenuEntry<AvtoparkItem?>(
+                  DropdownMenuEntry<AvtoparkItem?>(
                     value: null,
-                    label: 'Avtoparksiz (custom driver)',
+                    label: I18n.t('driver.reg.avtopark_none'),
                   ),
                   ..._avtoparks.map(
                     (a) => DropdownMenuEntry<AvtoparkItem?>(value: a, label: a.name),
@@ -286,12 +301,14 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
                 value: _companyOfferta,
                 onChanged: (v) => setState(() => _companyOfferta = v ?? false),
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Avtopark offertasini qabul qilaman *'),
+                title: OffertaCheckboxTitle(
+                  text: I18n.t('driver.reg.avtopark_offerta'),
+                ),
               ),
             ],
             const SizedBox(height: 24),
             GradientButton(
-              label: 'Tugatish',
+              label: I18n.t('driver.reg.finish_short'),
               icon: Icons.check_rounded,
               loading: _submitting,
               onPressed: _submitting ? null : _submit,
@@ -329,7 +346,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
       contentPadding: EdgeInsets.zero,
       leading: thumb,
       title: Text(label),
-      subtitle: Text(f?.name ?? 'Tanlanmagan',
+      subtitle: Text(f?.name ?? I18n.t('driver.reg.not_picked'),
           maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: IconButton(icon: const Icon(Icons.upload_file_rounded), onPressed: onPick),
     );
