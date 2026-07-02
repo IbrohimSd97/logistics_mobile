@@ -101,6 +101,8 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   }
 
   Future<void> _pickIssued() async {
+    // Sana tanlashdan oldin klaviaturani yopamiz.
+    FocusScope.of(context).unfocus();
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -270,17 +272,21 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.vehicle_name_required'), hintText: I18n.t('driver.reg.vehicle_name_hint')),
                 validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
               ),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _plate,
                 textCapitalization: TextCapitalization.characters,
-                inputFormatters: [LengthLimitingTextInputFormatter(20)],
+                // Davlat raqami maskasi: 01 A 123 BC (2 raqam · 1 harf · 3 raqam · 2 harf).
+                inputFormatters: [_UzPlateFormatter()],
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.plate_required'), hintText: I18n.t('driver.reg.plate_hint')),
                 validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
               ),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _color,
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.color_label')),
               ),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _capacityKg,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -302,12 +308,18 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.techpassport_section'),
                   style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
                       controller: _regSeries,
                       textCapitalization: TextCapitalization.characters,
+                      // Tex passport seriyasi — faqat harf, ko'pi bilan 3 ta.
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp('[A-Za-z]')),
+                        LengthLimitingTextInputFormatter(3),
+                      ],
                       decoration: InputDecoration(labelText: I18n.t('driver.reg.series_required'), hintText: I18n.t('driver.reg.techpassport_series_hint')),
                       validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
                     ),
@@ -318,14 +330,18 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                     child: TextFormField(
                       controller: _regNumber,
                       keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      // Tex passport raqami — faqat raqam, ko'pi bilan 7 ta.
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(7),
+                      ],
                       decoration: InputDecoration(labelText: I18n.t('driver.reg.number_required'), hintText: I18n.t('driver.reg.number_hint')),
                       validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               InkWell(
                 onTap: _pickIssued,
                 child: InputDecorator(
@@ -336,7 +352,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                   child: Text(_regIssuedDate == null ? I18n.t('driver.reg.not_picked') : _fmtDate(_regIssuedDate!)),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               CheckboxListTile(
                 value: _hasTrailer,
                 onChanged: (v) => setState(() => _hasTrailer = v ?? false),
@@ -360,6 +376,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
               ],
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.images_section'), style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 14),
               _imgRow(I18n.t('driver.reg.img_techpass_front'), _regFront, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _regFront = f);
@@ -433,6 +450,33 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       subtitle: Text(f?.name ?? I18n.t('driver.reg.not_picked'),
           maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: IconButton(icon: const Icon(Icons.photo_camera_outlined), onPressed: onPick),
+    );
+  }
+}
+
+class _UzPlateFormatter extends TextInputFormatter {
+  bool _isDigitPos(int i) => i <= 1 || (i >= 3 && i <= 5);
+
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final raw =
+        newValue.text.toUpperCase().replaceAll(RegExp('[^A-Z0-9]'), '');
+    final buf = StringBuffer();
+    for (var i = 0; i < raw.length && buf.length < 8; i++) {
+      final c = raw[i];
+      final isDigit = RegExp('[0-9]').hasMatch(c);
+      final pos = buf.length;
+      if (_isDigitPos(pos)) {
+        if (isDigit) buf.write(c);
+      } else {
+        if (!isDigit) buf.write(c);
+      }
+    }
+    final text = buf.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

@@ -294,9 +294,11 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
             Text(I18n.t('customer.reg.intro'), style: const TextStyle(height: 1.35)),
             const SizedBox(height: 16),
             TextField(controller: _last, decoration: InputDecoration(labelText: I18n.t('customer.reg.last_name_required'))),
+            const SizedBox(height: 14),
             TextField(controller: _first, decoration: InputDecoration(labelText: I18n.t('customer.reg.first_name_required'))),
+            const SizedBox(height: 14),
             TextField(controller: _middle, decoration: InputDecoration(labelText: I18n.t('customer.reg.middle_name_required'))),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             InkWell(
               onTap: _pickBirthDate,
               child: InputDecorator(
@@ -307,13 +309,13 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
                 child: Text(_birthDate == null ? I18n.t('customer.reg.not_picked') : _fmtDate(_birthDate!)),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             TextField(
               controller: _phoneCtrl,
               readOnly: true,
               decoration: InputDecoration(labelText: I18n.t('customer.reg.phone_label')),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             DropdownMenu<int>(
               initialSelection: _docType,
               expandedInsets: EdgeInsets.zero,
@@ -340,7 +342,8 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
               label: I18n.t('customer.reg.submit_btn'),
               icon: Icons.send_rounded,
               loading: _loading,
-              onPressed: _loading ? null : _submit,
+              // Offerta tasdiqlanmaguncha tugma o'chiq — barcha formada bir xil.
+              onPressed: (_loading || !_offerta) ? null : _submit,
             ),
           ],
         ),

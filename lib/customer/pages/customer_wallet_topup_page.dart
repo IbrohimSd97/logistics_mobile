@@ -98,7 +98,7 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
                     return null;
                   },
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 14),
                 TextFormField(
                   controller: _card,
                   keyboardType: TextInputType.number,
@@ -118,7 +118,7 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
                     return null;
                   },
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(

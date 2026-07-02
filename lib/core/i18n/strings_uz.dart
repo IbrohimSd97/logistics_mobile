@@ -14,6 +14,18 @@ const Map<String, String> kStringsUz = {
   'common.ok': 'OK',
   'common.yes': 'Ha',
   'common.no': 'Yo‘q',
+  // ── location (xarita / joriy joylashuv) ──────────────────────────────────
+  'location.enable_title': 'Joylashuvni yoqing',
+  'location.enable_body':
+      'Joriy joylashuvingizni aniqlash uchun qurilmada joylashuv (GPS) xizmati yoqilgan bo‘lishi kerak. Hozir yoqasizmi?',
+  'location.enable_action': 'Sozlamalarni ochish',
+  'location.service_disabled':
+      'Joylashuv xizmati o‘chiq. Uni yoqib, qayta urinib ko‘ring.',
+  'location.permission_denied': 'Joylashuv ruxsati berilmadi.',
+  'location.permission_denied_forever':
+      'Joylashuv doimiy rad etilgan. Sozlamalardan ruxsat bering.',
+  'location.unavailable': 'Joylashuvni aniqlab bo‘lmadi. Qayta urinib ko‘ring.',
+  'location.my_location': 'Joriy joylashuvim',
   'common.close': 'Yopish',
   'common.back': 'Orqaga',
   'common.next': 'Keyingi',
@@ -67,6 +79,7 @@ const Map<String, String> kStringsUz = {
   'auth.otp_hint': '6 xonali kod',
   'auth.verify': 'Tasdiqlash',
   'auth.resend_otp': 'Kodni qayta yuborish',
+  'auth.otp_expires_in': 'Kod amal qiladi: {time}',
   'auth.logout': 'Chiqish',
   'auth.logout_confirm': 'Hisobdan chiqishni xohlaysizmi?',
   'auth.session_expired': 'Sessiya tugadi. Qayta kiring.',
@@ -361,6 +374,7 @@ const Map<String, String> kStringsUz = {
   'driver.network_error_label': 'Tarmoq xatosi: {msg}',
   'driver.temp_token_label': 'Temp token: {msg}',
   'driver.gps_error': 'GPS xatosi: {msg}',
+  'driver.gps_timeout': 'Joylashuvni aniqlab bo‘lmadi. Ochiq joyga chiqib yoki GPS’ni tekshirib qayta urining.',
   'driver.help_about_driver': 'ALIX Logistics — haydovchi.',
   'driver.feed_current': 'Joriy',
   'driver.feed_plan': 'Reja',

@@ -1,12 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:http/http.dart' as http;
 
+import 'core/api/logging_http_client.dart';
+import 'core/api/net_log.dart';
+import 'core/api/net_log_overlay.dart';
 import 'core/i18n/i18n.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
-import 'screens/login_screen.dart';
+import 'screens/auth_gate.dart';
 
-void main() async {
+void main() {
+  // Tarmoq logi yoniq bo'lsa, BUTUN ishga tushirishni (binding init + runApp)
+  // logging-client bor zona ICHIDA bajaramiz. Bu juda muhim: agar
+  // `WidgetsFlutterBinding.ensureInitialized()` zonadan tashqarida chaqirilsa,
+  // Flutter binding o'sha (root) zonani "ushlab qoladi" va keyin barcha
+  // gesture/async callback'lar (tugma bosish → http.post) root zonada ishlaydi,
+  // ya'ni LoggingHttpClient'ni ko'rmaydi — natijada NET log bo'sh qoladi.
+  if (kNetLogEnabled) {
+    http.runWithClient(
+      _bootstrap,
+      () => LoggingHttpClient(http.Client()),
+    );
+  } else {
+    _bootstrap();
+  }
+}
+
+Future<void> _bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Future.wait<void>([
     ThemeController.instance.load(),
@@ -47,7 +68,11 @@ class MyApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: const LoginScreen(),
+          // Debug tarmoq log overlay'i (kNetLogEnabled bo'lsa) — barcha
+          // ekranlar ustida suzuvchi tugma + so'rov/javob ro'yxati.
+          builder: (context, child) =>
+              NetLogOverlay(child: child ?? const SizedBox.shrink()),
+          home: const AuthGate(),
         );
       },
     );

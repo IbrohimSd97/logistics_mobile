@@ -4,11 +4,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../config/app_links.dart';
 
 /// Offertani tashqi brauzerda ochadi. Ochib bo'lmasa SnackBar ko'rsatadi.
-Future<void> openOfferta(BuildContext context) async {
+/// [url] berilmasa — ilova offertasi (default).
+Future<void> openOfferta(BuildContext context, {String? url}) async {
   final messenger = ScaffoldMessenger.of(context);
   try {
     final ok = await launchUrl(
-      Uri.parse(AppLinks.offertaUrl),
+      Uri.parse(url ?? AppLinks.offertaUrl),
       mode: LaunchMode.externalApplication,
     );
     if (!ok) {
@@ -25,10 +26,13 @@ Future<void> openOfferta(BuildContext context) async {
 
 /// `CheckboxListTile.title` uchun: offerta matni + bosiladigan «Offertani o‘qish» havolasi.
 class OffertaCheckboxTitle extends StatelessWidget {
-  const OffertaCheckboxTitle({super.key, required this.text});
+  const OffertaCheckboxTitle({super.key, required this.text, this.url});
 
   /// Checkbox yonidagi asosiy matn (masalan: "Offertani o‘qidim va qabul qilaman *").
   final String text;
+
+  /// Qaysi offerta ochilsin (null — ilova offertasi).
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +44,7 @@ class OffertaCheckboxTitle extends StatelessWidget {
         Text(text),
         const SizedBox(height: 2),
         InkWell(
-          onTap: () => openOfferta(context),
+          onTap: () => openOfferta(context, url: url),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: Row(

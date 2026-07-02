@@ -13,6 +13,18 @@ const Map<String, String> kStringsRu = {
   'common.ok': 'OK',
   'common.yes': 'Да',
   'common.no': 'Нет',
+  // ── location (карта / текущее местоположение) ────────────────────────────
+  'location.enable_title': 'Включите геолокацию',
+  'location.enable_body':
+      'Чтобы определить ваше текущее местоположение, на устройстве должна быть включена служба геолокации (GPS). Включить сейчас?',
+  'location.enable_action': 'Открыть настройки',
+  'location.service_disabled':
+      'Служба геолокации выключена. Включите её и попробуйте снова.',
+  'location.permission_denied': 'Доступ к геолокации не предоставлен.',
+  'location.permission_denied_forever':
+      'Доступ к геолокации запрещён навсегда. Разрешите его в настройках.',
+  'location.unavailable': 'Не удалось определить местоположение. Попробуйте снова.',
+  'location.my_location': 'Моё местоположение',
   'common.close': 'Закрыть',
   'common.back': 'Назад',
   'common.next': 'Далее',
@@ -66,6 +78,7 @@ const Map<String, String> kStringsRu = {
   'auth.otp_hint': '6-значный код',
   'auth.verify': 'Подтвердить',
   'auth.resend_otp': 'Отправить код ещё раз',
+  'auth.otp_expires_in': 'Код действует: {time}',
   'auth.logout': 'Выйти',
   'auth.logout_confirm': 'Выйти из аккаунта?',
   'auth.session_expired': 'Сессия истекла. Войдите снова.',
@@ -359,6 +372,7 @@ const Map<String, String> kStringsRu = {
   'driver.network_error_label': 'Ошибка сети: {msg}',
   'driver.temp_token_label': 'Temp token: {msg}',
   'driver.gps_error': 'Ошибка GPS: {msg}',
+  'driver.gps_timeout': 'Не удалось определить местоположение. Выйдите на открытое место или проверьте GPS и повторите.',
   'driver.help_about_driver': 'ALIX Logistics — водитель.',
   'driver.feed_current': 'Текущие',
   'driver.feed_plan': 'План',

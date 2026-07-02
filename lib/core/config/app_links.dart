@@ -6,6 +6,9 @@
 class AppLinks {
   AppLinks._();
 
-  /// Ommaviy offerta sahifasi (brauzerda ochiladi).
+  /// Ilova (buyurtmachi/haydovchi) ommaviy offertasi.
   static const String offertaUrl = 'https://alix.uz/offerta';
+
+  /// Avtopark (fleet) offertasi — haydovchi avtoparkka biriktirilganda.
+  static const String avtoparkOffertaUrl = 'https://alix.uz/offerta/avtopark';
 }

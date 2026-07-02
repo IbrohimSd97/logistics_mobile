@@ -24,7 +24,8 @@ android {
         applicationId = "com.example.mening_ilovam"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Yandex MapKit minSdk 26 (Android 8.0+) talab qiladi.
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -41,4 +42,12 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Yandex MapKit native SDK — yandex_mapkit plugin uni `implementation`
+    // (yashirin) qilib e'lon qiladi, shuning uchun MainActivity'dan
+    // MapKitFactory.setApiKey(...) chaqirish uchun app modulida ham kerak.
+    // Versiya plugin ishlatadigan variant bilan bir xil (lite).
+    implementation("com.yandex.android:maps.mobile:4.22.0-lite")
 }

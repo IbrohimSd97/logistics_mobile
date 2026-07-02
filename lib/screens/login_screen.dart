@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -50,13 +52,45 @@ class _LoginScreenState extends State<LoginScreen>
   String? _tempToken;
   String? _verifyUserType;
 
+  /// OTP teskari sanoq (qolgan soniyalar) va uni boshqaruvchi timer.
+  int _otpRemaining = 0;
+  Timer? _otpTimer;
+
+  /// Noto'g'ri kod xatosi — input tagida qizil yozuv + qizil border uchun.
+  String? _otpError;
+
   @override
   void dispose() {
+    _otpTimer?.cancel();
     _phoneController.dispose();
     _otpController.dispose();
     _phoneFocus.dispose();
     _otpFocus.dispose();
     super.dispose();
+  }
+
+  /// OTP yuborilgach teskari sanoqni boshlaydi (expires_in_sec bo'yicha).
+  void _startOtpCountdown(int? seconds) {
+    _otpTimer?.cancel();
+    final total = seconds ?? 0;
+    setState(() => _otpRemaining = total);
+    if (total <= 0) return;
+    _otpTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        _otpRemaining = _otpRemaining > 0 ? _otpRemaining - 1 : 0;
+      });
+      if (_otpRemaining <= 0) t.cancel();
+    });
+  }
+
+  String _fmtMmSs(int sec) {
+    final m = (sec ~/ 60).toString().padLeft(2, '0');
+    final s = (sec % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   void _toast(String msg, {bool error = false, Duration? duration}) {
@@ -151,8 +185,10 @@ class _LoginScreenState extends State<LoginScreen>
         _phoneApi = apiPhone;
         _devCodeHint = r.devCode;
         _otpExpiresSec = r.expiresInSec;
+        _otpError = null;
       });
       _otpFocus.requestFocus();
+      _startOtpCountdown(r.expiresInSec);
       final sec = r.expiresInSec != null ? ' (${r.expiresInSec} s)' : '';
       _toast(
         r.devCode != null
@@ -361,8 +397,12 @@ class _LoginScreenState extends State<LoginScreen>
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
-      _toast(e.firstFieldMessage, error: true);
+      // Noto'g'ri kod — snackbar o'rniga input tagida qizil xato + qizil border.
+      setState(() {
+        _loading = false;
+        _otpError = e.firstFieldMessage;
+        _autoSubmittedCode = null;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -371,11 +411,14 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _resetOtpStep() {
+    _otpTimer?.cancel();
     setState(() {
       _otpSent = false;
       _otpController.clear();
       _devCodeHint = null;
       _otpExpiresSec = null;
+      _otpRemaining = 0;
+      _otpError = null;
       _tempToken = null;
       _verifyUserType = null;
       _exchangeFailed = false;
@@ -385,10 +428,14 @@ class _LoginScreenState extends State<LoginScreen>
     _phoneFocus.requestFocus();
   }
 
-  InputDecoration _fieldDecoration(String label, String hint, {Widget? prefix}) {
+  InputDecoration _fieldDecoration(String label, String hint,
+      {Widget? prefix, String? errorText}) {
+    const errorColor = Color(0xFFE53935);
     return InputDecoration(
       labelText: label,
       hintText: hint,
+      errorText: errorText,
+      errorStyle: const TextStyle(color: errorColor, height: 1.3),
       labelStyle: const TextStyle(color: AppPalette.muted),
       hintStyle: TextStyle(color: AppPalette.muted.withValues(alpha: 0.65)),
       prefixIcon: prefix,
@@ -405,6 +452,14 @@ class _LoginScreenState extends State<LoginScreen>
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: AppPalette.teal, width: 1.4),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: errorColor, width: 1.4),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: errorColor, width: 1.6),
       ),
     );
   }
@@ -566,8 +621,13 @@ class _LoginScreenState extends State<LoginScreen>
                             I18n.t('auth.sms_code_label'),
                             '• • • • • •',
                             prefix: const Icon(Icons.shield_outlined, color: AppPalette.muted),
+                            errorText: _otpError,
                           ).copyWith(counterText: ''),
                           onChanged: (v) {
+                            // Yangi kod kiritila boshlasa, oldingi xatoni tozalaymiz.
+                            if (_otpError != null) {
+                              setState(() => _otpError = null);
+                            }
                             // 6 ta raqam kiritilganda avtomat verify — har bir kod uchun faqat bir marta
                             // ('Tasdiqlash' tugmasi bilan takror yubormaslik uchun).
                             if (v.length == 6 && !_loading && v != _autoSubmittedCode) {
@@ -576,6 +636,38 @@ class _LoginScreenState extends State<LoginScreen>
                             }
                           },
                           onFieldSubmitted: (_) => _verifyOtp(),
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _otpRemaining > 0
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.timer_outlined,
+                                        size: 16,
+                                        color: AppPalette.muted.withValues(alpha: 0.8)),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      I18n.t('auth.otp_expires_in',
+                                          {'time': _fmtMmSs(_otpRemaining)}),
+                                      style: const TextStyle(
+                                          color: AppPalette.muted, fontSize: 13),
+                                    ),
+                                  ],
+                                )
+                              : TextButton.icon(
+                                  onPressed: _loading ? null : _sendOtp,
+                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppPalette.amber,
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: const Size(0, 0),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  label: Text(I18n.t('auth.resend_otp')),
+                                ),
                         ),
                         if (_devCodeHint != null) ...[
                           const SizedBox(height: 12),
@@ -674,24 +766,6 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                         ),
                       ],
-                      const SizedBox(height: 20),
-                      Text(
-                        I18n.t('auth.flow_hint'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppPalette.muted.withValues(alpha: 0.55),
-                          fontSize: 11,
-                          height: 1.4,
-                        ),
-                      ),
-                      Text(
-                        ApiConfig.baseUrl,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppPalette.teal.withValues(alpha: 0.55),
-                          fontSize: 11,
-                        ),
-                      ),
                     ],
                   ),
                 ),

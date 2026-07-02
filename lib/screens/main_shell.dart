@@ -548,6 +548,7 @@ class _MainShellState extends State<MainShell>
     return [
       DriverHomeBody(
         phoneDisplay: widget.phoneDisplay,
+        userId: widget.userId ?? 0,
         refreshTick: _refreshTick,
         onOpenDetail: (o, currentLocation) async {
           final changed = await Navigator.of(context).push<bool>(

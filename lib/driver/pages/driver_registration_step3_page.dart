@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/auth_api.dart';
+import '../../core/config/app_links.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../core/widgets/gradient_button.dart';
@@ -125,7 +126,11 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
       _toast(I18n.t('driver.reg.upload_legal_pdf'));
       return;
     }
-    if (_avtopark != null && !_companyOfferta) {
+    if (_avtopark == null) {
+      _toast(I18n.t('driver.reg.select_avtopark'));
+      return;
+    }
+    if (!_companyOfferta) {
       _toast(I18n.t('driver.reg.accept_avtopark_offerta'));
       return;
     }
@@ -281,19 +286,13 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
                 initialSelection: _avtopark,
                 expandedInsets: EdgeInsets.zero,
                 label: Text(I18n.t('driver.reg.avtopark_label')),
+                // Avtopark tanlash MAJBURIY — "avtoparksiz" varianti olib tashlandi.
                 dropdownMenuEntries: [
-                  DropdownMenuEntry<AvtoparkItem?>(
-                    value: null,
-                    label: I18n.t('driver.reg.avtopark_none'),
-                  ),
                   ..._avtoparks.map(
                     (a) => DropdownMenuEntry<AvtoparkItem?>(value: a, label: a.name),
                   ),
                 ],
-                onSelected: (v) => setState(() {
-                  _avtopark = v;
-                  if (v == null) _companyOfferta = false;
-                }),
+                onSelected: (v) => setState(() => _avtopark = v),
               ),
             if (_avtopark != null) ...[
               const SizedBox(height: 8),
@@ -303,6 +302,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
                 contentPadding: EdgeInsets.zero,
                 title: OffertaCheckboxTitle(
                   text: I18n.t('driver.reg.avtopark_offerta'),
+                  url: AppLinks.avtoparkOffertaUrl,
                 ),
               ),
             ],
@@ -311,7 +311,10 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
               label: I18n.t('driver.reg.finish_short'),
               icon: Icons.check_rounded,
               loading: _submitting,
-              onPressed: _submitting ? null : _submit,
+              // Offerta tasdiqlanmaguncha tugma o'chiq (barcha joyda bir xil xulq).
+              onPressed: (_submitting || _avtopark == null || !_companyOfferta)
+                  ? null
+                  : _submit,
             ),
           ],
         ),

@@ -302,11 +302,13 @@ class DriverApi {
   Future<void> saveLocation({required double latitude, required double longitude}) async {
     final token = await _requireRefresh();
     final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/current-location');
-    final res = await http.post(
-      url,
-      headers: _jsonAuth(token),
-      body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
-    );
+    final res = await http
+        .post(
+          url,
+          headers: _jsonAuth(token),
+          body: jsonEncode({'latitude': latitude, 'longitude': longitude}),
+        )
+        .timeout(const Duration(seconds: 10));
     _decode(res);
   }
 

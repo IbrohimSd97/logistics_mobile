@@ -69,4 +69,11 @@ class SessionStore {
     final p = await SharedPreferences.getInstance();
     return p.getString(_kPhone);
   }
+
+  /// Saqlangan foydalanuvchi turi ('customer' yoki 'driver'). App qayta
+  /// ochilganda AuthGate shu asosda to'g'ri ekranga yo'naltiradi.
+  Future<String?> getUserType() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_kUserType);
+  }
 }

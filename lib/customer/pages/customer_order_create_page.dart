@@ -110,6 +110,8 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
           title: isPickup ? I18n.t('order.create.pickup_picker_title') : I18n.t('order.create.delivery_picker_title'),
           initialLatLng: initialLat,
           initialAddress: initialAddr.isEmpty ? null : initialAddr,
+          // A nuqta (pickup) — ochilishi bilan joriy joylashuvga o'tadi.
+          useCurrentLocation: isPickup,
         ),
       ),
     );
@@ -350,7 +352,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
               latLng: _pickup,
               onPickFromMap: () => _pickFromMap(isPickup: true),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             _LocationField(
               label: I18n.t('order.create.delivery_field_label'),
               icon: Icons.flag_outlined,
@@ -358,6 +360,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
               latLng: _delivery,
               onPickFromMap: () => _pickFromMap(isPickup: false),
             ),
+            const SizedBox(height: 14),
             TextField(
               controller: _weight,
               keyboardType: TextInputType.number,
@@ -365,6 +368,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
               decoration: InputDecoration(labelText: I18n.t('order.create.weight_field_label')),
               textInputAction: TextInputAction.next,
             ),
+            const SizedBox(height: 14),
             TextField(
               controller: _comment,
               decoration: InputDecoration(labelText: I18n.t('order.create.comment_field_label')),

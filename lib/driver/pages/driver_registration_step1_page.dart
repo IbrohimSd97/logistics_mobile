@@ -96,6 +96,9 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _pickBirth() async {
+    // Sana tanlashdan oldin klaviaturani yopamiz — aks holda oldingi input
+    // (otasining ismi) fokusda qolib, klaviatura ochilib turadi.
+    FocusScope.of(context).unfocus();
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -109,6 +112,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
   }
 
   Future<void> _pickLicIssued() async {
+    FocusScope.of(context).unfocus();
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -124,6 +128,15 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
   Future<XFile?> _pickImage({required bool selfie}) async {
     if (kIsWeb) {
       return _picker.pickImage(source: ImageSource.gallery, imageQuality: 82);
+    }
+    // Selfi (guvohnoma bilan) — galereya tanlash mumkin emas, to'g'ridan old
+    // kamera ochiladi.
+    if (selfie) {
+      return _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 82,
+        preferredCameraDevice: CameraDevice.front,
+      );
     }
     final src = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -291,17 +304,19 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.field_last_required')),
                 validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_last') : null,
               ),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _first,
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.field_first_required')),
                 validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_first') : null,
               ),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _middle,
-                decoration: InputDecoration(labelText: I18n.t('driver.reg.field_middle_required')),
-                validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_middle') : null,
+                // Otasining ismi — majburiy emas.
+                decoration: InputDecoration(labelText: I18n.t('driver.reg.field_middle')),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               InkWell(
                 onTap: _pickBirth,
                 child: InputDecorator(
@@ -312,7 +327,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                   child: Text(_birthDate == null ? I18n.t('driver.reg.not_picked') : _fmtDate(_birthDate!)),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _pinfl,
                 keyboardType: TextInputType.number,
@@ -333,13 +348,18 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.driver_license_section'),
                   style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
                       controller: _licSeries,
                       textCapitalization: TextCapitalization.characters,
-                      inputFormatters: [LengthLimitingTextInputFormatter(10)],
+                      // Guvohnoma seriyasi — faqat harf, ko'pi bilan 2 ta.
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp('[A-Za-z]')),
+                        LengthLimitingTextInputFormatter(2),
+                      ],
                       decoration: InputDecoration(labelText: I18n.t('driver.reg.series_required'), hintText: I18n.t('driver.reg.series_hint')),
                       validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.series_required_msg') : null,
                     ),
@@ -350,9 +370,10 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                     child: TextFormField(
                       controller: _licNumber,
                       keyboardType: TextInputType.number,
+                      // Guvohnoma raqami — faqat raqam, ko'pi bilan 7 ta.
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(20),
+                        LengthLimitingTextInputFormatter(7),
                       ],
                       decoration: InputDecoration(labelText: I18n.t('driver.reg.number_required'), hintText: I18n.t('driver.reg.number_hint')),
                       validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.number_required_msg') : null,
@@ -360,7 +381,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               InkWell(
                 onTap: _pickLicIssued,
                 child: InputDecorator(
@@ -374,6 +395,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.images_section'),
                   style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
               _imgRow(I18n.t('driver.reg.img_license_front'), _front, () async {
                 final f = await _pickImage(selfie: false);
                 if (f != null) setState(() => _front = f);

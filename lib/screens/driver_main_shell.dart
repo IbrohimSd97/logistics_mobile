@@ -18,7 +18,10 @@ import '../customer/customer_api.dart';
 import '../customer/pages/customer_physical_registration_page.dart';
 import '../driver/driver_api.dart';
 import '../driver/driver_models.dart';
+import '../driver/pages/driver_failed_page.dart';
 import '../driver/pages/driver_order_detail_page.dart';
+import '../driver/pages/driver_pending_page.dart';
+import '../driver/pages/driver_rejected_page.dart';
 import 'customer_main_shell.dart';
 import 'login_screen.dart';
 
@@ -187,6 +190,7 @@ class _DriverMainShellState extends State<DriverMainShell>
         children: [
           DriverHomeBody(
             phoneDisplay: widget.phoneDisplay,
+            userId: widget.userId,
             refreshTick: _refreshTick,
             onOpenDetail: (o, currentLocation) async {
               final changed = await Navigator.of(context).push<bool>(
@@ -245,11 +249,13 @@ class _DriverMainShellState extends State<DriverMainShell>
 class DriverHomeBody extends StatefulWidget {
   const DriverHomeBody({
     required this.phoneDisplay,
+    required this.userId,
     required this.refreshTick,
     required this.onOpenDetail,
   });
 
   final String phoneDisplay;
+  final int userId;
   final int refreshTick;
   final void Function(DriverOrder order, LatLng? currentLocation) onOpenDetail;
 
@@ -350,6 +356,21 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
       _error = null;
     });
     try {
+      // Moderatsiya holati — admin haydovchini red etgan yoki holatini
+      // o'zgartirgan bo'lsa (status != 2/active), uni shu yerda tegishli
+      // sahifaga (rad etilgan / kutilmoqda / rad) yo'naltiramiz. Aks holda
+      // red etilgan driver asosiy ilovada qolib ketadi.
+      try {
+        final reg = await DriverApi.instance.registrationStatus();
+        if (!mounted) return;
+        if (reg.driverId != null && reg.status != 2) {
+          _redirectByModeration(reg);
+          return;
+        }
+      } catch (_) {
+        // Status olib bo'lmasa — mavjud xulqni saqlaymiz (ilovada qoladi).
+      }
+
       final cur = await DriverApi.instance.currentOrder();
       // Backend bilan online holatni sinxronlash: buyurtma yakunlanganda
       // server avtomat went_online_at'ni qayta qo'yadi — mobile UI ham
@@ -396,6 +417,35 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         _current = null;
       });
     }
+  }
+
+  /// Moderatsiya holatiga qarab driverni asosiy ilovadan tegishli sahifaga
+  /// olib chiqadi (butun stekni almashtiramiz — orqaga qaytib bo'lmaydi).
+  void _redirectByModeration(DriverRegistrationStatus reg) {
+    _stopLocationPushTimer();
+    final Widget target;
+    switch (reg.status) {
+      case 3:
+        target = DriverRejectedPage(
+          phoneDisplay: widget.phoneDisplay,
+          userId: widget.userId,
+          status: reg,
+        );
+        break;
+      case 4:
+        target = DriverFailedPage(phoneDisplay: widget.phoneDisplay);
+        break;
+      default:
+        target = DriverPendingPage(
+          phoneDisplay: widget.phoneDisplay,
+          userId: widget.userId,
+          initialStatus: reg,
+        );
+    }
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => target),
+      (route) => false,
+    );
   }
 
   Future<void> _toggleOnline() async {
@@ -451,6 +501,14 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
     await _sendCurrentGpsLocation(asOnline: true);
   }
 
+  /// Onlayn bo'lishni qayta urinish — joylashuv xizmati o'chiq/ruxsat yo'q
+  /// bo'lib xato chiqqach, foydalanuvchi uni yoqib qayta bosadi. Yuk turlari
+  /// avval tanlangani uchun qaytadan so'ramaymiz — to'g'ridan GPS/online'ni
+  /// qayta sinab ko'ramiz.
+  Future<void> _retryGoOnline() async {
+    await _sendCurrentGpsLocation(asOnline: true);
+  }
+
   /// GPS orqali joriy joylashuv olib backend'ga yuboradi. Permission yo'q yoki xizmat
   /// o'chirilgan bo'lsa foydalanuvchiga ko'rsatamiz.
   Future<void> _sendCurrentGpsLocation({required bool asOnline}) async {
@@ -492,9 +550,29 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         return;
       }
 
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-      );
+      // GPS fiksatsiyasi timeLimit BILAN — aks holda yuqori-aniqlik fiksatsiyasi
+      // (ichkarida/sovuq GPS) cheksiz osilib, online'ga o'tish "o'ylanib" qoladi.
+      // Vaqt tugasa oxirgi ma'lum joylashuvni ishlatamiz (bo'lsa).
+      Position pos;
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 8),
+          ),
+        );
+      } on TimeoutException {
+        final last = await Geolocator.getLastKnownPosition();
+        if (last == null) {
+          if (!mounted) return;
+          setState(() {
+            _busy = false;
+            _error = I18n.t('driver.gps_timeout');
+          });
+          return;
+        }
+        pos = last;
+      }
       final latLng = LatLng(pos.latitude, pos.longitude);
 
       await DriverApi.instance.saveLocation(
@@ -502,15 +580,21 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
         longitude: pos.longitude,
       );
 
-      // Reverse-geocode (jimgina, xato bo'lsa koordinata ko'rsatamiz)
-      final address = await _reverseGeocode(latLng);
-
       if (!mounted) return;
+      // Online'ga DARHOL o'tamiz — manzil yorlig'i (reverse-geocode) kritik
+      // yo'lda emas: avval koordinata ko'rsatiladi, manzil fonda kelib yangilanadi.
       setState(() {
         _pickedLocation = latLng;
-        _pickedAddress = address ?? '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+        _pickedAddress = '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
         _online = true;
         _busy = false;
+      });
+
+      // Manzilni fonda aniqlaymiz — tayyor bo'lganda yorliqni yangilaymiz.
+      _reverseGeocode(latLng).then((addr) {
+        if (addr != null && addr.isNotEmpty && mounted) {
+          setState(() => _pickedAddress = addr);
+        }
       });
 
       // Onlayn bo'lgandan keyin har 1 daqiqada GPS lokatsiyasini backend'ga
@@ -698,12 +782,36 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
           if (_error != null)
             Card(
               color: cs.errorContainer,
-              child: ListTile(
-                leading: Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
-                title: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
-                trailing: FilledButton.tonal(
-                  onPressed: _online ? _loadActive : _loadCurrent,
-                  child: Text(I18n.t('driver.retry_btn_short')),
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.error_outline_rounded,
+                            color: cs.onErrorContainer, size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _error!,
+                            style: TextStyle(
+                                color: cs.onErrorContainer, height: 1.35),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.tonal(
+                        onPressed: _online ? _loadActive : _retryGoOnline,
+                        child: Text(I18n.t('driver.retry_btn_short')),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
