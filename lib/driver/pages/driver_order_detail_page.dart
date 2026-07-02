@@ -2,15 +2,13 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:yandex_mapkit/yandex_mapkit.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/cancel_reasons_api.dart';
 import '../../core/i18n/i18n.dart';
-import '../../core/location/map_markers.dart';
-import '../../core/location/yandex_point.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/widgets/deadline_banner.dart';
 import '../../core/widgets/order_timeline.dart';
@@ -41,11 +39,8 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   bool _busy = false;
   bool _reloading = false;
   late DriverOrder _order;
-  YandexMapController? _mapCtrl;
+  final MapController _mapCtrl = MapController();
   double _lastZoom = 12;
-  BitmapDescriptor? _aPin;
-  BitmapDescriptor? _bPin;
-  BitmapDescriptor? _driverIcon;
 
   /// Bottom sheet'ning hozirgi balandligi (0..1). Recenter FAB shu qiymatga
   /// qarab map'ning ko'rinib turgan qismida turishi uchun ishlatiladi.
@@ -94,7 +89,6 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     super.initState();
     _order = widget.order;
     _currentDriverLocation = widget.initialDriverLocation;
-    _loadMarkers();
     _refetchRoute();
     _waitTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -106,38 +100,26 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   void dispose() {
     _waitTicker?.cancel();
     _gpsSub?.cancel();
+    _mapCtrl.dispose();
     super.dispose();
-  }
-
-  /// Yandex Placemark markerlarini (A/B pin, driver strelka) bir marta chizamiz.
-  Future<void> _loadMarkers() async {
-    final a = await MapMarkers.abPin('A', AppPalette.success);
-    final b = await MapMarkers.abPin('B', AppPalette.dangerLight);
-    final drv = await MapMarkers.driverArrow(AppPalette.teal);
-    if (!mounted) return;
-    setState(() {
-      _aPin = a;
-      _bPin = b;
-      _driverIcon = drv;
-    });
   }
 
   /// Kamerani nuqtaga olib boradi ([azimuth] berilsa heading-up aylantiradi).
   void _moveCamera(LatLng p, {double? zoom, double azimuth = 0}) {
-    _mapCtrl?.moveCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: latLngToPoint(p), zoom: zoom ?? _lastZoom, azimuth: azimuth),
-      ),
-      animation: const MapAnimation(type: MapAnimationType.smooth, duration: 0.4),
-    );
+    try {
+      _mapCtrl.moveAndRotate(p, zoom ?? _lastZoom, -azimuth);
+    } catch (_) {
+      // map hali ready emas bo'lishi mumkin
+    }
   }
 
   void _fitToPoints(List<LatLng> pts) {
-    if (_mapCtrl == null || pts.length < 2) return;
-    _mapCtrl!.moveCamera(
-      CameraUpdate.newGeometry(Geometry.fromBoundingBox(boundingBoxOf(pts))),
-      animation: const MapAnimation(type: MapAnimationType.smooth, duration: 0.4),
-    );
+    if (pts.length < 2) return;
+    try {
+      _mapCtrl.fitCamera(
+        CameraFit.bounds(bounds: LatLngBounds.fromPoints(pts), padding: const EdgeInsets.all(64)),
+      );
+    } catch (_) {}
   }
 
   /// GPS oqimini ochib, har bir yangilanishda:
@@ -692,25 +674,6 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     // route) — faqat pinlar, A↔B to'g'ri chiziq emas (talab bo'yicha).
     final routePoints = _route?.points;
 
-    final mapObjects = <MapObject>[
-      if (routePoints != null && routePoints.length >= 2)
-        PolylineMapObject(
-          mapId: const MapObjectId('route'),
-          polyline: Polyline(points: latLngListToPoints(routePoints)),
-          strokeColor: AppPalette.teal,
-          strokeWidth: 5,
-          outlineColor: Colors.white.withValues(alpha: 0.9),
-          outlineWidth: 2,
-        ),
-      // A pin doim (mavjud bo'lsa). B pin — faqat InTransit/Unloading bosqichlari.
-      if (p != null && _aPin != null) _abPlacemark(p, isStart: true),
-      if (d != null && _bPin != null && (s == 6 || s == 7 || s == 8 || s == 9 || s == 10))
-        _abPlacemark(d, isStart: false),
-      // Driver hozirgi joylashuvi — final holatlardan tashqari doim ko'rinadi.
-      if (s != 9 && s != 10 && s != 11 && s != 12 && _driverIcon != null)
-        _driverPlacemark(_currentDriverLocation ?? _acceptPoint ?? p ?? _toshkent),
-    ];
-
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -738,33 +701,66 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
           child: Stack(
           children: [
             Positioned.fill(
-              child: YandexMap(
-                nightModeEnabled: isDark,
-                mapObjects: mapObjects,
-                onMapCreated: (controller) {
-                  _mapCtrl = controller;
-                  controller.moveCamera(
-                    CameraUpdate.newCameraPosition(
-                      CameraPosition(
-                        target: latLngToPoint(initialCenter),
-                        zoom: isActiveStage ? 16.0 : 12.0,
-                      ),
+              child: FlutterMap(
+                mapController: _mapCtrl,
+                options: MapOptions(
+                  initialCenter: initialCenter,
+                  // Faol bosqichlarda navigatsiya zoom (16) — ko'cha darajasi;
+                  // boshqa bosqichlarda butun yo'lni ko'rsatish uchun keng (12).
+                  initialZoom: isActiveStage ? 16.0 : 12.0,
+                  initialRotation: 0,
+                  minZoom: 4,
+                  maxZoom: 18,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all,
+                  ),
+                  onMapReady: () {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      // Faol bosqichda navigatsiya tuyg'usini buzmaymiz; boshqa
+                      // hollarda butun marshrutni kameraga sig'diramiz.
+                      if (!isActiveStage) _fitMapToRoute();
+                    });
+                  },
+                  onPositionChanged: (camera, hasGesture) {
+                    _lastZoom = camera.zoom;
+                    // Foydalanuvchi qo'lda surса auto-follow'ni o'chiramiz.
+                    if (hasGesture && _followDriver) {
+                      setState(() => _followDriver = false);
+                    }
+                  },
+                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: isDark
+                        ? 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
+                        : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.mening_ilovam',
+                    subdomains: const ['a', 'b', 'c', 'd'],
+                  ),
+                  if (routePoints != null && routePoints.length >= 2)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: routePoints,
+                          color: AppPalette.teal,
+                          strokeWidth: 5,
+                          borderColor: Colors.white.withValues(alpha: 0.9),
+                          borderStrokeWidth: 2,
+                        ),
+                      ],
                     ),
-                  );
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    // Faol bosqichda navigatsiya tuyg'usini buzmaymiz; boshqa
-                    // hollarda butun marshrutni kameraga sig'diramiz.
-                    if (!isActiveStage) _fitMapToRoute();
-                  });
-                },
-                onCameraPositionChanged: (position, reason, finished) {
-                  _lastZoom = position.zoom;
-                  // Foydalanuvchi qo'lda surса auto-follow'ni o'chiramiz. Yandex
-                  // gesture'ni dasturiy harakatdan ajratadi (reason).
-                  if (reason == CameraUpdateReason.gestures && _followDriver) {
-                    setState(() => _followDriver = false);
-                  }
-                },
+                  MarkerLayer(
+                    markers: [
+                      // A pin doim (mavjud bo'lsa). B pin — faqat InTransit/Unloading bosqichlari.
+                      if (p != null) _routeMarker(p, isStart: true),
+                      if (d != null && (s == 6 || s == 7 || s == 8 || s == 9 || s == 10))
+                        _routeMarker(d, isStart: false),
+                      // Driver hozirgi joylashuvi — final holatlardan tashqari doim ko'rinadi.
+                      if (s != 9 && s != 10 && s != 11 && s != 12)
+                        _driverMarker(_currentDriverLocation ?? _acceptPoint ?? p ?? _toshkent),
+                    ],
+                  ),
+                ],
               ),
             ),
             if (_routeLoading)
@@ -1169,32 +1165,71 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     );
   }
 
-  PlacemarkMapObject _abPlacemark(LatLng point, {required bool isStart}) {
-    return PlacemarkMapObject(
-      mapId: MapObjectId(isStart ? 'pickup' : 'delivery'),
-      point: latLngToPoint(point),
-      opacity: 1,
-      icon: PlacemarkIcon.single(PlacemarkIconStyle(
-        image: (isStart ? _aPin : _bPin)!,
-        anchor: const Offset(0.5, 0.5),
-        scale: 1,
-      )),
+  Marker _routeMarker(LatLng point, {required bool isStart}) {
+    final color = isStart ? AppPalette.success : AppPalette.dangerLight;
+    return Marker(
+      point: point,
+      width: 44,
+      height: 56,
+      alignment: Alignment.topCenter,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                isStart ? 'A' : 'B',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+          Container(width: 2, height: 8, color: color),
+        ],
+      ),
     );
   }
 
-  /// Driver marker — screen-aligned (noRotation): map heading-up'ga
-  /// aylantirilgani uchun navigatsiya strelkasi doim "yuqori = oldinga".
-  PlacemarkMapObject _driverPlacemark(LatLng point) {
-    return PlacemarkMapObject(
-      mapId: const MapObjectId('driver'),
-      point: latLngToPoint(point),
-      opacity: 1,
-      icon: PlacemarkIcon.single(PlacemarkIconStyle(
-        image: _driverIcon!,
-        anchor: const Offset(0.5, 0.5),
-        rotationType: RotationType.noRotation,
-        scale: 1,
-      )),
+  /// Driver marker — har doim ekran ustida "yuqoriga qarab" turadi: map
+  /// `-heading`'ga aylantirilgani uchun navigatsiya arrow (Icons.navigation)
+  /// avtomatik driver yo'nalishini ko'rsatadi. `rotate: true` flutter_map'ga
+  /// marker'ni map rotation'ni kompensatsiya qilib screen-aligned ushlashni
+  /// aytadi.
+  Marker _driverMarker(LatLng point) {
+    return Marker(
+      point: point,
+      width: 44,
+      height: 44,
+      alignment: Alignment.center,
+      rotate: true, // map rotation'ga teskari aylan — har doim ekran fazasida.
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppPalette.teal,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 3),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3)),
+          ],
+        ),
+        child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 24),
+      ),
     );
   }
 }

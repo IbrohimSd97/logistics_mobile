@@ -45,9 +45,4 @@ flutter {
 }
 
 dependencies {
-    // Yandex MapKit native SDK — yandex_mapkit plugin uni `implementation`
-    // (yashirin) qilib e'lon qiladi, shuning uchun MainActivity'dan
-    // MapKitFactory.setApiKey(...) chaqirish uchun app modulida ham kerak.
-    // Versiya plugin ishlatadigan variant bilan bir xil (lite).
-    implementation("com.yandex.android:maps.mobile:4.22.0-lite")
 }

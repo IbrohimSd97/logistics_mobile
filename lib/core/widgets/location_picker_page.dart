@@ -2,19 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-import 'package:yandex_mapkit/yandex_mapkit.dart';
 
 import '../i18n/i18n.dart';
 import '../location/current_location.dart';
 import '../location/my_location_button.dart';
-import '../location/yandex_point.dart';
 import '../theme/app_palette.dart';
 import 'gradient_button.dart';
 
 /// Map orqali manzil tanlash sahifasi.
-/// Yandex Maps + Nominatim geocoding (qidiruv/manzil hali OSM Nominatim).
+/// OpenStreetMap tile'lari + Nominatim geocoding (bepul, API key kerak emas).
 ///
 /// Qaytaradi: [LocationPickerResult]? — null bo'lsa user cancelladi.
 class LocationPickerPage extends StatefulWidget {
@@ -51,12 +50,14 @@ class LocationPickerResult {
 class _LocationPickerPageState extends State<LocationPickerPage> {
   static const _toshkent = LatLng(41.311081, 69.240562);
 
-  /// O'zbekiston chegarasi (taxminiy bounding box). Kamera faqat shu hududda
-  /// harakatlanadi; manzil qidiruvi ham (countrycodes=uz) faqat shu hududda.
-  static const _uzSouthWest = Point(latitude: 37.0, longitude: 55.9);
-  static const _uzNorthEast = Point(latitude: 45.7, longitude: 73.2);
+  /// O'zbekiston chegarasi (taxminiy bounding box). Xarita ham, manzil qidiruvi
+  /// ham (countrycodes=uz) faqat shu hududga cheklangan.
+  static final _uzbekistanBounds = LatLngBounds(
+    const LatLng(37.0, 55.9), // janubi-g'arbiy burchak
+    const LatLng(45.7, 73.2), // shimoli-sharqiy burchak
+  );
 
-  YandexMapController? _mapCtrl;
+  final _mapCtrl = MapController();
   final _searchCtrl = TextEditingController();
   Timer? _reverseDebounce;
 
@@ -113,19 +114,15 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     _scheduleReverse(loc);
   }
 
-  /// Kamerani berilgan nuqtaga (silliq animatsiya bilan) olib boradi.
+  /// Kamerani berilgan nuqtaga olib boradi.
   void _moveCamera(LatLng p, double zoom) {
-    _mapCtrl?.moveCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: latLngToPoint(p), zoom: zoom),
-      ),
-      animation: const MapAnimation(type: MapAnimationType.smooth, duration: 0.3),
-    );
+    _mapCtrl.move(p, zoom);
   }
 
   @override
   void dispose() {
     _reverseDebounce?.cancel();
+    _mapCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -256,38 +253,40 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       ),
       body: Stack(
         children: [
-          YandexMap(
-            nightModeEnabled: isDark,
-            // Kamera faqat O'zbekiston hududida harakatlanadi.
-            cameraBounds: const CameraBounds(
+          FlutterMap(
+            mapController: _mapCtrl,
+            options: MapOptions(
+              initialCenter: _center,
+              initialZoom: 13,
               minZoom: 5,
               maxZoom: 18,
-              latLngBounds: BoundingBox(northEast: _uzNorthEast, southWest: _uzSouthWest),
-            ),
-            onMapCreated: (controller) {
-              _mapCtrl = controller;
-              controller.moveCamera(
-                CameraUpdate.newCameraPosition(
-                  CameraPosition(target: latLngToPoint(_center), zoom: 13),
-                ),
-              );
-            },
-            // Markaz-pin usuli: tanlangan nuqta — xarita markazi. Kamera
-            // to'xtaganda (finished) manzilni reverse-geocode qilamiz.
-            onCameraPositionChanged: (position, reason, finished) {
-              _center = pointToLatLng(position.target);
-              if (finished && reason == CameraUpdateReason.gestures) {
+              // Xarita faqat O'zbekiston hududida — tashqariga surib bo'lmaydi.
+              cameraConstraint: CameraConstraint.contain(bounds: _uzbekistanBounds),
+              // Markaz-pin usuli: tanlangan nuqta — xarita markazi. Kamera
+              // gesture bilan harakatlanganda manzilni reverse-geocode qilamiz.
+              onPositionChanged: (camera, hasGesture) {
+                if (!hasGesture) return;
+                _center = camera.center;
                 setState(() {});
-                _scheduleReverse(_center);
-              }
-            },
-            onMapTap: (point) {
-              final p = pointToLatLng(point);
-              _center = p;
-              _moveCamera(p, 15.5);
-              setState(() {});
-              _scheduleReverse(p);
-            },
+                _scheduleReverse(camera.center);
+              },
+              onTap: (tap, latlng) {
+                _center = latlng;
+                _moveCamera(latlng, _mapCtrl.camera.zoom);
+                setState(() {});
+                _scheduleReverse(latlng);
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: isDark
+                    // CartoDB dark tiles (OSM compatible) — dark mode uchun.
+                    ? 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
+                    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.mening_ilovam',
+                subdomains: const ['a', 'b', 'c', 'd'],
+              ),
+            ],
           ),
           // Center pin (markerni xarita o'rtasiga sahna ustidan qo'yamiz)
           IgnorePointer(
