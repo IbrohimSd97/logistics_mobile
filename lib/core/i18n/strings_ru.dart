@@ -716,6 +716,8 @@ const Map<String, String> kStringsRu = {
   'driver.reg.field_last_required': 'Фамилия *',
   'driver.reg.field_first_required': 'Имя *',
   'driver.reg.field_middle_required': 'Отчество *',
+  'driver.reg.field_middle': 'Отчество (необязательно)',
+  'driver.reg.select_avtopark': 'Выберите автопарк',
   'driver.reg.field_required_last': 'Укажите фамилию',
   'driver.reg.field_required_first': 'Укажите имя',
   'driver.reg.field_required_middle': 'Укажите отчество',

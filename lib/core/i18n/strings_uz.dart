@@ -718,6 +718,8 @@ const Map<String, String> kStringsUz = {
   'driver.reg.field_last_required': 'Familiya *',
   'driver.reg.field_first_required': 'Ism *',
   'driver.reg.field_middle_required': 'Otasining ismi *',
+  'driver.reg.field_middle': 'Otasining ismi (ixtiyoriy)',
+  'driver.reg.select_avtopark': 'Avtoparkni tanlang',
   'driver.reg.field_required_last': 'Familiya kerak',
   'driver.reg.field_required_first': 'Ism kerak',
   'driver.reg.field_required_middle': 'Otasining ismi kerak',
