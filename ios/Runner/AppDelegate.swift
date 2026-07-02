@@ -9,7 +9,7 @@ import YandexMapsMobile
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     // Yandex MapKit API kaliti — xarita ishlatilishidan oldin o'rnatiladi.
-    YMKMapKit.setApiKey("d2c652fa-693a-4f40-87d5-3d604ee5f87b")
+    YMKMapKit.setApiKey("7274db48-2d0a-4457-8b93-39a72d815106")
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
