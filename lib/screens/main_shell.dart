@@ -213,10 +213,10 @@ class _MainShellState extends State<MainShell>
       if (!mounted) return;
       if (status != null && status.driverId != null) {
         switch (status.status) {
-          case 2: // Active
+          case DriverRegistrationStatus.statusActive: // 4
             _setMode('driver');
             return;
-          case 3: // Rejected
+          case DriverRegistrationStatus.statusRejected: // 2 — xatolarni tuzatish sahifasi
             await Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => DriverRejectedPage(
@@ -227,14 +227,14 @@ class _MainShellState extends State<MainShell>
               ),
             );
             return;
-          case 4: // Failed
+          case DriverRegistrationStatus.statusFailed: // 3 — 3 martadan ortiq rad etilgan
             await Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => DriverFailedPage(phoneDisplay: widget.phoneDisplay),
               ),
             );
             return;
-          case 1: // Pending
+          case DriverRegistrationStatus.statusPending: // 1
           default:
             await Navigator.of(context).push(
               MaterialPageRoute<void>(
@@ -312,19 +312,19 @@ class _MainShellState extends State<MainShell>
     if (status == null) return;
     Widget? target;
     switch (status.status) {
-      case 2: // Active — driver mode shellni o'zi ko'rsatadi
+      case DriverRegistrationStatus.statusActive: // 4 — driver mode shellni o'zi ko'rsatadi
         return;
-      case 3:
+      case DriverRegistrationStatus.statusRejected: // 2 — xatolarni tuzatish sahifasi
         target = DriverRejectedPage(
           phoneDisplay: widget.phoneDisplay,
           userId: _userId ?? 0,
           status: status,
         );
         break;
-      case 4:
+      case DriverRegistrationStatus.statusFailed: // 3 — 3 martadan ortiq rad etilgan
         target = DriverFailedPage(phoneDisplay: widget.phoneDisplay);
         break;
-      case 1:
+      case DriverRegistrationStatus.statusPending: // 1
       default:
         target = DriverPendingPage(
           phoneDisplay: widget.phoneDisplay,

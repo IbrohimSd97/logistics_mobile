@@ -79,11 +79,10 @@ class _DriverPendingPageState extends State<DriverPendingPage>
 
   void _routeIfChanged(DriverRegistrationStatus s) {
     final st = s.status;
-    if (st == 2) {
+    if (st == DriverRegistrationStatus.statusActive) {
+      // 4 = Active — tasdiqlandi. Stack'ni tozalab MainShell(driver) bilan
+      // almashtiramiz (login'dan to'g'ridan yoki toggle orqali — yagona MainShell).
       _poll?.cancel();
-      // Stack'ni tozalab MainShell(driver) bilan almashtiramiz.
-      // Bu yerga ham login'dan to'g'ridan, ham toggle orqali kelinishi mumkin —
-      // har holatda ham yagona MainShell qoladi.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
           builder: (_) => MainShell(
@@ -95,7 +94,8 @@ class _DriverPendingPageState extends State<DriverPendingPage>
         ),
         (_) => false,
       );
-    } else if (st == 3) {
+    } else if (st == DriverRegistrationStatus.statusRejected) {
+      // 2 = Rejected — xatolarni tuzatish (3 steplik register) sahifasiga.
       _poll?.cancel();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
@@ -106,7 +106,8 @@ class _DriverPendingPageState extends State<DriverPendingPage>
           ),
         ),
       );
-    } else if (st == 4) {
+    } else if (st == DriverRegistrationStatus.statusFailed) {
+      // 3 = Failed — 3 martadan ortiq rad etilgan.
       _poll?.cancel();
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(

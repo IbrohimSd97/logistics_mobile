@@ -356,14 +356,14 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
       _error = null;
     });
     try {
-      // Moderatsiya holati — admin haydovchini red etgan yoki holatini
-      // o'zgartirgan bo'lsa (status != 2/active), uni shu yerda tegishli
-      // sahifaga (rad etilgan / kutilmoqda / rad) yo'naltiramiz. Aks holda
-      // red etilgan driver asosiy ilovada qolib ketadi.
+      // Moderatsiya holati — admin haydovchini rad etgan yoki holatini
+      // o'zgartirgan bo'lsa (status active=4 EMAS), uni shu yerda tegishli
+      // sahifaga (rad etilgan / kutilmoqda / failed) yo'naltiramiz. Aks holda
+      // rad etilgan driver asosiy ilovada qolib ketadi.
       try {
         final reg = await DriverApi.instance.registrationStatus();
         if (!mounted) return;
-        if (reg.driverId != null && reg.status != 2) {
+        if (reg.driverId != null && reg.status != DriverRegistrationStatus.statusActive) {
           _redirectByModeration(reg);
           return;
         }
@@ -425,14 +425,14 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
     _stopLocationPushTimer();
     final Widget target;
     switch (reg.status) {
-      case 3:
+      case DriverRegistrationStatus.statusRejected: // 2 — xatolarni tuzatish sahifasi
         target = DriverRejectedPage(
           phoneDisplay: widget.phoneDisplay,
           userId: widget.userId,
           status: reg,
         );
         break;
-      case 4:
+      case DriverRegistrationStatus.statusFailed: // 3 — 3 martadan ortiq rad etilgan
         target = DriverFailedPage(phoneDisplay: widget.phoneDisplay);
         break;
       default:

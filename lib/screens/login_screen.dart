@@ -327,7 +327,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     Widget target;
     switch (status.status) {
-      case 2: // active
+      case DriverRegistrationStatus.statusActive: // 4 = active
         target = MainShell(
           initialMode: 'driver',
           phoneDisplay: phone,
@@ -335,17 +335,17 @@ class _LoginScreenState extends State<LoginScreen>
           hasRefreshSession: true,
         );
         break;
-      case 3: // rejected
+      case DriverRegistrationStatus.statusRejected: // 2 = rejected — xatolarni tuzatish
         target = DriverRejectedPage(
           phoneDisplay: phone,
           userId: userId,
           status: status,
         );
         break;
-      case 4: // failed
+      case DriverRegistrationStatus.statusFailed: // 3 = failed
         target = DriverFailedPage(phoneDisplay: phone);
         break;
-      case 1: // pending
+      case DriverRegistrationStatus.statusPending: // 1 = pending
       default:
         // status null bo'lsa va next_step > 0 bo'lsa — registratsiya yarim. Ammo bu yo'lda exchange muvaffaqiyatli bo'lgan,
         // ya'ni driver record bor; demak status null kelmaydi. null kelsa ham pending sifatida ko'rsatamiz.

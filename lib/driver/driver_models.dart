@@ -35,8 +35,19 @@ class DriverRegistrationStatus {
   final int? driverId;
 
   /// `drivers.status`. null = driver yozuvi yo'q.
-  /// Backend semantika: 1=pending, 2=active, 3=rejected, 4=failed (taxminiy — TZ ga ko'ra).
+  /// Backend semantikasi (DriverModerationService const'lari bilan mos):
+  ///   1 = pending (moderatsiya kutilmoqda)
+  ///   2 = rejected (rad etildi — xatolarni tuzatish kerak)
+  ///   3 = failed (3 martadan ortiq rad etildi)
+  ///   4 = active (tasdiqlandi — yuk olishi mumkin)
   final int? status;
+
+  /// Backend status kodlari — routing shu konstantalar bilan qilinsin,
+  /// raw raqam emas (ilgari 2/3/4 noto'g'ri "active/rejected/failed" deb taxmin qilingan edi).
+  static const int statusPending = 1;
+  static const int statusRejected = 2;
+  static const int statusFailed = 3;
+  static const int statusActive = 4;
 
   /// 1, 2 yoki 3 — qaysi stepdan davom etish kerak. 0 = registratsiya tugagan.
   final int nextStep;

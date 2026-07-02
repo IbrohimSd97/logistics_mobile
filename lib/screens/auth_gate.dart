@@ -96,7 +96,7 @@ class _AuthGateState extends State<AuthGate> {
 
     Widget target;
     switch (status.status) {
-      case 2: // active
+      case DriverRegistrationStatus.statusActive: // 4 = active
         target = MainShell(
           initialMode: 'driver',
           phoneDisplay: phone,
@@ -104,13 +104,13 @@ class _AuthGateState extends State<AuthGate> {
           hasRefreshSession: true,
         );
         break;
-      case 3: // rejected
+      case DriverRegistrationStatus.statusRejected: // 2 = rejected — xatolarni tuzatish
         target = DriverRejectedPage(phoneDisplay: phone, userId: userId, status: status);
         break;
-      case 4: // failed
+      case DriverRegistrationStatus.statusFailed: // 3 = failed
         target = DriverFailedPage(phoneDisplay: phone);
         break;
-      case 1: // pending
+      case DriverRegistrationStatus.statusPending: // 1 = pending
       default:
         target = DriverPendingPage(phoneDisplay: phone, userId: userId, initialStatus: status);
     }

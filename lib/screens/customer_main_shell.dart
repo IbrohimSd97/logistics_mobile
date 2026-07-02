@@ -233,24 +233,24 @@ class _CustomerMainShellState extends State<CustomerMainShell>
         // Driver record mavjud — status'ga qarab yo'naltiramiz
         Widget target;
         switch (status.status) {
-          case 2:
+          case DriverRegistrationStatus.statusActive: // 4 = active
             target = DriverMainShell(
               phoneDisplay: widget.phoneDisplay,
               userId: _userId ?? 0,
               userType: 'driver',
             );
             break;
-          case 3:
+          case DriverRegistrationStatus.statusRejected: // 2 = rejected — xatolarni tuzatish
             target = DriverRejectedPage(
               phoneDisplay: widget.phoneDisplay,
               userId: _userId ?? 0,
               status: status,
             );
             break;
-          case 4:
+          case DriverRegistrationStatus.statusFailed: // 3 = failed
             target = DriverFailedPage(phoneDisplay: widget.phoneDisplay);
             break;
-          case 1:
+          case DriverRegistrationStatus.statusPending: // 1 = pending
           default:
             target = DriverPendingPage(
               phoneDisplay: widget.phoneDisplay,
