@@ -14,6 +14,6 @@ import com.yandex.mapkit.MapKitFactory
 class MainApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        MapKitFactory.setApiKey("7274db48-2d0a-4457-8b93-39a72d815106")
+        MapKitFactory.setApiKey("4f90e4d9-a238-4f79-8443-19eb8514c041")
     }
 }
