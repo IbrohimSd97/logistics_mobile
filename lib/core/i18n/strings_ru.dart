@@ -467,6 +467,7 @@ const Map<String, String> kStringsRu = {
   'driver.rejected.step2_title': 'Данные автомобиля',
   'driver.rejected.step3_title': 'Право собственности и юр. статус',
   'driver.rejected.step_no_error': 'Ошибок нет',
+  'driver.rejected.reason_generic': 'Есть недочёт',
   'driver.rejected.step_prefix': 'Шаг {n}: {title}',
   'driver.rejected.relogin_btn': 'Войти и исправить',
   'driver.rejected.relogin_hint':

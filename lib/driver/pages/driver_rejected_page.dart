@@ -106,7 +106,7 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
     );
   }
 
-  Widget _stepCard(int stepNo, String title, Map<String, dynamic>? errors, ColorScheme cs) {
+  Widget _stepCard(int stepNo, String title, List<dynamic>? errors, ColorScheme cs) {
     if (errors == null || errors.isEmpty) {
       return Card(
         child: ListTile(
@@ -137,15 +137,24 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
               ],
             ),
             const SizedBox(height: 8),
-            ...errors.entries.map(
-              (e) => Padding(
+            ...errors.map((e) {
+              final map = e is Map ? e : const <dynamic, dynamic>{};
+              final field = map['field']?.toString() ?? '';
+              final reasonText = map['reason_text']?.toString();
+              final reasonCode = map['reason_code']?.toString();
+              // Asosiy: admin yozgan aniq izoh (reason_text). Bo'sh bo'lsa —
+              // reason_code'ni o'qiladigan ko'rinishga o'giramiz.
+              final reason = (reasonText != null && reasonText.trim().isNotEmpty)
+                  ? reasonText.trim()
+                  : _reasonLabel(reasonCode);
+              return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2),
                 child: Text(
-                  '• ${_humanize(e.key)}: ${_describe(e.value)}',
+                  '• ${_fieldLabel(field)}: $reason',
                   style: TextStyle(color: cs.onErrorContainer, height: 1.35),
                 ),
-              ),
-            ),
+              );
+            }),
           ],
         ),
       ),
@@ -155,10 +164,51 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
   String _humanize(String key) =>
       key.replaceAll('_', ' ').replaceFirstMapped(RegExp(r'^[a-z]'), (m) => m[0]!.toUpperCase());
 
-  String _describe(dynamic v) {
-    if (v == null) return '—';
-    if (v is List) return v.join(', ');
-    return v.toString();
+  /// Backend maydon nomini (masalan `car_license_selfie_img`) o'qiladigan
+  /// nomga o'giradi. Noma'lum maydon — umumiy humanize.
+  static const Map<String, String> _fieldLabels = {
+    'last_name': 'Familiya',
+    'first_name': 'Ism',
+    'middle_name': 'Otasining ismi',
+    'birth_date': 'Tug‘ilgan sana',
+    'national_id': 'JSHSHIR (INN)',
+    'car_license_series': 'Guvohnoma seriyasi',
+    'car_license_number': 'Guvohnoma raqami',
+    'car_license_issued_date': 'Guvohnoma berilgan sana',
+    'car_license_front_img': 'Guvohnoma — old tomon',
+    'car_license_back_img': 'Guvohnoma — orqa tomon',
+    'car_license_selfie_img': 'Guvohnoma bilan selfi',
+    'vehicle_name': 'Avtomobil nomi',
+    'plate_number': 'Davlat raqami',
+    'reg_certificate_series': 'Texpasport seriyasi',
+    'reg_certificate_number': 'Texpasport raqami',
+    'reg_certificate_issued_date': 'Texpasport sanasi',
+    'reg_certificate_front_img': 'Texpasport — old',
+    'reg_certificate_back_img': 'Texpasport — orqa',
+    'vehicle_front_img': 'Avtomobil — old',
+    'vehicle_side_img': 'Avtomobil — yon',
+    'vehicle_back_img': 'Avtomobil — orqa',
+    'ownership_contract_img': 'Mulkchilik hujjati',
+    'legal_certificate_img': 'Yuridik hujjat',
+  };
+
+  String _fieldLabel(String field) => _fieldLabels[field] ?? _humanize(field);
+
+  /// reason_code'ni (masalan `blurry_image`) o'qiladigan sababga o'giradi.
+  static const Map<String, String> _reasonLabels = {
+    'blurry_image': 'Rasm noaniq',
+    'wrong_document': 'Noto‘g‘ri hujjat',
+    'unreadable': 'O‘qib bo‘lmaydi',
+    'mismatch': 'Ma’lumotlar mos kelmaydi',
+    'expired': 'Muddati o‘tgan',
+    'invalid': 'Noto‘g‘ri',
+    'missing': 'Yetishmaydi',
+    'other': 'Boshqa sabab',
+  };
+
+  String _reasonLabel(String? code) {
+    if (code == null || code.trim().isEmpty) return I18n.t('driver.rejected.reason_generic');
+    return _reasonLabels[code] ?? _humanize(code);
   }
 
   @override

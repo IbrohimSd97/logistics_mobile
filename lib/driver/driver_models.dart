@@ -77,9 +77,12 @@ class DriverRegistrationRejects {
   });
 
   final int? driverId;
-  final Map<String, dynamic>? step1Errors;
-  final Map<String, dynamic>? step2Errors;
-  final Map<String, dynamic>? step3Errors;
+  /// Backend har bir step uchun MASSIV qaytaradi:
+  /// `[{field, reason_code, reason_text}, ...]`. Har element — bitta maydon
+  /// bo'yicha admin belgilagan xatolik.
+  final List<dynamic>? step1Errors;
+  final List<dynamic>? step2Errors;
+  final List<dynamic>? step3Errors;
   final String? comment;
 
   bool get hasAnyErrors =>
@@ -97,15 +100,9 @@ class DriverRegistrationRejects {
   static DriverRegistrationRejects fromMap(Map<String, dynamic> m) {
     return DriverRegistrationRejects(
       driverId: _int(m['driver_id']),
-      step1Errors: m['step1_errors'] is Map<String, dynamic>
-          ? m['step1_errors'] as Map<String, dynamic>
-          : null,
-      step2Errors: m['step2_errors'] is Map<String, dynamic>
-          ? m['step2_errors'] as Map<String, dynamic>
-          : null,
-      step3Errors: m['step3_errors'] is Map<String, dynamic>
-          ? m['step3_errors'] as Map<String, dynamic>
-          : null,
+      step1Errors: m['step1_errors'] is List ? m['step1_errors'] as List : null,
+      step2Errors: m['step2_errors'] is List ? m['step2_errors'] as List : null,
+      step3Errors: m['step3_errors'] is List ? m['step3_errors'] as List : null,
       comment: m['comment']?.toString(),
     );
   }

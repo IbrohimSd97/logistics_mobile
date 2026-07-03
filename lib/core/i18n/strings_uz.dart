@@ -469,6 +469,7 @@ const Map<String, String> kStringsUz = {
   'driver.rejected.step2_title': 'Mashina ma‘lumotlari',
   'driver.rejected.step3_title': 'Egalik va yuridik holat',
   'driver.rejected.step_no_error': 'Xatolik yo‘q',
+  'driver.rejected.reason_generic': 'Kamchilik bor',
   'driver.rejected.step_prefix': 'Step {n}: {title}',
   'driver.rejected.relogin_btn': 'Qayta kirish va tuzatish',
   'driver.rejected.relogin_hint':
