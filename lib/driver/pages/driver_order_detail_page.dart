@@ -1119,8 +1119,12 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                 ),
                               ),
                             ],
-                            const SizedBox(height: 14),
-                            _IncomeBreakdown(order: _order),
+                            // Avtoparkning O'Z (fleet) driveriga tushum
+                            // ko'rsatilmaydi — u faqat yuk ma'lumotlarini ko'radi.
+                            if (_order.incomeVisible) ...[
+                              const SizedBox(height: 14),
+                              _IncomeBreakdown(order: _order),
+                            ],
                             const SizedBox(height: 14),
                             OrderTimeline(steps: _timelineStepsDriver(_order)),
                             if (s == 9) ...[

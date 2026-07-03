@@ -288,6 +288,7 @@ class DriverOrder {
     this.companyCommissionAmount,
     this.driverIncomeAmount,
     this.scheduledPickupAt,
+    this.incomeVisible = true,
   });
 
   final int id;
@@ -334,6 +335,10 @@ class DriverOrder {
   final String? driverIncomeAmount;
   /// Rejali buyurtma — kelajakdagi olib ketish vaqti. NULL bo'lsa zudlik bilan.
   final String? scheduledPickupAt;
+
+  /// Driverga tushum (daromad + komissiya taqsimoti) ko'rsatiladimi? Avtoparkning
+  /// O'Z (fleet) driveri uchun `false` — u faqat yuk ma'lumotlarini ko'radi.
+  final bool incomeVisible;
 
   static double? _double(Object? v) {
     if (v == null) return null;
@@ -386,6 +391,8 @@ class DriverOrder {
       companyCommissionAmount: m['company_commission_amount']?.toString(),
       driverIncomeAmount: m['driver_income_amount']?.toString(),
       scheduledPickupAt: m['scheduled_pickup_at']?.toString(),
+      // Backend yubormasa (eski javob) — default true (ko'rsatiladi).
+      incomeVisible: m['income_visible'] is bool ? m['income_visible'] as bool : true,
     );
   }
 }
