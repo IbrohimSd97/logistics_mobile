@@ -9,6 +9,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../driver_api.dart';
+import '../driver_models.dart';
 import 'driver_registration_step2_page.dart';
 
 class DriverRegistrationStep1Page extends StatefulWidget {
@@ -19,6 +20,7 @@ class DriverRegistrationStep1Page extends StatefulWidget {
     this.prefillFirstName,
     this.prefillMiddleName,
     this.prefillBirthDate,
+    this.rejects,
   });
 
   final String phoneDisplay;
@@ -26,6 +28,7 @@ class DriverRegistrationStep1Page extends StatefulWidget {
   final String? prefillFirstName;
   final String? prefillMiddleName;
   final String? prefillBirthDate;
+  final DriverRegistrationRejects? rejects;
 
   @override
   State<DriverRegistrationStep1Page> createState() => _DriverRegistrationStep1PageState();
@@ -207,6 +210,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
           builder: (_) => DriverRegistrationStep2Page(
             phoneDisplay: widget.phoneDisplay,
             sessionId: sessionId,
+            rejects: widget.rejects,
           ),
         ),
       );
@@ -219,6 +223,32 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       setState(() => _submitting = false);
       _toast(I18n.t('driver.reg.network_error_label', {'msg': '$e'}));
     }
+  }
+
+  String? _fieldError(String field) {
+    final errs = widget.rejects?.step1Errors;
+    if (errs == null) return null;
+    for (final e in errs) {
+      if (e is Map && e['field'] == field) {
+        final rt = e['reason_text']?.toString();
+        if (rt != null && rt.trim().isNotEmpty) return rt.trim();
+        return e['reason_code']?.toString();
+      }
+    }
+    return null;
+  }
+
+  Widget _errorNote(String field) {
+    final r = _fieldError(field);
+    if (r == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 6, bottom: 2),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.error_outline_rounded, size: 15, color: Colors.red),
+        const SizedBox(width: 4),
+        Expanded(child: Text('Admin: $r', style: const TextStyle(color: Colors.red, fontSize: 12, height: 1.3))),
+      ]),
+    );
   }
 
   void _toast(String m) {
@@ -304,18 +334,21 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.field_last_required')),
                 validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_last') : null,
               ),
+              _errorNote('last_name'),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _first,
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.field_first_required')),
                 validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_first') : null,
               ),
+              _errorNote('first_name'),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _middle,
                 // Otasining ismi — majburiy emas.
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.field_middle')),
               ),
+              _errorNote('middle_name'),
               const SizedBox(height: 14),
               InkWell(
                 onTap: _pickBirth,
@@ -327,6 +360,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                   child: Text(_birthDate == null ? I18n.t('driver.reg.not_picked') : _fmtDate(_birthDate!)),
                 ),
               ),
+              _errorNote('birth_date'),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _pinfl,
@@ -345,6 +379,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                   return null;
                 },
               ),
+              _errorNote('national_id'),
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.driver_license_section'),
                   style: Theme.of(context).textTheme.titleSmall),
@@ -381,6 +416,8 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                   ),
                 ],
               ),
+              _errorNote('car_license_series'),
+              _errorNote('car_license_number'),
               const SizedBox(height: 14),
               InkWell(
                 onTap: _pickLicIssued,
@@ -392,6 +429,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                   child: Text(_licIssuedDate == null ? I18n.t('driver.reg.not_picked') : _fmtDate(_licIssuedDate!)),
                 ),
               ),
+              _errorNote('car_license_issued_date'),
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.images_section'),
                   style: Theme.of(context).textTheme.titleSmall),
@@ -400,14 +438,17 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                 final f = await _pickImage(selfie: false);
                 if (f != null) setState(() => _front = f);
               }),
+              _errorNote('car_license_front_img'),
               _imgRow(I18n.t('driver.reg.img_license_back'), _back, () async {
                 final f = await _pickImage(selfie: false);
                 if (f != null) setState(() => _back = f);
               }),
+              _errorNote('car_license_back_img'),
               _imgRow(I18n.t('driver.reg.img_license_selfie'), _selfie, () async {
                 final f = await _pickImage(selfie: true);
                 if (f != null) setState(() => _selfie = f);
               }),
+              _errorNote('car_license_selfie_img'),
               const SizedBox(height: 24),
               GradientButton(
                 label: I18n.t('driver.reg.next_vehicle_btn'),

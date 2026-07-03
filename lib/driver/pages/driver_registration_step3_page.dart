@@ -20,10 +20,12 @@ class DriverRegistrationStep3Page extends StatefulWidget {
     super.key,
     required this.phoneDisplay,
     required this.sessionId,
+    this.rejects,
   });
 
   final String phoneDisplay;
   final String sessionId;
+  final DriverRegistrationRejects? rejects;
 
   @override
   State<DriverRegistrationStep3Page> createState() => _DriverRegistrationStep3PageState();
@@ -80,6 +82,32 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
         _avtoparksError = I18n.t('driver.reg.network_error_label', {'msg': '$e'});
       });
     }
+  }
+
+  String? _fieldError(String field) {
+    final errs = widget.rejects?.step3Errors;
+    if (errs == null) return null;
+    for (final e in errs) {
+      if (e is Map && e['field'] == field) {
+        final rt = e['reason_text']?.toString();
+        if (rt != null && rt.trim().isNotEmpty) return rt.trim();
+        return e['reason_code']?.toString();
+      }
+    }
+    return null;
+  }
+
+  Widget _errorNote(String field) {
+    final r = _fieldError(field);
+    if (r == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 6, bottom: 2),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.error_outline_rounded, size: 15, color: Colors.red),
+        const SizedBox(width: 4),
+        Expanded(child: Text('Admin: $r', style: const TextStyle(color: Colors.red, fontSize: 12, height: 1.3))),
+      ]),
+    );
   }
 
   void _toast(String m) {
@@ -242,6 +270,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
                 final f = await _pickImage();
                 if (f != null) setState(() => _ownershipFile = f);
               }),
+            _errorNote('ownership_contract_img'),
             const Divider(height: 32),
             Text(I18n.t('driver.reg.legal_title'),
                 style: Theme.of(context).textTheme.titleSmall),
@@ -274,6 +303,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
                 final f = await _pickPdfPlaceholder();
                 if (f != null) setState(() => _legalPdf = f);
               }),
+            _errorNote('legal_certificate_img'),
             const Divider(height: 32),
             Text(I18n.t('driver.reg.avtopark_title'),
                 style: Theme.of(context).textTheme.titleSmall),

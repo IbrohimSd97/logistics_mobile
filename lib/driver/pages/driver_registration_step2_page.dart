@@ -18,10 +18,12 @@ class DriverRegistrationStep2Page extends StatefulWidget {
     super.key,
     required this.phoneDisplay,
     required this.sessionId,
+    this.rejects,
   });
 
   final String phoneDisplay;
   final String sessionId;
+  final DriverRegistrationRejects? rejects;
 
   @override
   State<DriverRegistrationStep2Page> createState() => _DriverRegistrationStep2PageState();
@@ -197,6 +199,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
           builder: (_) => DriverRegistrationStep3Page(
             phoneDisplay: widget.phoneDisplay,
             sessionId: r.sessionId ?? widget.sessionId,
+            rejects: widget.rejects,
           ),
         ),
       );
@@ -272,6 +275,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.vehicle_name_required'), hintText: I18n.t('driver.reg.vehicle_name_hint')),
                 validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
               ),
+              _errorNote('vehicle_name'),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _plate,
@@ -281,11 +285,13 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.plate_required'), hintText: I18n.t('driver.reg.plate_hint')),
                 validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
               ),
+              _errorNote('plate_number'),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _color,
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.color_label')),
               ),
+              _errorNote('color'),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _capacityKg,
@@ -305,6 +311,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                   return null;
                 },
               ),
+              _errorNote('capacity_kg'),
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.techpassport_section'),
                   style: Theme.of(context).textTheme.titleSmall),
@@ -312,31 +319,45 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
               Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: _regSeries,
-                      textCapitalization: TextCapitalization.characters,
-                      // Tex passport seriyasi — faqat harf, ko'pi bilan 3 ta.
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp('[A-Za-z]')),
-                        LengthLimitingTextInputFormatter(3),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          controller: _regSeries,
+                          textCapitalization: TextCapitalization.characters,
+                          // Tex passport seriyasi — faqat harf, ko'pi bilan 3 ta.
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp('[A-Za-z]')),
+                            LengthLimitingTextInputFormatter(3),
+                          ],
+                          decoration: InputDecoration(labelText: I18n.t('driver.reg.series_required'), hintText: I18n.t('driver.reg.techpassport_series_hint')),
+                          validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
+                        ),
+                        _errorNote('reg_certificate_series'),
                       ],
-                      decoration: InputDecoration(labelText: I18n.t('driver.reg.series_required'), hintText: I18n.t('driver.reg.techpassport_series_hint')),
-                      validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     flex: 2,
-                    child: TextFormField(
-                      controller: _regNumber,
-                      keyboardType: TextInputType.number,
-                      // Tex passport raqami — faqat raqam, ko'pi bilan 7 ta.
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(7),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          controller: _regNumber,
+                          keyboardType: TextInputType.number,
+                          // Tex passport raqami — faqat raqam, ko'pi bilan 7 ta.
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(7),
+                          ],
+                          decoration: InputDecoration(labelText: I18n.t('driver.reg.number_required'), hintText: I18n.t('driver.reg.number_hint')),
+                          validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
+                        ),
+                        _errorNote('reg_certificate_number'),
                       ],
-                      decoration: InputDecoration(labelText: I18n.t('driver.reg.number_required'), hintText: I18n.t('driver.reg.number_hint')),
-                      validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
                     ),
                   ),
                 ],
@@ -352,6 +373,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                   child: Text(_regIssuedDate == null ? I18n.t('driver.reg.not_picked') : _fmtDate(_regIssuedDate!)),
                 ),
               ),
+              _errorNote('reg_certificate_issued_date'),
               const SizedBox(height: 14),
               CheckboxListTile(
                 value: _hasTrailer,
@@ -365,14 +387,17 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                   textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(labelText: I18n.t('driver.reg.trailer_plate_required')),
                 ),
+                _errorNote('trailer_plate_number'),
                 _imgRow(I18n.t('driver.reg.img_trailer_front'), _tFront, () async {
                   final f = await _pick();
                   if (f != null) setState(() => _tFront = f);
                 }),
+                _errorNote('trailer_reg_certificate_front_img'),
                 _imgRow(I18n.t('driver.reg.img_trailer_back'), _tBack, () async {
                   final f = await _pick();
                   if (f != null) setState(() => _tBack = f);
                 }),
+                _errorNote('trailer_reg_certificate_back_img'),
               ],
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.images_section'), style: Theme.of(context).textTheme.titleSmall),
@@ -381,22 +406,27 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                 final f = await _pick();
                 if (f != null) setState(() => _regFront = f);
               }),
+              _errorNote('reg_certificate_front_img'),
               _imgRow(I18n.t('driver.reg.img_techpass_back'), _regBack, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _regBack = f);
               }),
+              _errorNote('reg_certificate_back_img'),
               _imgRow(I18n.t('driver.reg.img_vehicle_front'), _vFront, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _vFront = f);
               }),
+              _errorNote('vehicle_front_img'),
               _imgRow(I18n.t('driver.reg.img_vehicle_side'), _vSide, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _vSide = f);
               }),
+              _errorNote('vehicle_side_img'),
               _imgRow(I18n.t('driver.reg.img_vehicle_back'), _vBack, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _vBack = f);
               }),
+              _errorNote('vehicle_back_img'),
               const SizedBox(height: 16),
               CheckboxListTile(
                 value: _offerta,
@@ -417,6 +447,32 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
           ),
         ),
       ),
+    );
+  }
+
+  String? _fieldError(String field) {
+    final errs = widget.rejects?.step2Errors;
+    if (errs == null) return null;
+    for (final e in errs) {
+      if (e is Map && e['field'] == field) {
+        final rt = e['reason_text']?.toString();
+        if (rt != null && rt.trim().isNotEmpty) return rt.trim();
+        return e['reason_code']?.toString();
+      }
+    }
+    return null;
+  }
+
+  Widget _errorNote(String field) {
+    final r = _fieldError(field);
+    if (r == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 6, bottom: 2),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.error_outline_rounded, size: 15, color: Colors.red),
+        const SizedBox(width: 4),
+        Expanded(child: Text('Admin: $r', style: const TextStyle(color: Colors.red, fontSize: 12, height: 1.3))),
+      ]),
     );
   }
 

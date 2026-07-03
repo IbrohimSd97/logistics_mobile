@@ -101,7 +101,10 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
     setState(() => _busy = false);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => DriverRegistrationStep1Page(phoneDisplay: widget.phoneDisplay),
+        builder: (_) => DriverRegistrationStep1Page(
+          phoneDisplay: widget.phoneDisplay,
+          rejects: _rejects,
+        ),
       ),
     );
   }
