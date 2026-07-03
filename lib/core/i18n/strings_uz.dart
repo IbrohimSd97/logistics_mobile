@@ -717,7 +717,7 @@ const Map<String, String> kStringsUz = {
   'driver.reg.step2_appbar': 'Step 2 — Mashina ma‘lumotlari',
   'driver.reg.step3_appbar': 'Step 3 — Egalik va yuridik holat',
   'driver.reg.prefill_hint':
-      'Customer ma‘lumotlaringizdan ba‘zi maydonlar avtomat to‘ldirildi. Tekshirib chiqib, kerak bo‘lsan o‘zgartiring.',
+      'Avvalgi ma‘lumotlaringiz avtomat to‘ldirildi. Tekshirib chiqib, xato maydonlarni to‘g‘rilang.',
   'driver.reg.phone_label': 'Telefon: {phone}',
   'driver.reg.field_last_required': 'Familiya *',
   'driver.reg.field_first_required': 'Ism *',

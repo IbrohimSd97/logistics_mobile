@@ -715,7 +715,7 @@ const Map<String, String> kStringsRu = {
   'driver.reg.step2_appbar': 'Шаг 2 — Данные автомобиля',
   'driver.reg.step3_appbar': 'Шаг 3 — Собственность и юр. статус',
   'driver.reg.prefill_hint':
-      'Некоторые поля заполнены автоматически из вашего профиля. Проверьте и при необходимости измените.',
+      'Ваши прежние данные заполнены автоматически. Проверьте и исправьте поля с ошибками.',
   'driver.reg.phone_label': 'Телефон: {phone}',
   'driver.reg.field_last_required': 'Фамилия *',
   'driver.reg.field_first_required': 'Имя *',
