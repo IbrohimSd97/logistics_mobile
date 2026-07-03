@@ -279,83 +279,57 @@ class _LoginScreenState extends State<LoginScreen>
   }) {
     // Login ekranidagi eski (masalan, tarmoq) SnackBar yangi ekranga "yopishib" qolmasin.
     ScaffoldMessenger.of(context).clearSnackBars();
-    if (userType == 'driver') {
-      // Driver uchun status'ni so'raymiz va shunga qarab yo'naltiramiz.
-      _routeDriverByStatus(phone: phone, userId: userId);
+    // Har doim driver moderatsiya holatini tekshiramiz: foydalanuvchi driver
+    // bo'lib ro'yxatdan o'tган va hali tasdiqlanmagan (pending/rejected/failed)
+    // bo'lsa — user_type 'customer' bo'lsa ham driver holat sahifasiga chiqaramiz.
+    _routeDriverByStatus(phone: phone, userId: userId, userType: userType);
+  }
+
+  Future<void> _routeDriverByStatus({
+    required String phone,
+    required int userId,
+    required String userType,
+  }) async {
+    DriverRegistrationStatus? status;
+    try {
+      status = await DriverApi.instance.registrationStatus();
+    } on ApiException catch (_) {
+      // Status olib bo'lmadi — pastda user_type bo'yicha davom etamiz.
+    } catch (_) {}
+    if (!mounted) return;
+
+    // Driver yozuvi bor va hali ACTIVE emas → tegishli driver holat sahifasi
+    // (pending/rejected/failed). user_type dan qat'i nazar shu ko'rsatiladi,
+    // shunda logout/qayta kirishda ham driver o'z holat sahifasida turadi.
+    if (status != null &&
+        status.driverId != null &&
+        status.status != DriverRegistrationStatus.statusActive) {
+      Widget target;
+      switch (status.status) {
+        case DriverRegistrationStatus.statusRejected: // 2 — xatolarni tuzatish
+          target = DriverRejectedPage(phoneDisplay: phone, userId: userId, status: status);
+          break;
+        case DriverRegistrationStatus.statusFailed: // 3 — 3 martadan ortiq rad etilgan
+          target = DriverFailedPage(phoneDisplay: phone);
+          break;
+        default: // 1 = pending (moderatsiya kutilmoqda)
+          target = DriverPendingPage(phoneDisplay: phone, userId: userId, initialStatus: status);
+      }
+      Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => target));
       return;
     }
+
+    // Active driver yoki driver yozuvi yo'q → user_type bo'yicha asosiy shell.
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => MainShell(
-          initialMode: 'customer',
+          initialMode: userType == 'driver' ? 'driver' : 'customer',
           phoneDisplay: phone,
           userId: userId,
           hasRefreshSession: true,
         ),
       ),
     );
-  }
-
-  Future<void> _routeDriverByStatus({
-    required String phone,
-    required int userId,
-  }) async {
-    DriverRegistrationStatus? status;
-    try {
-      status = await DriverApi.instance.registrationStatus();
-    } on ApiException catch (e) {
-      _toast(I18n.t('auth.status_label', {'msg': e.firstFieldMessage}), error: true);
-    } catch (e) {
-      _toastNetworkFailure(e);
-    }
-    if (!mounted) return;
-
-    if (status == null) {
-      // Fallback: status olib bo'lmadi — driver main shellga ochamiz.
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => MainShell(
-            initialMode: 'driver',
-            phoneDisplay: phone,
-            userId: userId,
-            hasRefreshSession: true,
-          ),
-        ),
-      );
-      return;
-    }
-
-    Widget target;
-    switch (status.status) {
-      case DriverRegistrationStatus.statusActive: // 4 = active
-        target = MainShell(
-          initialMode: 'driver',
-          phoneDisplay: phone,
-          userId: userId,
-          hasRefreshSession: true,
-        );
-        break;
-      case DriverRegistrationStatus.statusRejected: // 2 = rejected — xatolarni tuzatish
-        target = DriverRejectedPage(
-          phoneDisplay: phone,
-          userId: userId,
-          status: status,
-        );
-        break;
-      case DriverRegistrationStatus.statusFailed: // 3 = failed
-        target = DriverFailedPage(phoneDisplay: phone);
-        break;
-      case DriverRegistrationStatus.statusPending: // 1 = pending
-      default:
-        // status null bo'lsa va next_step > 0 bo'lsa — registratsiya yarim. Ammo bu yo'lda exchange muvaffaqiyatli bo'lgan,
-        // ya'ni driver record bor; demak status null kelmaydi. null kelsa ham pending sifatida ko'rsatamiz.
-        target = DriverPendingPage(
-          phoneDisplay: phone,
-          userId: userId,
-          initialStatus: status,
-        );
-    }
-    Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => target));
   }
 
   Future<void> _verifyOtp() async {

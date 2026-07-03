@@ -473,6 +473,9 @@ const Map<String, String> kStringsUz = {
   'driver.rejected.relogin_btn': 'Qayta kirish va tuzatish',
   'driver.rejected.relogin_hint':
       'Qayta kirish: telefoningizga yangi OTP yuboriladi va siz kamchiliklarni tuzatib qayta yuborishingiz mumkin.',
+  'driver.rejected.fix_btn': 'Xatolarni tuzatib qayta yuborish',
+  'driver.rejected.fix_hint':
+      'Ma’lumotlarni qaytadan kiritib, kamchiliklarni tuzatasiz va qayta yuborasiz. Yakunida ariza yana moderatsiyaga tushadi.',
   'driver.failed.title_short': 'Ro‘yxatdan o‘tib bo‘lmadi',
   'driver.failed.body_full':
       'Sizning arizangiz 3 marta rad etildi. Yana urinishingiz uchun iltimos quyidagi raqam orqali aloqaga chiqing.',

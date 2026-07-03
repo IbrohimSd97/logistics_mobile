@@ -13,6 +13,7 @@ import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/offerta_link.dart';
 import '../driver_api.dart';
 import '../driver_models.dart';
+import 'driver_pending_page.dart';
 
 class DriverRegistrationStep3Page extends StatefulWidget {
   const DriverRegistrationStep3Page({
@@ -165,12 +166,21 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
         phoneDisplay: widget.phoneDisplay,
       );
 
-      // Driver hozir pending status'da bo'ladi — moderatsiya kutiladi.
-      // Tugagandan keyin pop(true) qaytaramiz; MainShell qaytishi va pending sahifani
-      // ko'rsatishi (yoki active bo'lsa to'g'ridan driver mode'ga o'tishi) o'zi hal qiladi.
+      // Registratsiya yakunlandi — driver endi PENDING (moderatsiya kutilmoqda).
+      // To'g'ridan-to'g'ri driver kutish sahifasiga o'tamiz va butun stack'ni
+      // tozalaymiz — shunda customer sahifaga qaytib ketmaydi. Keyinchalik
+      // logout/qayta kirishda ham login routing shu holatga qarab yo'naltiradi.
       if (!mounted) return;
       setState(() => _submitting = false);
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => DriverPendingPage(
+            phoneDisplay: widget.phoneDisplay,
+            userId: ex.userId,
+          ),
+        ),
+        (_) => false,
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/api/auth_api.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../screens/login_screen.dart';
 import '../driver_api.dart';
 import '../driver_models.dart';
+import 'driver_registration_step1_page.dart';
 
 class DriverRejectedPage extends StatefulWidget {
   const DriverRejectedPage({
@@ -27,6 +29,7 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
     with I18nObserverMixin<DriverRejectedPage> {
   DriverRegistrationRejects? _rejects;
   bool _loading = true;
+  bool _busy = false;
   String? _error;
 
   @override
@@ -68,6 +71,38 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
       (_) => false,
+    );
+  }
+
+  /// Xatolarni tuzatish — LOGOUT SHART EMAS. Joriy refresh sessiyadan yangi
+  /// temp_token olib, to'g'ridan-to'g'ri registratsiya qadamlarini (Step 1→3)
+  /// ochamiz. Backend qadamlarni upsert qiladi (yangi driver yaratmaydi),
+  /// yakunda status yana `pending` bo'lib DriverPendingPage'ga o'tadi.
+  Future<void> _startFix() async {
+    setState(() => _busy = true);
+    final refresh = await SessionStore().getRefreshToken();
+    if (refresh == null || refresh.isEmpty) {
+      // Refresh yo'q — eski yo'l (logout → login → OTP).
+      await _logoutAndRetry();
+      return;
+    }
+    try {
+      final temp = await const AuthApi().issueTempTokenFromRefresh(refresh);
+      await SessionStore().saveTempRegistrationToken(temp);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(I18n.t('driver.network_error_label', {'msg': '$e'}))),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DriverRegistrationStep1Page(phoneDisplay: widget.phoneDisplay),
+      ),
     );
   }
 
@@ -232,16 +267,21 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
             ],
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: _logoutAndRetry,
-              icon: const Icon(Icons.refresh_rounded),
-              label: Text(I18n.t('driver.rejected.relogin_btn')),
+              onPressed: _busy ? null : _startFix,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.build_rounded),
+              label: Text(I18n.t('driver.rejected.fix_btn')),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              I18n.t('driver.rejected.relogin_hint'),
+              I18n.t('driver.rejected.fix_hint'),
               style: TextStyle(color: cs.onSurfaceVariant, height: 1.35, fontSize: 12),
             ),
           ],
