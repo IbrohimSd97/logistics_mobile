@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/cancel_reasons_api.dart';
@@ -80,15 +81,28 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   static const double _autoTransitionDistanceM = 100.0;
 
   /// OSRM ni qayta chaqirishda throttle: oxirgi route boshlangan
-  /// nuqta. Driver bundan ≥ 500 m uzoqlashsa qayta hisoblanadi.
+  /// nuqta. Driver bundan ≥ 500 m uzoqlashsa qayta hisoblanadi (fallback).
   LatLng? _lastRouteFromLoc;
   static const double _routeRecalcDistanceM = 500.0;
+
+  /// Driver chizilgan yo'ldan shu masofadan (m) ko'proq uzoqlashsa —
+  /// yo'nalish o'zgargan deb hisoblab, route'ni DARHOL qayta chizamiz.
+  /// Shu tufayli "update qilmaguncha o'zgarmaydi" muammosi yo'qoladi.
+  static const double _offRouteThresholdM = 45.0;
+
+  /// OSRM ni juda tez-tez urmaslik uchun — qayta hisoblashlar orasidagi
+  /// minimal interval.
+  DateTime? _lastRouteFetchAt;
+  static const Duration _minRecalcInterval = Duration(seconds: 4);
 
   @override
   void initState() {
     super.initState();
     _order = widget.order;
     _currentDriverLocation = widget.initialDriverLocation;
+    // Navigatsiya ekrani ochiq turganда ekran o'chib qolmasin (yo'l chizib
+    // borilayotganда driver telefonга tegmasa ham xarita yonib tursin).
+    WakelockPlus.enable().catchError((_) {});
     _refetchRoute();
     _waitTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -98,6 +112,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
 
   @override
   void dispose() {
+    WakelockPlus.disable().catchError((_) {});
     _waitTicker?.cancel();
     _gpsSub?.cancel();
     _mapCtrl.dispose();
@@ -120,6 +135,89 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
         CameraFit.bounds(bounds: LatLngBounds.fromPoints(pts), padding: const EdgeInsets.all(64)),
       );
     } catch (_) {}
+  }
+
+  /// Nuqtadan yo'l (polyline)gacha eng qisqa masofa (m). Har bir segmentga
+  /// perpendikulyar masofani hisoblaydi — off-route aniqlash uchun.
+  static double _distanceToRoute(LatLng p, List<LatLng> pts) {
+    var best = double.infinity;
+    for (int i = 0; i < pts.length - 1; i++) {
+      final d = _pointToSegmentMeters(p, pts[i], pts[i + 1]);
+      if (d < best) best = d;
+    }
+    return best;
+  }
+
+  /// Nuqtadan (a→b) segmentigacha masofa (m). Kichik masofalar uchun aniq
+  /// bo'lgan lokal ekvivalent-to'rtburchak (equirectangular) proyeksiyasi.
+  static double _pointToSegmentMeters(LatLng p, LatLng a, LatLng b) {
+    const r = 6371000.0;
+    final latRef = a.latitude * math.pi / 180;
+    double x(LatLng q) => (q.longitude * math.pi / 180) * math.cos(latRef) * r;
+    double y(LatLng q) => (q.latitude * math.pi / 180) * r;
+    final px = x(p), py = y(p);
+    final ax = x(a), ay = y(a);
+    final dx = x(b) - ax, dy = y(b) - ay;
+    final len2 = dx * dx + dy * dy;
+    var t = len2 == 0 ? 0.0 : ((px - ax) * dx + (py - ay) * dy) / len2;
+    t = t.clamp(0.0, 1.0);
+    final cx = ax + t * dx, cy = ay + t * dy;
+    return math.sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+  }
+
+  /// Route'ni driverning eng yaqin nuqtasidan ikkiga bo'ladi:
+  ///   behind — o'tib ketilgan qism (xira ko'rsatiladi = "o'chirilgan"),
+  ///   ahead  — oldindagi qolgan qism (yorqin). Ahead boshiga driver
+  /// joylashuvini qo'shamiz — chiziq uzilib qolmasligi uchun.
+  (List<LatLng>, List<LatLng>) _splitRouteAtDriver(List<LatLng> pts) {
+    final drv = _currentDriverLocation;
+    if (drv == null || pts.length < 2) return (const <LatLng>[], pts);
+    var nearestIdx = 0;
+    var best = double.infinity;
+    for (int i = 0; i < pts.length; i++) {
+      final dd = Geolocator.distanceBetween(
+          drv.latitude, drv.longitude, pts[i].latitude, pts[i].longitude);
+      if (dd < best) {
+        best = dd;
+        nearestIdx = i;
+      }
+    }
+    final behind = pts.sublist(0, (nearestIdx + 1).clamp(0, pts.length));
+    final ahead = <LatLng>[drv, ...pts.sublist(nearestIdx)];
+    return (behind, ahead);
+  }
+
+  /// Chizish uchun polyline'lar: faol yurish bosqichida (3/4/6/7) o'tilgan
+  /// qismni xiralashtirib, qolganini yorqin ko'rsatadi. Aks holda — butun yo'l.
+  List<Polyline> _buildRoutePolylines(List<LatLng> pts, int? s) {
+    final driving = (s == 3 || s == 4 || s == 6 || s == 7) && _currentDriverLocation != null;
+    if (!driving) {
+      return [
+        Polyline(
+          points: pts,
+          color: AppPalette.teal,
+          strokeWidth: 5,
+          borderColor: Colors.white.withValues(alpha: 0.9),
+          borderStrokeWidth: 2,
+        ),
+      ];
+    }
+    final (behind, ahead) = _splitRouteAtDriver(pts);
+    return [
+      if (behind.length >= 2)
+        Polyline(
+          points: behind,
+          color: Colors.grey.withValues(alpha: 0.4),
+          strokeWidth: 4,
+        ),
+      Polyline(
+        points: ahead,
+        color: AppPalette.teal,
+        strokeWidth: 5,
+        borderColor: Colors.white.withValues(alpha: 0.9),
+        borderStrokeWidth: 2,
+      ),
+    ];
   }
 
   /// GPS oqimini ochib, har bir yangilanishda:
@@ -163,7 +261,9 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       // GPS heading bermagan qurilmalarda ishlaydi. Tezlik 1 km/h dan past
       // bo'lsa heading shovqinli bo'ladi — oldingi qiymatni saqlaymiz.
       double? incomingHeading;
-      if (pos.heading.isFinite && pos.heading >= 0 && pos.heading <= 360) {
+      var fromBearing = false;
+      if (pos.heading.isFinite && pos.heading >= 0 && pos.heading <= 360 && speedKmh >= 1.0) {
+        // GPS heading faqat harakatda ishonchli (turganda shovqinli bo'ladi).
         incomingHeading = pos.heading;
       } else if (_prevHeadingLoc != null) {
         final movedM = Geolocator.distanceBetween(
@@ -173,9 +273,13 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
         // Faqat sezilarli harakatda hisoblaymiz (GPS shovqinidan farqlash uchun).
         if (movedM >= 5) {
           incomingHeading = _bearingDegrees(_prevHeadingLoc!, newLoc);
+          fromBearing = true;
         }
       }
-      if (incomingHeading != null && speedKmh >= 1.0) {
+      // Heading GPS'dan (speed≥1) YOKI haqiqiy harakat bearing'idan kelsa
+      // qo'llaymiz — shunda tezlikni 0 beradigan qurilmalarda ham xarita
+      // yo'nalishga qarab aylanadi (yo'nalish o'zgarishi darhol ko'rinadi).
+      if (incomingHeading != null && (speedKmh >= 1.0 || fromBearing)) {
         _currentHeading = incomingHeading;
         _prevHeadingLoc = newLoc;
       } else if (_prevHeadingLoc == null) {
@@ -208,17 +312,26 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
         _refetchRoute();
       }
 
-      // Active bosqichlarda (3/4 — A ga, 6/7 — B ga) driver harakatlanganda
-      // OSRM marshrutni qayta hisoblaymiz. 500m'dan ortiq siljishdan keyin
-      // chaqirib, OSRM serverini ortiqcha urmaymiz.
-      if ((s == 3 || s == 4 || s == 6 || s == 7) && _lastRouteFromLoc != null) {
-        final moved = Geolocator.distanceBetween(
-          _lastRouteFromLoc!.latitude,
-          _lastRouteFromLoc!.longitude,
-          newLoc.latitude,
-          newLoc.longitude,
-        );
-        if (moved >= _routeRecalcDistanceM) {
+      // Active bosqichlarda (3/4 — A ga, 6/7 — B ga) marshrutni AVTO yangilaymiz:
+      //   - driver chizilgan yo'ldan _offRouteThresholdM (~45m) uzoqlashsa —
+      //     yo'nalish o'zgargan, DARHOL qayta hisoblanadi (kutish shart emas), yoki
+      //   - _routeRecalcDistanceM (500m) dan ko'p siljigan bo'lsa (fallback).
+      // Min interval bilan throttle qilingan — OSRM'ni ortiqcha urmaymiz.
+      if (s == 3 || s == 4 || s == 6 || s == 7) {
+        final route = _route;
+        final movedFromLast = _lastRouteFromLoc == null
+            ? double.infinity
+            : Geolocator.distanceBetween(_lastRouteFromLoc!.latitude,
+                _lastRouteFromLoc!.longitude, newLoc.latitude, newLoc.longitude);
+        final offRoute = (route != null && route.points.length >= 2)
+            ? _distanceToRoute(newLoc, route.points)
+            : double.infinity;
+        final now = DateTime.now();
+        final throttled = _lastRouteFetchAt != null &&
+            now.difference(_lastRouteFetchAt!) < _minRecalcInterval;
+        final needsRecalc =
+            offRoute > _offRouteThresholdM || movedFromLast >= _routeRecalcDistanceM;
+        if (needsRecalc && !_routeLoading && !throttled) {
           _refetchRoute();
         }
       }
@@ -320,6 +433,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     }
     setState(() => _routeLoading = true);
     _lastRouteFromLoc = from;
+    _lastRouteFetchAt = DateTime.now();
     final r = await OsrmRoute.fetch(from, to);
     if (!mounted) return;
     setState(() {
@@ -739,15 +853,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                   ),
                   if (routePoints != null && routePoints.length >= 2)
                     PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: routePoints,
-                          color: AppPalette.teal,
-                          strokeWidth: 5,
-                          borderColor: Colors.white.withValues(alpha: 0.9),
-                          borderStrokeWidth: 2,
-                        ),
-                      ],
+                      polylines: _buildRoutePolylines(routePoints, s),
                     ),
                   MarkerLayer(
                     markers: [
