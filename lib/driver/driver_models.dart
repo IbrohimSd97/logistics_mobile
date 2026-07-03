@@ -108,6 +108,41 @@ class DriverRegistrationRejects {
   }
 }
 
+/// Rad etilgan haydovchining oldin yuborgan registratsiya qiymatlari (Driver +
+/// Vehicle). "Xatolarni tuzatish" oqimida step maydonlarini oldindan to'ldirish
+/// uchun. Rasm maydonlari `*_img_url` — nisbiy `/storage/...` yo'l.
+class DriverRegistrationData {
+  const DriverRegistrationData({this.step1, this.step2, this.step3});
+
+  final Map<String, dynamic>? step1;
+  final Map<String, dynamic>? step2;
+  final Map<String, dynamic>? step3;
+
+  static Map<String, dynamic>? _sect(dynamic v) =>
+      v is Map ? Map<String, dynamic>.from(v) : null;
+
+  static DriverRegistrationData fromMap(Map<String, dynamic> m) {
+    return DriverRegistrationData(
+      step1: _sect(m['step1']),
+      step2: _sect(m['step2']),
+      step3: _sect(m['step3']),
+    );
+  }
+
+  String? s1(String k) => _str(step1?[k]);
+  String? s2(String k) => _str(step2?[k]);
+  String? s3(String k) => _str(step3?[k]);
+  int? i2(String k) => _int(step2?[k]);
+  int? i3(String k) => _int(step3?[k]);
+  bool b2(String k) => step2?[k] == true;
+
+  static String? _str(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString();
+    return s.isEmpty ? null : s;
+  }
+}
+
 class DriverStepResult {
   const DriverStepResult({
     required this.nextStep,

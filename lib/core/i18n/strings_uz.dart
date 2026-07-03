@@ -729,6 +729,7 @@ const Map<String, String> kStringsUz = {
   'driver.reg.field_required_middle': 'Otasining ismi kerak',
   'driver.reg.field_birth_required': 'Tug‘ilgan sana *',
   'driver.reg.not_picked': 'Tanlanmagan',
+  'driver.reg.existing_image': 'Yuklangan (mavjud) — o‘zgartirish uchun bosing',
   'driver.reg.pinfl_required': 'PINFL (14 raqam) *',
   'driver.reg.pinfl_14_digits': '14 raqam kerak',
   'driver.reg.driver_license_section': 'Haydovchilik guvohnomasi',

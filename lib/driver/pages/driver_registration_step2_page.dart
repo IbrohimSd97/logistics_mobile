@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/config/api_config.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/offerta_link.dart';
@@ -19,11 +20,15 @@ class DriverRegistrationStep2Page extends StatefulWidget {
     required this.phoneDisplay,
     required this.sessionId,
     this.rejects,
+    this.data,
   });
 
   final String phoneDisplay;
   final String sessionId;
   final DriverRegistrationRejects? rejects;
+
+  /// Xatolarni tuzatish oqimida oldin yuborilgan qiymatlar (prefill).
+  final DriverRegistrationData? data;
 
   @override
   State<DriverRegistrationStep2Page> createState() => _DriverRegistrationStep2PageState();
@@ -48,15 +53,74 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
 
   bool _hasTrailer = false;
   bool _offerta = false;
+  bool _tariffPrefilled = false;
 
   XFile? _regFront, _regBack, _vFront, _vSide, _vBack, _tFront, _tBack;
+
+  // Server'da mavjud rasmlar (prefill). Foydalanuvchi qayta tanlamasa, submit
+  // paytida shu URL'dan yuklab qayta yuboriladi.
+  String? _regFrontUrl,
+      _regBackUrl,
+      _vFrontUrl,
+      _vSideUrl,
+      _vBackUrl,
+      _tFrontUrl,
+      _tBackUrl;
+
   final _picker = ImagePicker();
   bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
+    // Prefill: server (data.step2) qiymatlaridan. Tarif tariflar yuklangach
+    // (_loadTariffs ichida) tanlanadi.
+    final d = widget.data?.step2;
+    if (d != null) {
+      _setText(_vehicleName, widget.data!.s2('vehicle_name'));
+      _setText(_plate, widget.data!.s2('plate_number'));
+      _setText(_color, widget.data!.s2('color'));
+      _setText(_capacityKg, widget.data!.s2('capacity_kg'));
+      _setText(_regSeries, widget.data!.s2('reg_certificate_series'));
+      _setText(_regNumber, widget.data!.s2('reg_certificate_number'));
+      _setText(_trailerPlate, widget.data!.s2('trailer_plate_number'));
+      _regIssuedDate =
+          _parseDate(widget.data!.s2('reg_certificate_issued_date')) ?? _regIssuedDate;
+      _hasTrailer = widget.data!.b2('has_trailer');
+      _regFrontUrl = widget.data!.s2('reg_certificate_front_img_url');
+      _regBackUrl = widget.data!.s2('reg_certificate_back_img_url');
+      _vFrontUrl = widget.data!.s2('vehicle_front_img_url');
+      _vSideUrl = widget.data!.s2('vehicle_side_img_url');
+      _vBackUrl = widget.data!.s2('vehicle_back_img_url');
+      _tFrontUrl = widget.data!.s2('trailer_reg_certificate_front_img_url');
+      _tBackUrl = widget.data!.s2('trailer_reg_certificate_back_img_url');
+    }
     _loadTariffs();
+  }
+
+  static void _setText(TextEditingController c, String? v) {
+    if (v != null && v.isNotEmpty) c.text = v;
+  }
+
+  static DateTime? _parseDate(String? s) {
+    if (s == null || s.isEmpty) return null;
+    try {
+      final parts = s.split('T').first.split('-');
+      if (parts.length >= 3) {
+        return DateTime(
+            int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Yangi tanlangan rasm bo'lsa — o'sha; aks holda mavjud URL'dan yuklab oladi.
+  Future<XFile?> _resolveImage(XFile? picked, String? url) async {
+    if (picked != null) return picked;
+    if (url != null && url.isNotEmpty) {
+      return DriverApi.instance.downloadToTempFile(url);
+    }
+    return null;
   }
 
   @override
@@ -86,6 +150,19 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
         _tariffs = list;
         _loadingTariffs = false;
         _tariff = list.isNotEmpty ? list.first : null;
+        // Prefill: oldin tanlangan tarifni ID bo'yicha topamiz (bir marta).
+        if (!_tariffPrefilled && widget.data?.step2 != null) {
+          final id = widget.data!.i2('tariff_id');
+          if (id != null) {
+            for (final t in list) {
+              if (t.id == id) {
+                _tariff = t;
+                break;
+              }
+            }
+          }
+          _tariffPrefilled = true;
+        }
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -156,11 +233,20 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       _toast(I18n.t('driver.reg.select_tariff'));
       return;
     }
-    if (_regFront == null || _regBack == null || _vFront == null || _vSide == null || _vBack == null) {
+    // Har bir majburiy rasm: yangi tanlangan bo'lsa — o'sha; aks holda mavjud
+    // URL bo'lsa qabul qilinadi (submit paytida yuklab olinadi).
+    if ((_regFront == null && (_regFrontUrl ?? '').isEmpty) ||
+        (_regBack == null && (_regBackUrl ?? '').isEmpty) ||
+        (_vFront == null && (_vFrontUrl ?? '').isEmpty) ||
+        (_vSide == null && (_vSideUrl ?? '').isEmpty) ||
+        (_vBack == null && (_vBackUrl ?? '').isEmpty)) {
       _toast(I18n.t('driver.reg.upload_5_required'));
       return;
     }
-    if (_hasTrailer && (_tFront == null || _tBack == null || _trailerPlate.text.trim().isEmpty)) {
+    if (_hasTrailer &&
+        ((_tFront == null && (_tFrontUrl ?? '').isEmpty) ||
+            (_tBack == null && (_tBackUrl ?? '').isEmpty) ||
+            _trailerPlate.text.trim().isEmpty)) {
       _toast(I18n.t('driver.reg.trailer_incomplete'));
       return;
     }
@@ -170,6 +256,24 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     }
     setState(() => _submitting = true);
     try {
+      final regFront = await _resolveImage(_regFront, _regFrontUrl);
+      final regBack = await _resolveImage(_regBack, _regBackUrl);
+      final vFront = await _resolveImage(_vFront, _vFrontUrl);
+      final vSide = await _resolveImage(_vSide, _vSideUrl);
+      final vBack = await _resolveImage(_vBack, _vBackUrl);
+      final tFront = _hasTrailer ? await _resolveImage(_tFront, _tFrontUrl) : null;
+      final tBack = _hasTrailer ? await _resolveImage(_tBack, _tBackUrl) : null;
+      if (regFront == null ||
+          regBack == null ||
+          vFront == null ||
+          vSide == null ||
+          vBack == null ||
+          (_hasTrailer && (tFront == null || tBack == null))) {
+        if (!mounted) return;
+        setState(() => _submitting = false);
+        _toast(I18n.t('driver.reg.upload_5_required'));
+        return;
+      }
       final r = await DriverApi.instance.registrationStep2(
         sessionId: widget.sessionId,
         tariffId: _tariff!.id,
@@ -183,13 +287,13 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
         hasTrailer: _hasTrailer,
         trailerPlateNumber: _hasTrailer ? _trailerPlate.text.trim() : null,
         projectOffertaAccepted: _offerta,
-        regCertFront: _regFront!,
-        regCertBack: _regBack!,
-        vehicleFront: _vFront!,
-        vehicleSide: _vSide!,
-        vehicleBack: _vBack!,
-        trailerRegFront: _hasTrailer ? _tFront : null,
-        trailerRegBack: _hasTrailer ? _tBack : null,
+        regCertFront: regFront,
+        regCertBack: regBack,
+        vehicleFront: vFront,
+        vehicleSide: vSide,
+        vehicleBack: vBack,
+        trailerRegFront: tFront,
+        trailerRegBack: tBack,
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -200,6 +304,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
             phoneDisplay: widget.phoneDisplay,
             sessionId: r.sessionId ?? widget.sessionId,
             rejects: widget.rejects,
+            data: widget.data,
           ),
         ),
       );
@@ -388,12 +493,12 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                   decoration: InputDecoration(labelText: I18n.t('driver.reg.trailer_plate_required')),
                 ),
                 _errorNote('trailer_plate_number'),
-                _imgRow(I18n.t('driver.reg.img_trailer_front'), _tFront, () async {
+                _imgRow(I18n.t('driver.reg.img_trailer_front'), _tFront, _tFrontUrl, () async {
                   final f = await _pick();
                   if (f != null) setState(() => _tFront = f);
                 }),
                 _errorNote('trailer_reg_certificate_front_img'),
-                _imgRow(I18n.t('driver.reg.img_trailer_back'), _tBack, () async {
+                _imgRow(I18n.t('driver.reg.img_trailer_back'), _tBack, _tBackUrl, () async {
                   final f = await _pick();
                   if (f != null) setState(() => _tBack = f);
                 }),
@@ -402,27 +507,27 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.images_section'), style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 14),
-              _imgRow(I18n.t('driver.reg.img_techpass_front'), _regFront, () async {
+              _imgRow(I18n.t('driver.reg.img_techpass_front'), _regFront, _regFrontUrl, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _regFront = f);
               }),
               _errorNote('reg_certificate_front_img'),
-              _imgRow(I18n.t('driver.reg.img_techpass_back'), _regBack, () async {
+              _imgRow(I18n.t('driver.reg.img_techpass_back'), _regBack, _regBackUrl, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _regBack = f);
               }),
               _errorNote('reg_certificate_back_img'),
-              _imgRow(I18n.t('driver.reg.img_vehicle_front'), _vFront, () async {
+              _imgRow(I18n.t('driver.reg.img_vehicle_front'), _vFront, _vFrontUrl, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _vFront = f);
               }),
               _errorNote('vehicle_front_img'),
-              _imgRow(I18n.t('driver.reg.img_vehicle_side'), _vSide, () async {
+              _imgRow(I18n.t('driver.reg.img_vehicle_side'), _vSide, _vSideUrl, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _vSide = f);
               }),
               _errorNote('vehicle_side_img'),
-              _imgRow(I18n.t('driver.reg.img_vehicle_back'), _vBack, () async {
+              _imgRow(I18n.t('driver.reg.img_vehicle_back'), _vBack, _vBackUrl, () async {
                 final f = await _pick();
                 if (f != null) setState(() => _vBack = f);
               }),
@@ -476,9 +581,10 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     );
   }
 
-  Widget _imgRow(String label, XFile? f, VoidCallback onPick) {
+  Widget _imgRow(String label, XFile? f, String? existingUrl, VoidCallback onPick) {
     Widget thumb;
-    if (f == null) {
+    final hasExisting = f == null && (existingUrl ?? '').isNotEmpty;
+    if (f == null && !hasExisting) {
       thumb = Container(
         width: 56,
         height: 56,
@@ -488,26 +594,49 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
         ),
         child: const Icon(Icons.image_outlined),
       );
+    } else if (hasExisting) {
+      // Server'dagi mavjud rasm (prefill).
+      thumb = ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          _fullUrl(existingUrl!),
+          width: 56,
+          height: 56,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Container(
+            width: 56,
+            height: 56,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: const Icon(Icons.broken_image_outlined),
+          ),
+        ),
+      );
     } else if (kIsWeb) {
       thumb = ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.network(f.path, width: 56, height: 56, fit: BoxFit.cover),
+        child: Image.network(f!.path, width: 56, height: 56, fit: BoxFit.cover),
       );
     } else {
       thumb = ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.file(File(f.path), width: 56, height: 56, fit: BoxFit.cover),
+        child: Image.file(File(f!.path), width: 56, height: 56, fit: BoxFit.cover),
       );
     }
+    final subtitle = f?.name ??
+        (hasExisting
+            ? I18n.t('driver.reg.existing_image')
+            : I18n.t('driver.reg.not_picked'));
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: thumb,
       title: Text(label),
-      subtitle: Text(f?.name ?? I18n.t('driver.reg.not_picked'),
-          maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: IconButton(icon: const Icon(Icons.photo_camera_outlined), onPressed: onPick),
     );
   }
+
+  static String _fullUrl(String urlOrPath) =>
+      urlOrPath.startsWith('http') ? urlOrPath : '${ApiConfig.baseUrl}$urlOrPath';
 }
 
 class _UzPlateFormatter extends TextInputFormatter {

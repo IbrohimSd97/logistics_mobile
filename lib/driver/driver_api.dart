@@ -80,6 +80,41 @@ class DriverApi {
     return DriverRegistrationRejects.fromMap(data);
   }
 
+  /// GET /api/driver/registration/data (auth.refresh)
+  /// Rad etilgan haydovchining oldin yuborgan barcha qiymatlari — "xatolarni
+  /// tuzatish" oqimida maydonlarni oldindan to'ldirish uchun.
+  Future<DriverRegistrationData> registrationData() async {
+    final token = await _requireRefresh();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/registration/data');
+    final res = await http.get(url, headers: _jsonAuth(token));
+    final map = _decode(res);
+    final data = map['data'];
+    if (data is! Map<String, dynamic>) {
+      throw ApiException('Javobda data yo‘q');
+    }
+    return DriverRegistrationData.fromMap(data);
+  }
+
+  /// Server'dagi mavjud rasmni (nisbiy `/storage/...` yoki to'liq URL) yuklab
+  /// olib, vaqtinchalik faylga yozadi va `XFile` sifatida qaytaradi. Prefill
+  /// oqimida foydalanuvchi rasmni qayta tanlamasa, mavjud rasm shu yo'l bilan
+  /// qayta yuboriladi (backend submit shartnomasi o'zgarmaydi).
+  Future<XFile> downloadToTempFile(String urlOrPath) async {
+    final full = urlOrPath.startsWith('http')
+        ? urlOrPath
+        : '${ApiConfig.baseUrl}$urlOrPath';
+    final res = await http.get(Uri.parse(full));
+    if (res.statusCode >= 400) {
+      throw ApiException('Mavjud rasmni yuklab bo‘lmadi ($full)');
+    }
+    final name = full.split('?').first.split('/').last;
+    final safe = name.isEmpty ? 'image.jpg' : name;
+    final dir = Directory.systemTemp.createTempSync('prefill_');
+    final f = File('${dir.path}/$safe');
+    await f.writeAsBytes(res.bodyBytes);
+    return XFile(f.path);
+  }
+
   // ────────────────────────────── lookups ──────────────────────────────
 
   /// GET /api/driver/avtoparks/lists (no auth required by routes)

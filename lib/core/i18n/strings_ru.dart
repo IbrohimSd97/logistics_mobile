@@ -727,6 +727,7 @@ const Map<String, String> kStringsRu = {
   'driver.reg.field_required_middle': 'Укажите отчество',
   'driver.reg.field_birth_required': 'Дата рождения *',
   'driver.reg.not_picked': 'Не выбрано',
+  'driver.reg.existing_image': 'Загружено (есть) — нажмите, чтобы изменить',
   'driver.reg.pinfl_required': 'ПИНФЛ (14 цифр) *',
   'driver.reg.pinfl_14_digits': 'Нужно 14 цифр',
   'driver.reg.driver_license_section': 'Водительское удостоверение',

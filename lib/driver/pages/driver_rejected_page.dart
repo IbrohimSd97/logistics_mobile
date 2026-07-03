@@ -86,9 +86,15 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
       await _logoutAndRetry();
       return;
     }
+    DriverRegistrationData? data;
     try {
       final temp = await const AuthApi().issueTempTokenFromRefresh(refresh);
       await SessionStore().saveTempRegistrationToken(temp);
+      // Oldin yuborilgan qiymatlarni prefill uchun yuklaymiz (xato bo'lsa —
+      // prefill'siz davom etadi, bloklamaydi).
+      try {
+        data = await DriverApi.instance.registrationData();
+      } catch (_) {}
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -104,6 +110,7 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
         builder: (_) => DriverRegistrationStep1Page(
           phoneDisplay: widget.phoneDisplay,
           rejects: _rejects,
+          data: data,
         ),
       ),
     );

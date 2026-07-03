@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/config/api_config.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../driver_api.dart';
@@ -21,6 +22,7 @@ class DriverRegistrationStep1Page extends StatefulWidget {
     this.prefillMiddleName,
     this.prefillBirthDate,
     this.rejects,
+    this.data,
   });
 
   final String phoneDisplay;
@@ -29,6 +31,9 @@ class DriverRegistrationStep1Page extends StatefulWidget {
   final String? prefillMiddleName;
   final String? prefillBirthDate;
   final DriverRegistrationRejects? rejects;
+
+  /// Xatolarni tuzatish oqimida oldin yuborilgan qiymatlar (prefill).
+  final DriverRegistrationData? data;
 
   @override
   State<DriverRegistrationStep1Page> createState() => _DriverRegistrationStep1PageState();
@@ -48,34 +53,64 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
   DateTime? _licIssuedDate;
   bool _prefilled = false;
 
+  // Server'da mavjud rasmlar (prefill). Foydalanuvchi qayta tanlamasa, submit
+  // paytida shu URL'dan yuklab qayta yuboriladi.
+  String? _frontUrl;
+  String? _backUrl;
+  String? _selfieUrl;
+
   @override
   void initState() {
     super.initState();
-    if ((widget.prefillLastName ?? '').isNotEmpty) {
+    // Prefill: avval data (server) qiymatlari, keyin eski prefill* paramlar.
+    final d = widget.data?.step1;
+    if (d != null) {
+      _setText(_last, widget.data!.s1('last_name'));
+      _setText(_first, widget.data!.s1('first_name'));
+      _setText(_middle, widget.data!.s1('middle_name'));
+      _setText(_pinfl, widget.data!.s1('national_id'));
+      _setText(_licSeries, widget.data!.s1('car_license_series'));
+      _setText(_licNumber, widget.data!.s1('car_license_number'));
+      _birthDate = _parseDate(widget.data!.s1('birth_date')) ?? _birthDate;
+      _licIssuedDate =
+          _parseDate(widget.data!.s1('car_license_issued_date')) ?? _licIssuedDate;
+      _frontUrl = widget.data!.s1('car_license_front_img_url');
+      _backUrl = widget.data!.s1('car_license_back_img_url');
+      _selfieUrl = widget.data!.s1('car_license_selfie_img_url');
+      if (_last.text.isNotEmpty || _birthDate != null) _prefilled = true;
+    }
+    if (_last.text.isEmpty && (widget.prefillLastName ?? '').isNotEmpty) {
       _last.text = widget.prefillLastName!;
       _prefilled = true;
     }
-    if ((widget.prefillFirstName ?? '').isNotEmpty) {
+    if (_first.text.isEmpty && (widget.prefillFirstName ?? '').isNotEmpty) {
       _first.text = widget.prefillFirstName!;
       _prefilled = true;
     }
-    if ((widget.prefillMiddleName ?? '').isNotEmpty) {
+    if (_middle.text.isEmpty && (widget.prefillMiddleName ?? '').isNotEmpty) {
       _middle.text = widget.prefillMiddleName!;
       _prefilled = true;
     }
-    if ((widget.prefillBirthDate ?? '').isNotEmpty) {
-      try {
-        final parts = widget.prefillBirthDate!.split('-');
-        if (parts.length >= 3) {
-          _birthDate = DateTime(
-            int.parse(parts[0]),
-            int.parse(parts[1]),
-            int.parse(parts[2]),
-          );
-          _prefilled = true;
-        }
-      } catch (_) {}
+    if (_birthDate == null && (widget.prefillBirthDate ?? '').isNotEmpty) {
+      _birthDate = _parseDate(widget.prefillBirthDate);
+      if (_birthDate != null) _prefilled = true;
     }
+  }
+
+  static void _setText(TextEditingController c, String? v) {
+    if (v != null && v.isNotEmpty) c.text = v;
+  }
+
+  static DateTime? _parseDate(String? s) {
+    if (s == null || s.isEmpty) return null;
+    try {
+      final parts = s.split('T').first.split('-');
+      if (parts.length >= 3) {
+        return DateTime(
+            int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+      }
+    } catch (_) {}
+    return null;
   }
 
   XFile? _front;
@@ -169,6 +204,15 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     );
   }
 
+  /// Yangi tanlangan rasm bo'lsa — o'sha; aks holda mavjud URL'dan yuklab oladi.
+  Future<XFile?> _resolveImage(XFile? picked, String? url) async {
+    if (picked != null) return picked;
+    if (url != null && url.isNotEmpty) {
+      return DriverApi.instance.downloadToTempFile(url);
+    }
+    return null;
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_birthDate == null) {
@@ -179,12 +223,26 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       _toast(I18n.t('driver.reg.license_issued_required_msg'));
       return;
     }
-    if (_front == null || _back == null || _selfie == null) {
+    // Har bir rasm: yangi tanlangan bo'lsa — o'sha; aks holda mavjud URL bo'lsa
+    // qabul qilinadi (submit paytida yuklab olinadi). Ikkalasi ham yo'q bo'lsa —
+    // xatolik.
+    if ((_front == null && (_frontUrl ?? '').isEmpty) ||
+        (_back == null && (_backUrl ?? '').isEmpty) ||
+        (_selfie == null && (_selfieUrl ?? '').isEmpty)) {
       _toast(I18n.t('driver.reg.upload_3_msg'));
       return;
     }
     setState(() => _submitting = true);
     try {
+      final front = await _resolveImage(_front, _frontUrl);
+      final back = await _resolveImage(_back, _backUrl);
+      final selfie = await _resolveImage(_selfie, _selfieUrl);
+      if (front == null || back == null || selfie == null) {
+        if (!mounted) return;
+        setState(() => _submitting = false);
+        _toast(I18n.t('driver.reg.upload_3_msg'));
+        return;
+      }
       final r = await DriverApi.instance.registrationStep1(
         lastName: _last.text.trim(),
         firstName: _first.text.trim(),
@@ -194,9 +252,9 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
         carLicenseSeries: _licSeries.text.trim(),
         carLicenseNumber: _licNumber.text.trim(),
         carLicenseIssuedDate: _fmtDate(_licIssuedDate!),
-        carLicenseFront: _front!,
-        carLicenseBack: _back!,
-        carLicenseSelfie: _selfie!,
+        carLicenseFront: front,
+        carLicenseBack: back,
+        carLicenseSelfie: selfie,
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -211,6 +269,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
             phoneDisplay: widget.phoneDisplay,
             sessionId: sessionId,
             rejects: widget.rejects,
+            data: widget.data,
           ),
         ),
       );
@@ -434,17 +493,20 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
               Text(I18n.t('driver.reg.images_section'),
                   style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
-              _imgRow(I18n.t('driver.reg.img_license_front'), _front, () async {
+              _imgRow(I18n.t('driver.reg.img_license_front'), _front, _frontUrl,
+                  () async {
                 final f = await _pickImage(selfie: false);
                 if (f != null) setState(() => _front = f);
               }),
               _errorNote('car_license_front_img'),
-              _imgRow(I18n.t('driver.reg.img_license_back'), _back, () async {
+              _imgRow(I18n.t('driver.reg.img_license_back'), _back, _backUrl,
+                  () async {
                 final f = await _pickImage(selfie: false);
                 if (f != null) setState(() => _back = f);
               }),
               _errorNote('car_license_back_img'),
-              _imgRow(I18n.t('driver.reg.img_license_selfie'), _selfie, () async {
+              _imgRow(I18n.t('driver.reg.img_license_selfie'), _selfie, _selfieUrl,
+                  () async {
                 final f = await _pickImage(selfie: true);
                 if (f != null) setState(() => _selfie = f);
               }),
@@ -463,9 +525,10 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     );
   }
 
-  Widget _imgRow(String label, XFile? f, VoidCallback onPick) {
+  Widget _imgRow(String label, XFile? f, String? existingUrl, VoidCallback onPick) {
     Widget thumb;
-    if (f == null) {
+    final hasExisting = f == null && (existingUrl ?? '').isNotEmpty;
+    if (f == null && !hasExisting) {
       thumb = Container(
         width: 56,
         height: 56,
@@ -475,27 +538,50 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
         ),
         child: const Icon(Icons.image_outlined),
       );
+    } else if (hasExisting) {
+      // Server'dagi mavjud rasm (prefill).
+      thumb = ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          _fullUrl(existingUrl!),
+          width: 56,
+          height: 56,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Container(
+            width: 56,
+            height: 56,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: const Icon(Icons.broken_image_outlined),
+          ),
+        ),
+      );
     } else if (kIsWeb) {
       thumb = ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.network(f.path, width: 56, height: 56, fit: BoxFit.cover),
+        child: Image.network(f!.path, width: 56, height: 56, fit: BoxFit.cover),
       );
     } else {
       thumb = ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Image.file(File(f.path), width: 56, height: 56, fit: BoxFit.cover),
+        child: Image.file(File(f!.path), width: 56, height: 56, fit: BoxFit.cover),
       );
     }
+    final subtitle = f?.name ??
+        (hasExisting
+            ? I18n.t('driver.reg.existing_image')
+            : I18n.t('driver.reg.not_picked'));
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: thumb,
       title: Text(label),
-      subtitle: Text(f?.name ?? I18n.t('driver.reg.not_picked'),
-          maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: IconButton(
         icon: const Icon(Icons.photo_camera_outlined),
         onPressed: onPick,
       ),
     );
   }
+
+  static String _fullUrl(String urlOrPath) =>
+      urlOrPath.startsWith('http') ? urlOrPath : '${ApiConfig.baseUrl}$urlOrPath';
 }

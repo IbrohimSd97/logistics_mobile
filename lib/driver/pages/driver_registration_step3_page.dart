@@ -21,11 +21,15 @@ class DriverRegistrationStep3Page extends StatefulWidget {
     required this.phoneDisplay,
     required this.sessionId,
     this.rejects,
+    this.data,
   });
 
   final String phoneDisplay;
   final String sessionId;
   final DriverRegistrationRejects? rejects;
+
+  /// Xatolarni tuzatish oqimida oldin yuborilgan qiymatlar (prefill).
+  final DriverRegistrationData? data;
 
   @override
   State<DriverRegistrationStep3Page> createState() => _DriverRegistrationStep3PageState();
@@ -36,10 +40,12 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   /// 1=O'zimniki, 2=Boshqa hujjat asosida
   int _ownership = 1;
   XFile? _ownershipFile;
+  String? _ownershipUrl; // server'dagi mavjud hujjat (prefill)
 
   /// 1=YATT, 2=O'z-o'zini band qilish, 3=Jismoniy shaxs
   int _legalType = 3;
   XFile? _legalPdf;
+  String? _legalUrl; // server'dagi mavjud hujjat (prefill)
 
   AvtoparkItem? _avtopark;
   List<AvtoparkItem> _avtoparks = [];
@@ -54,6 +60,15 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   @override
   void initState() {
     super.initState();
+    // Prefill: oldin yuborilgan tanlovlar va mavjud hujjatlar.
+    if (widget.data?.step3 != null) {
+      final own = widget.data!.i3('vehicle_ownership');
+      if (own == 1 || own == 2) _ownership = own!;
+      final lt = widget.data!.i3('legal_entity_type');
+      if (lt == 1 || lt == 2 || lt == 3) _legalType = lt!;
+      _ownershipUrl = widget.data!.s3('ownership_contract_img_url');
+      _legalUrl = widget.data!.s3('legal_certificate_img_url');
+    }
     _loadAvtoparks();
   }
 
@@ -68,6 +83,16 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
       setState(() {
         _avtoparks = list;
         _loadingAvtoparks = false;
+        // Prefill: oldin tanlangan avtoparkni id bo'yicha tiklaymiz.
+        final cid = widget.data?.i3('company_id');
+        if (_avtopark == null && cid != null) {
+          for (final a in list) {
+            if (a.id == cid) {
+              _avtopark = a;
+              break;
+            }
+          }
+        }
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -147,11 +172,16 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   }
 
   Future<void> _submit() async {
-    if (_ownership == 2 && _ownershipFile == null) {
+    // Hujjat majburiy: yangi tanlangan yoki server'da mavjud (URL) bo'lsa yetarli.
+    if (_ownership == 2 &&
+        _ownershipFile == null &&
+        (_ownershipUrl ?? '').isEmpty) {
       _toast(I18n.t('driver.reg.upload_ownership_doc'));
       return;
     }
-    if ((_legalType == 1 || _legalType == 2) && _legalPdf == null) {
+    if ((_legalType == 1 || _legalType == 2) &&
+        _legalPdf == null &&
+        (_legalUrl ?? '').isEmpty) {
       _toast(I18n.t('driver.reg.upload_legal_pdf'));
       return;
     }
@@ -166,12 +196,26 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
 
     setState(() => _submitting = true);
     try {
+      // Foydalanuvchi qayta tanlamagan hujjatlarni mavjud URL'dan yuklab olamiz.
+      XFile? ownershipFile = _ownershipFile;
+      if (_ownership == 2 &&
+          ownershipFile == null &&
+          (_ownershipUrl ?? '').isNotEmpty) {
+        ownershipFile =
+            await DriverApi.instance.downloadToTempFile(_ownershipUrl!);
+      }
+      XFile? legalPdf = _legalPdf;
+      if ((_legalType == 1 || _legalType == 2) &&
+          legalPdf == null &&
+          (_legalUrl ?? '').isNotEmpty) {
+        legalPdf = await DriverApi.instance.downloadToTempFile(_legalUrl!);
+      }
       final r = await DriverApi.instance.registrationStep3(
         sessionId: widget.sessionId,
         vehicleOwnership: _ownership,
-        ownershipFile: _ownershipFile,
+        ownershipFile: ownershipFile,
         legalEntityType: _legalType,
-        legalCertificatePdf: _legalPdf,
+        legalCertificatePdf: legalPdf,
         companyId: _avtopark?.id,
         companyOffertaAccepted: _companyOfferta,
       );
@@ -266,7 +310,8 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
               contentPadding: EdgeInsets.zero,
             ),
             if (_ownership == 2)
-              _fileRow(I18n.t('driver.reg.ownership_doc'), _ownershipFile, () async {
+              _fileRow(I18n.t('driver.reg.ownership_doc'), _ownershipFile,
+                  _ownershipUrl, () async {
                 final f = await _pickImage();
                 if (f != null) setState(() => _ownershipFile = f);
               }),
@@ -299,7 +344,8 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
               contentPadding: EdgeInsets.zero,
             ),
             if (_legalType == 1 || _legalType == 2)
-              _fileRow(I18n.t('driver.reg.legal_pdf'), _legalPdf, () async {
+              _fileRow(I18n.t('driver.reg.legal_pdf'), _legalPdf, _legalUrl,
+                  () async {
                 final f = await _pickPdfPlaceholder();
                 if (f != null) setState(() => _legalPdf = f);
               }),
@@ -362,9 +408,23 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
     );
   }
 
-  Widget _fileRow(String label, XFile? f, VoidCallback onPick) {
+  Widget _fileRow(String label, XFile? f, String? existingUrl, VoidCallback onPick) {
     Widget thumb;
-    if (f == null) {
+    final hasExisting = f == null && (existingUrl ?? '').isNotEmpty;
+    if (hasExisting) {
+      // Mavjud hujjat (PDF bo'lishi mumkin) — rasm sifatida ko'rsatmaymiz,
+      // "biriktirilgan hujjat" belgisi.
+      thumb = Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(Icons.description_rounded,
+            color: Theme.of(context).colorScheme.onPrimaryContainer),
+      );
+    } else if (f == null) {
       thumb = Container(
         width: 56,
         height: 56,
@@ -385,12 +445,15 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
         child: Image.file(File(f.path), width: 56, height: 56, fit: BoxFit.cover),
       );
     }
+    final subtitle = f?.name ??
+        (hasExisting
+            ? I18n.t('driver.reg.existing_image')
+            : I18n.t('driver.reg.not_picked'));
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: thumb,
       title: Text(label),
-      subtitle: Text(f?.name ?? I18n.t('driver.reg.not_picked'),
-          maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: IconButton(icon: const Icon(Icons.upload_file_rounded), onPressed: onPick),
     );
   }
