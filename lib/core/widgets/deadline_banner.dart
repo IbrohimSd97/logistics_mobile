@@ -10,6 +10,7 @@ class DeadlineBanner extends StatelessWidget {
     required this.deadlineAtIso,
     required this.slaHours,
     required this.deliveredAtIso,
+    this.arrivedDeliveryAtIso,
     this.latePenaltyAmount,
     this.penaltyPerHour,
     required this.isDriver,
@@ -22,6 +23,12 @@ class DeadlineBanner extends StatelessWidget {
   /// Buyurtma `delivered_at`. Tugatilgan bo'lsa shu vaqtga nisbatan
   /// kechikishni ko'rsatamiz, bo'lmasa hozirgi vaqtga.
   final String? deliveredAtIso;
+
+  /// Driver yetkazish nuqtasiga yetib kelgan vaqt (`arrived_delivery_at`).
+  /// Driver jarimasi FAQAT kechikib yetib kelgani uchun — yetib kelgandan
+  /// keyingi tushirish kutishi mijoz aybi. Shuning uchun bu qiymat mavjud
+  /// bo'lsa, kechikish shu vaqtda "muzlaydi" (tushirish davomida o'smaydi).
+  final String? arrivedDeliveryAtIso;
 
   /// Yakunlangandan keyin server yozgan jarima (so'm). null bo'lsa ko'rsatilmaydi.
   final String? latePenaltyAmount;
@@ -37,9 +44,15 @@ class DeadlineBanner extends StatelessWidget {
     final deadline = DateTime.tryParse(deadlineAtIso);
     if (deadline == null) return const SizedBox.shrink();
 
-    final reference = deliveredAtIso != null
-        ? (DateTime.tryParse(deliveredAtIso!) ?? DateTime.now())
-        : DateTime.now();
+    // Kechikish o'lchov nuqtasi: yetib kelgan vaqt (arrived) bo'lsa — o'sha
+    // (tushirish davomida jarima o'smaydi); bo'lmasa delivered; u ham bo'lmasa
+    // hozirgi vaqt (driver hali yo'lda). Bu backenddagi jarima mantig'iga mos
+    // (ApplyLateDeliveryPenaltyAction `arrived_delivery_at` bo'yicha o'lchaydi).
+    final reference = arrivedDeliveryAtIso != null
+        ? (DateTime.tryParse(arrivedDeliveryAtIso!) ?? DateTime.now())
+        : (deliveredAtIso != null
+            ? (DateTime.tryParse(deliveredAtIso!) ?? DateTime.now())
+            : DateTime.now());
 
     final isLate = reference.isAfter(deadline);
     final diff = isLate ? reference.difference(deadline) : deadline.difference(reference);

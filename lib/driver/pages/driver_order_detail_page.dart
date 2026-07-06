@@ -1021,6 +1021,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                 deadlineAtIso: _order.deliveryDeadlineAt!,
                                 slaHours: _order.slaHoursSnapshot,
                                 deliveredAtIso: _order.deliveredAt,
+                                arrivedDeliveryAtIso: _order.arrivedDeliveryAt,
                                 latePenaltyAmount: _order.latePenaltyAmount,
                                 penaltyPerHour: _order.cargoType != null
                                     ? _calcPenaltyPerHour(_order.cargoType!)

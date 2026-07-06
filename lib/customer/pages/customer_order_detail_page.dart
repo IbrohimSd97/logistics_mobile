@@ -885,6 +885,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                                 deadlineAtIso: _order.deliveryDeadlineAt!,
                                 slaHours: _order.slaHoursSnapshot,
                                 deliveredAtIso: _order.deliveredAt,
+                                arrivedDeliveryAtIso: _order.arrivedDeliveryAt,
                                 latePenaltyAmount: _order.latePenaltyAmount,
                                 penaltyPerHour: _order.cargoType != null
                                     ? _calcPenaltyPerHour(_order.cargoType!)
