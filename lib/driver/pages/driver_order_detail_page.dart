@@ -39,6 +39,10 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
 
   bool _busy = false;
   bool _reloading = false;
+  /// Sahifada biror amal (status o'zgarishi/bekor qilish) bo'ldimi. Orqaga
+  /// qaytganda home ekraniga shu bayroq (`true`) qaytariladi — u ro'yxat/joriy
+  /// buyurtmani darhol qayta yuklaydi (qo'lda refresh shart bo'lmaydi).
+  bool _changed = false;
   late DriverOrder _order;
   final MapController _mapCtrl = MapController();
   double _lastZoom = 12;
@@ -477,9 +481,9 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   /// Buyurtmani server'dan qayta yuklash — active/scheduled/archive ro'yxatlari
   /// va current-order'dan bittasini ID bo'yicha topadi. Backend hozircha alohida
   /// `GET orders/{id}` endpoint chiqarmagani uchun shu yo'l ishlatiladi.
-  Future<void> _reloadOrder() async {
+  Future<void> _reloadOrder({bool silent = false}) async {
     if (_reloading) return;
-    setState(() => _reloading = true);
+    if (!silent) setState(() => _reloading = true);
     try {
       final results = await Future.wait<List<DriverOrder>>([
         DriverApi.instance.activeOrders().catchError((_) => <DriverOrder>[]),
@@ -505,15 +509,15 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       if (found != null) {
         setState(() => _order = found!);
         unawaited(_refetchRoute());
-      } else {
+      } else if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(I18n.t('driver.detail.order_not_found'))),
         );
       }
     } catch (e) {
-      _showError(e);
+      if (!silent) _showError(e);
     } finally {
-      if (mounted) setState(() => _reloading = false);
+      if (mounted && !silent) setState(() => _reloading = false);
     }
   }
 
@@ -524,6 +528,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       if (!mounted) return;
       setState(() {
         _busy = false;
+        _changed = true;
         _order = _orderWithStatus(newStatus);
       });
       // status o'zgargach yangi bosqich uchun route'ni qayta olamiz
@@ -533,6 +538,10 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       if (newStatus == 5) {
         _autoTransitionTriggered = false;
       }
+      // Serverdan to'liq holatni JIM olib, barcha maydonlarni (vaqtlar, deadline,
+      // kutish haqi, summalar) yakuniy qiymatga keltiramiz. Optimistik yangilanish
+      // ustiga ishlaydi — foydalanuvchi kutmaydi, xatolik bo'lsa jim o'tadi.
+      unawaited(_reloadOrder(silent: true));
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
@@ -626,6 +635,12 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   }
 
   DriverOrder _orderWithStatus(int newStatus) {
+    // Optimistik yangilanish — status bilan birga mos bosqich vaqtlarini ham
+    // darhol to'ldiramiz (timeline/banner refreshsiz yangilansin). Statuslar:
+    // 3=Accepted, 5=Loading(=ArrivedPickup collapse), 6=InTransit,
+    // 8=Unloading(=ArrivedDelivery collapse), 9=Delivered.
+    final nowIso = DateTime.now().toIso8601String();
+    String? at(String? cur, bool set) => set ? (cur ?? nowIso) : cur;
     return DriverOrder(
       id: _order.id,
       orderNumber: _order.orderNumber,
@@ -647,16 +662,23 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       comment: _order.comment,
       createdAt: _order.createdAt,
       cargoType: _order.cargoType,
-      acceptedAt: _order.acceptedAt,
-      arrivedPickupAt: _order.arrivedPickupAt,
-      loadingStartedAt: newStatus == 5 ? DateTime.now().toIso8601String() : _order.loadingStartedAt,
-      inTransitAt: _order.inTransitAt,
-      arrivedDeliveryAt: _order.arrivedDeliveryAt,
-      unloadingStartedAt: newStatus == 8 ? DateTime.now().toIso8601String() : _order.unloadingStartedAt,
-      deliveredAt: newStatus == 9 ? DateTime.now().toIso8601String() : _order.deliveredAt,
+      acceptedAt: at(_order.acceptedAt, newStatus >= 3),
+      arrivedPickupAt: at(_order.arrivedPickupAt, newStatus >= 5),
+      loadingStartedAt: at(_order.loadingStartedAt, newStatus >= 5),
+      inTransitAt: at(_order.inTransitAt, newStatus >= 6),
+      arrivedDeliveryAt: at(_order.arrivedDeliveryAt, newStatus >= 8),
+      unloadingStartedAt: at(_order.unloadingStartedAt, newStatus >= 8),
+      deliveredAt: at(_order.deliveredAt, newStatus >= 9),
       deliveryDeadlineAt: _order.deliveryDeadlineAt,
       slaHoursSnapshot: _order.slaHoursSnapshot,
       latePenaltyAmount: _order.latePenaltyAmount,
+      companyCommissionPct: _order.companyCommissionPct,
+      projectCommissionPct: _order.projectCommissionPct,
+      companyCommissionAmount: _order.companyCommissionAmount,
+      projectCommissionAmount: _order.projectCommissionAmount,
+      driverIncomeAmount: _order.driverIncomeAmount,
+      scheduledPickupAt: _order.scheduledPickupAt,
+      incomeVisible: _order.incomeVisible,
     );
   }
 
@@ -788,13 +810,21 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     // route) — faqat pinlar, A↔B to'g'ri chiziq emas (talab bo'yicha).
     final routePoints = _route?.points;
 
-    return Scaffold(
+    return PopScope(
+      // Pop'ni o'zimiz boshqaramiz — orqaga qaytganda `_changed` natijasini
+      // qaytaramiz, shunda home ro'yxati/joriy buyurtma darhol yangilanadi.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.of(context).pop(_changed);
+      },
+      child: Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: AppPalette.darkOn,
         elevation: 0,
-        leading: _circleIconButton(Icons.arrow_back_rounded, () => Navigator.of(context).pop()),
+        leading: _circleIconButton(Icons.arrow_back_rounded, () => Navigator.of(context).pop(_changed)),
         actions: [
           _circleIconButton(Icons.center_focus_strong_rounded, _fitMapToRoute),
           _circleIconButton(
@@ -1216,6 +1246,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
           ],
         ),
         ),
+      ),
       ),
     );
   }
