@@ -10,6 +10,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/cancel_reasons_api.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/location/current_location.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/widgets/deadline_banner.dart';
 import '../../core/widgets/order_timeline.dart';
@@ -698,11 +699,14 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
           permission == LocationPermission.whileInUse) {
         final serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (serviceEnabled) {
-          final pos = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-          ).timeout(const Duration(seconds: 6));
-          acceptLoc = LatLng(pos.latitude, pos.longitude);
-          if (mounted) setState(() => _currentDriverLocation = acceptLoc);
+          // ANR-xavfsiz: oxirgi ma'lum joylashuv → yangi fix. Dart `.timeout()`
+          // ishlatmaymiz — u getCurrentPosition'ni bekor qilib, geolocator'ning
+          // ASOSIY OQIMDAGI bloklovchi NMEA unregister'ini chaqiradi (ANR sababi).
+          final pos = await CurrentLocation.oneShot();
+          if (pos != null) {
+            acceptLoc = LatLng(pos.latitude, pos.longitude);
+            if (mounted) setState(() => _currentDriverLocation = acceptLoc);
+          }
         }
       }
     } catch (_) {

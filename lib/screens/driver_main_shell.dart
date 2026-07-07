@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+
+import '../core/location/current_location.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
@@ -263,7 +265,8 @@ class DriverHomeBody extends StatefulWidget {
   State<DriverHomeBody> createState() => DriverHomeBodyState();
 }
 
-class DriverHomeBodyState extends State<DriverHomeBody> {
+class DriverHomeBodyState extends State<DriverHomeBody>
+    with WidgetsBindingObserver {
   bool _online = false;
   bool _busy = false;
   String? _error;
@@ -290,6 +293,7 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadCurrent();
     // Hot-reload yoki widget qayta yaratilganda agar driver allaqachon
     // onlayn bo'lib qolgan bo'lsa, push timer'ni qayta ishga tushiramiz.
@@ -298,8 +302,28 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _locationPushTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Ilova fon'dan qaytdi — eski (bayon qolgan) ma'lumot ko'rsatilmasin:
+      // joriy buyurtmani serverdan qayta yuklaymiz. (Uzoq suspend'dan keyin
+      // ekranda eski karta qolib ketishi muammosini hal qiladi.)
+      _loadCurrent();
+      if (_online) {
+        _startLocationPushTimer();
+        if (_current == null) _loadActive();
+      }
+    } else if (state == AppLifecycleState.paused) {
+      // Fon'da GPS push timer'ni to'xtatamiz — batareya/CPU tejaladi va
+      // resume paytida toza qayta ishga tushadi.
+      _stopLocationPushTimer();
+    }
   }
 
   /// Onlayn bo'lganda chaqiriladi — har 1 daqiqada GPS lokatsiyasini
@@ -327,12 +351,10 @@ class DriverHomeBodyState extends State<DriverHomeBody> {
       if (permission == LocationPermission.denied) return;
       if (permission == LocationPermission.deniedForever) return;
 
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 8),
-        ),
-      );
+      // Periodik push — oxirgi ma'lum joylashuvni ishlatamiz (ANR-xavfsiz;
+      // har tick'da yangi fix so'rab NMEA start/stop churn qilmaymiz).
+      final pos = await CurrentLocation.oneShot(timeLimit: const Duration(seconds: 8));
+      if (pos == null) return;
       await DriverApi.instance.saveLocation(
         latitude: pos.latitude,
         longitude: pos.longitude,

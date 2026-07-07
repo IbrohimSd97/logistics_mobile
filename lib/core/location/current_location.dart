@@ -13,6 +13,35 @@ import '../i18n/i18n.dart';
 class CurrentLocation {
   CurrentLocation._();
 
+  /// Bir martalik joylashuv o'qish — **ANR-xavfsiz**.
+  ///
+  /// Avval `getLastKnownPosition()` (kesh) qaytariladi — u GPS oqimini
+  /// boshlamaydi, demak geolocator NMEA listener'ini ro'yxatga olmaydi/olib
+  /// tashlamaydi. Bu muhim: geolocator GPS'ni to'xtatganда `removeNmeaListener`
+  /// ni ASOSIY OQIMDA sinxron binder chaqiruvi bilan bajaradi va tizim
+  /// joylashuv xizmati sekin bo'lsa (uzoq suspend/emulator) 5s+ bloklanib ANR
+  /// beradi. Oxirgi ma'lum joylashuv bo'lmagandagina yangi fix so'raladi
+  /// (Dart `.timeout()` emas — geolocator'ning ichki `timeLimit`i bilan, chunki
+  /// `.timeout()` so'rovni bekor qilib o'sha bloklovchi to'xtatishni chaqiradi).
+  static Future<Position?> oneShot({
+    Duration timeLimit = const Duration(seconds: 6),
+  }) async {
+    try {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) return last;
+    } catch (_) {}
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: timeLimit,
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<LatLng?> ensureAndGet(BuildContext context) async {
     // 1) Joylashuv xizmati yoniqmi? O'chiq bo'lsa — yoqishni so'raymiz.
     var serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -47,16 +76,11 @@ class CurrentLocation {
       return null;
     }
 
-    // 3) Joriy joylashuvni olamiz.
-    try {
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-      );
-      return LatLng(pos.latitude, pos.longitude);
-    } catch (_) {
-      if (context.mounted) _snack(context, I18n.t('location.unavailable'));
-      return null;
-    }
+    // 3) Joriy joylashuvni olamiz (ANR-xavfsiz: oxirgi ma'lum → yangi fix).
+    final pos = await oneShot();
+    if (pos != null) return LatLng(pos.latitude, pos.longitude);
+    if (context.mounted) _snack(context, I18n.t('location.unavailable'));
+    return null;
   }
 
   static Future<bool?> _askEnableService(BuildContext context) {
