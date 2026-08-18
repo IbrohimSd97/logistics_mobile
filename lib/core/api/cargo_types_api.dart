@@ -16,7 +16,9 @@ class CargoType {
     this.deliveryFreeWaitMinutes = 0,
     this.deliveryPaidWaitPrice,
     this.deliveryPaidWaitIntervalMin = 10,
+    this.baseFare,
     this.pricePerKm,
+    this.pricePerMinute,
     this.minOrderPrice,
     this.compensationPricePerKm,
   });
@@ -30,7 +32,13 @@ class CargoType {
   final int deliveryFreeWaitMinutes;
   final String? deliveryPaidWaitPrice;
   final int deliveryPaidWaitIntervalMin;
+
+  /// Narx formulasi: (baza + km × pricePerKm + daqiqa × pricePerMinute) × K,
+  /// natija minOrderPrice dan kam bo'lsa — minOrderPrice. K serverdan
+  /// [CargoTypesApi.list] javobida keladi.
+  final String? baseFare;
   final String? pricePerKm;
+  final String? pricePerMinute;
   final String? minOrderPrice;
   final String? compensationPricePerKm;
 
@@ -55,7 +63,9 @@ class CargoType {
       deliveryFreeWaitMinutes: _int(m['delivery_free_wait_minutes']) ?? 0,
       deliveryPaidWaitPrice: m['delivery_paid_wait_price']?.toString(),
       deliveryPaidWaitIntervalMin: _int(m['delivery_paid_wait_interval_min']) ?? 10,
+      baseFare: m['base_fare']?.toString(),
       pricePerKm: m['price_per_km']?.toString(),
+      pricePerMinute: m['price_per_minute']?.toString(),
       minOrderPrice: m['min_order_price']?.toString(),
       compensationPricePerKm: m['compensation_price_per_km']?.toString(),
     );
