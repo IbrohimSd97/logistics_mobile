@@ -663,11 +663,12 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     return (raw != null && raw.isNotEmpty) ? raw : null;
   }
 
+  /// Soatlik jarima tarifi — serverdagi `late_penalty_per_hour` bilan bir xil
+  /// manba (avval kutish narxidan hisoblanardi, endi mustaqil ustun).
   double? _calcPenaltyPerHour(CargoTypeMini c) {
-    final price = num.tryParse(c.deliveryPaidWaitPrice ?? '');
-    final interval = c.deliveryPaidWaitIntervalMin;
-    if (price == null || interval <= 0) return null;
-    return price.toDouble() * 60.0 / interval;
+    final perHour = num.tryParse(c.latePenaltyPerHour ?? '');
+    if (perHour == null || perHour <= 0) return null;
+    return perHour.toDouble();
   }
 
   DriverOrder _orderWithStatus(int newStatus) {
@@ -1081,6 +1082,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                 penaltyPerHour: _order.cargoType != null
                                     ? _calcPenaltyPerHour(_order.cargoType!)
                                     : null,
+                                orderPrice: _order.totalPrice,
                                 isDriver: true,
                               ),
                             if (s == 5 && _order.loadingStartedAt != null && _order.cargoType != null)

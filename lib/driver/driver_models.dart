@@ -217,6 +217,7 @@ class CargoTypeMini {
     this.deliveryFreeWaitMinutes = 0,
     this.deliveryPaidWaitPrice,
     this.deliveryPaidWaitIntervalMin = 10,
+    this.latePenaltyPerHour,
   });
 
   final int id;
@@ -227,6 +228,9 @@ class CargoTypeMini {
   final int deliveryFreeWaitMinutes;
   final String? deliveryPaidWaitPrice;
   final int deliveryPaidWaitIntervalMin;
+
+  /// Kechikish jarimasi (so'm/soat). Kutish narxidan mustaqil.
+  final String? latePenaltyPerHour;
 
   static CargoTypeMini? fromMap(Map<String, dynamic>? m) {
     if (m == null) return null;
@@ -241,6 +245,7 @@ class CargoTypeMini {
       deliveryFreeWaitMinutes: _int(m['delivery_free_wait_minutes']) ?? 0,
       deliveryPaidWaitPrice: m['delivery_paid_wait_price']?.toString(),
       deliveryPaidWaitIntervalMin: _int(m['delivery_paid_wait_interval_min']) ?? 10,
+      latePenaltyPerHour: m['late_penalty_per_hour']?.toString(),
     );
   }
 }

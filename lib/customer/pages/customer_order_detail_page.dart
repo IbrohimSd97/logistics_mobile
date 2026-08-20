@@ -343,11 +343,12 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
     return s == 1 || s == 2 || s == 3 || s == 5;
   }
 
+  /// Soatlik jarima tarifi — serverdagi `late_penalty_per_hour` bilan bir xil
+  /// manba (avval kutish narxidan hisoblanardi, endi mustaqil ustun).
   double? _calcPenaltyPerHour(CargoTypeMini c) {
-    final price = num.tryParse(c.deliveryPaidWaitPrice ?? '');
-    final interval = c.deliveryPaidWaitIntervalMin;
-    if (price == null || interval <= 0) return null;
-    return price.toDouble() * 60.0 / interval;
+    final perHour = num.tryParse(c.latePenaltyPerHour ?? '');
+    if (perHour == null || perHour <= 0) return null;
+    return perHour.toDouble();
   }
 
   List<TimelineStep> _timelineStepsCustomer(CustomerOrder o) {
@@ -863,6 +864,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                                 penaltyPerHour: _order.cargoType != null
                                     ? _calcPenaltyPerHour(_order.cargoType!)
                                     : null,
+                                orderPrice: _order.totalPrice,
                                 isDriver: false,
                               ),
                             if (s == 5 && _order.loadingStartedAt != null && _order.cargoType != null)

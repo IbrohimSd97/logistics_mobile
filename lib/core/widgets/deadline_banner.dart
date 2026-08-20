@@ -13,8 +13,14 @@ class DeadlineBanner extends StatelessWidget {
     this.arrivedDeliveryAtIso,
     this.latePenaltyAmount,
     this.penaltyPerHour,
+    this.orderPrice,
     required this.isDriver,
   });
+
+  /// Jarima buyurtma narxining shu ulushidan oshmaydi — serverdagi
+  /// `DeliverySla::MaxPenaltyShareOfPrice` bilan bir xil bo'lishi shart,
+  /// aks holda ilova haqiqiydan katta summa ko'rsatadi.
+  static const double maxPenaltyShareOfPrice = 0.50;
 
   /// `delivery_deadline_at` ISO string.
   final String deadlineAtIso;
@@ -35,6 +41,9 @@ class DeadlineBanner extends StatelessWidget {
 
   /// Soatlik jarima tarifi (so'm) — kechikish jarayonida tahminiy summa uchun.
   final double? penaltyPerHour;
+
+  /// Buyurtma narxi (`total_price`) — jarima cheklovini hisoblash uchun.
+  final String? orderPrice;
 
   /// `true` — driver pespektivasi (jarima ogohlantirish), `false` — customer (kompensatsiya).
   final bool isDriver;
@@ -81,7 +90,17 @@ class DeadlineBanner extends StatelessWidget {
       penaltyText = _money(serverPenalty.toString());
     } else if (isLate && penaltyPerHour != null && penaltyPerHour! > 0) {
       final lateHours = (diff.inSeconds / 3600.0).ceil();
-      penaltyText = _money((lateHours * penaltyPerHour!).toString());
+      var estimate = lateHours * penaltyPerHour!;
+
+      // Server jarimani buyurtma narxining yarmi bilan cheklaydi — prognoz ham
+      // shu cheklovga bo'ysunishi kerak.
+      final price = num.tryParse(orderPrice ?? '');
+      if (price != null && price > 0) {
+        final cap = price.toDouble() * maxPenaltyShareOfPrice;
+        if (estimate > cap) estimate = cap;
+      }
+
+      penaltyText = _money(estimate.toString());
     }
 
     final detailLine = isLate
