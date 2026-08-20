@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Claude Code ish fayllari — mahalliy sozlamalar (ba'zan API kalitlari bo'ladi)
+# va worktree nusxalari. Repoga kirmasligi kerak.
+.claude/
