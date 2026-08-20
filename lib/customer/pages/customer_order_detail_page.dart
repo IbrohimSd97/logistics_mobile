@@ -3,18 +3,20 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:yandex_mapkit/yandex_mapkit.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/cancel_reasons_api.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/location/current_location.dart';
+import '../../core/location/map_markers.dart';
 import '../../core/location/my_location_button.dart';
+import '../../core/location/yandex_point.dart';
+import '../../core/location/yandex_route.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/widgets/deadline_banner.dart';
 import '../../core/widgets/order_timeline.dart';
-import '../../core/widgets/osrm_route.dart';
 import '../../core/widgets/slide_button.dart';
 import '../customer_api.dart';
 import '../customer_models.dart';
@@ -36,8 +38,16 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
   bool _busy = false;
   bool _reloading = false;
   late CustomerOrder _order;
-  final MapController _mapCtrl = MapController();
-  OsrmRoute? _route;
+  YandexMapController? _mapCtrl;
+  double _zoom = 12;
+
+  /// Marker rasmlari runtime'da Canvas bilan chiziladi (asset shart emas) va
+  /// bir marta tayyorlanib saqlanadi — har rebuild'da qayta chizilmasligi uchun.
+  BitmapDescriptor? _pinA;
+  BitmapDescriptor? _pinB;
+  BitmapDescriptor? _driverIcon;
+
+  MapRoute? _route;
   bool _routeLoading = false;
   Timer? _ticker;
 
@@ -65,6 +75,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
   void initState() {
     super.initState();
     _order = widget.order;
+    _prepareMarkerIcons();
     _refetchRoute();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
@@ -72,11 +83,22 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
     _startDriverLocationPolling();
   }
 
+  Future<void> _prepareMarkerIcons() async {
+    final a = await MapMarkers.abPin('A', AppPalette.success);
+    final b = await MapMarkers.abPin('B', AppPalette.dangerLight);
+    final driver = await MapMarkers.driverArrow(AppPalette.teal);
+    if (!mounted) return;
+    setState(() {
+      _pinA = a;
+      _pinB = b;
+      _driverIcon = driver;
+    });
+  }
+
   @override
   void dispose() {
     _ticker?.cancel();
     _driverPollTimer?.cancel();
-    _mapCtrl.dispose();
     super.dispose();
   }
 
@@ -140,11 +162,8 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
         // Heading-up follow: faol bosqichda map'ni driver'ga moslab
         // yo'nalish (azimuth)'ga aylantiramiz.
         if (_followDriver && isActive) {
-          double targetZoom = 15.0;
-          try {
-            final cur = _mapCtrl.camera.zoom;
-            targetZoom = cur < 13 ? 15.0 : cur;
-          } catch (_) {}
+          // Uzoqlashtirilgan holatda driverni kuzatish qiyin — 15 ga yaqinlashtiramiz.
+          final targetZoom = _zoom < 13 ? 15.0 : _zoom;
           _moveCamera(newLoc, zoom: targetZoom, azimuth: _driverHeading);
         }
       }
@@ -170,12 +189,21 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
   /// Kamerani nuqtaga olib boradi. [azimuth] berilsa xaritani aylantiradi
   /// (heading-up). Dastur tomonidan chaqiriladi — gesture emas.
   void _moveCamera(LatLng p, {double? zoom, double azimuth = 0}) {
-    try {
-      _lastProgrammaticCameraChange = DateTime.now();
-      _mapCtrl.moveAndRotate(p, zoom ?? _mapCtrl.camera.zoom, -azimuth);
-    } catch (_) {
-      // map hali ready emas
-    }
+    final ctrl = _mapCtrl;
+    if (ctrl == null) return;
+
+    _lastProgrammaticCameraChange = DateTime.now();
+    _zoom = zoom ?? _zoom;
+    ctrl.moveCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: latLngToPoint(p),
+          zoom: _zoom,
+          azimuth: azimuth,
+        ),
+      ),
+      animation: const MapAnimation(type: MapAnimationType.smooth, duration: 0.4),
+    );
   }
 
   static double _bearingDegrees(LatLng from, LatLng to) {
@@ -231,7 +259,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
       return;
     }
     setState(() => _routeLoading = true);
-    final r = await OsrmRoute.fetch(from, to);
+    final r = await MapRoute.fetch(from, to);
     if (!mounted) return;
     setState(() {
       _route = r;
@@ -251,17 +279,14 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
 
   /// Kamerani berilgan nuqtalarni o'z ichiga oladigan qilib moslaydi.
   void _fitToPoints(List<LatLng> pts) {
-    if (pts.length < 2) return;
-    try {
-      _mapCtrl.fitCamera(
-        CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints(pts),
-          padding: const EdgeInsets.all(64),
-        ),
-      );
-    } catch (_) {
-      // map hali ready emas
-    }
+    final ctrl = _mapCtrl;
+    if (ctrl == null || pts.length < 2) return;
+
+    _lastProgrammaticCameraChange = DateTime.now();
+    ctrl.moveCamera(
+      CameraUpdate.newGeometry(Geometry.fromBoundingBox(boundingBoxOf(pts))),
+      animation: const MapAnimation(type: MapAnimationType.smooth, duration: 0.4),
+    );
   }
 
   void _fitMapToRoute() {
@@ -550,68 +575,34 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
     );
   }
 
-  Marker _routeMarker(LatLng point, {required bool isStart}) {
-    final color = isStart ? AppPalette.success : AppPalette.dangerLight;
-    return Marker(
-      point: point,
-      width: 44,
-      height: 56,
-      alignment: Alignment.topCenter,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 3),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                isStart ? 'A' : 'B',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ),
-          Container(width: 2, height: 8, color: color),
-        ],
+  PlacemarkMapObject _routeMarker(LatLng point, {required bool isStart}) {
+    return PlacemarkMapObject(
+      mapId: MapObjectId(isStart ? 'pickup' : 'delivery'),
+      point: latLngToPoint(point),
+      opacity: 1,
+      icon: PlacemarkIcon.single(
+        PlacemarkIconStyle(
+          image: (isStart ? _pinA : _pinB)!,
+          scale: 0.75,
+        ),
       ),
     );
   }
 
-  /// Driver markeri customer xaritasi uchun. Map heading-up'ga aylantirilgan
-  /// bo'lsa, `rotate: true` orqali marker screen-aligned ushlanadi va
-  /// navigatsiya arrow doim "yuqori = oldinga" ko'rinadi.
-  Marker _driverMarker(LatLng point) {
-    return Marker(
-      point: point,
-      width: 44,
-      height: 44,
-      alignment: Alignment.center,
-      rotate: true,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppPalette.teal,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 3),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 3)),
-          ],
+  /// Driver markeri customer xaritasi uchun. Xarita aylantirilgan bo'lsa ham
+  /// strelka screen-aligned qoladi (`isFlat: false`), ya'ni doim
+  /// "yuqori = oldinga" ko'rinadi.
+  PlacemarkMapObject _driverMarker(LatLng point) {
+    return PlacemarkMapObject(
+      mapId: const MapObjectId('driver'),
+      point: latLngToPoint(point),
+      opacity: 1,
+      icon: PlacemarkIcon.single(
+        PlacemarkIconStyle(
+          image: _driverIcon!,
+          scale: 0.7,
+          isFlat: false,
         ),
-        child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 24),
       ),
     );
   }
@@ -649,70 +640,52 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
         child: Stack(
           children: [
             Positioned.fill(
-              child: FlutterMap(
-                mapController: _mapCtrl,
-                options: MapOptions(
-                  initialCenter: initialCenter,
-                  initialZoom: 12,
-                  initialRotation: 0,
-                  minZoom: 4,
-                  maxZoom: 18,
-                  // Rotation gesture'lari yoqilgan — foydalanuvchi 2 barmoq
-                  // bilan o'zi map'ni aylantirishi mumkin.
-                  interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.all,
-                  ),
-                  onMapReady: () {
-                    WidgetsBinding.instance.addPostFrameCallback((_) => _fitMapToRoute());
-                  },
-                  onPositionChanged: (camera, hasGesture) {
-                    // Foydalanuvchi o'zi surса — driverga ergashishni to'xtatamiz.
-                    // Dastur o'zi kamerani surganda (moveAndRotate) 200ms ichida
-                    // kelgan gesture-bo'lmagan eventlarni e'tibordan qoldiramiz.
-                    if (hasGesture && _followDriver) {
-                      final last = _lastProgrammaticCameraChange;
-                      if (last != null &&
-                          DateTime.now().difference(last).inMilliseconds < 200) {
-                        return;
-                      }
-                      setState(() => _followDriver = false);
-                    }
-                  },
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate: isDark
-                        ? 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
-                        : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.mening_ilovam',
-                    subdomains: const ['a', 'b', 'c', 'd'],
-                  ),
-                  if (routePoints != null && routePoints.length >= 2)
-                    PolylineLayer(
-                      polylines: [
-                        Polyline(
-                          points: routePoints,
-                          color: AppPalette.teal,
-                          strokeWidth: 5,
-                          borderColor: Colors.white.withValues(alpha: 0.9),
-                          borderStrokeWidth: 2,
-                        ),
-                      ],
+              child: YandexMap(
+                nightModeEnabled: isDark,
+                onMapCreated: (controller) async {
+                  _mapCtrl = controller;
+                  await controller.moveCamera(
+                    CameraUpdate.newCameraPosition(
+                      CameraPosition(target: latLngToPoint(initialCenter), zoom: _zoom),
                     ),
-                  MarkerLayer(
-                    markers: [
-                      if (p != null) _routeMarker(p, isStart: true),
-                      if (d != null) _routeMarker(d, isStart: false),
-                      // Driver markeri — real-vaqt poll'dan kelgan lokatsiya
-                      // ustun, fallback accept_lat/lng. Faqat driver yo'lda
-                      // bo'lgan bosqichlarda; rejali buyurtmada olib ketish
-                      // vaqti kelmaguncha ko'rsatilmaydi.
-                      if ((s == 3 || s == 4 || s == 6 || s == 7 || s == 8) &&
-                          !_isScheduledBeforePickup &&
-                          (_liveDriverLocation ?? _acceptPoint) != null)
-                        _driverMarker((_liveDriverLocation ?? _acceptPoint)!),
-                    ],
-                  ),
+                  );
+                  if (mounted) _fitMapToRoute();
+                },
+                onCameraPositionChanged: (position, reason, finished) {
+                  _zoom = position.zoom;
+                  // Foydalanuvchi o'zi surса — driverga ergashishni to'xtatamiz.
+                  // Dastur o'zi kamerani surganda 200ms ichida kelgan
+                  // eventlarni e'tibordan qoldiramiz.
+                  if (reason == CameraUpdateReason.gestures && _followDriver) {
+                    final last = _lastProgrammaticCameraChange;
+                    if (last != null &&
+                        DateTime.now().difference(last).inMilliseconds < 200) {
+                      return;
+                    }
+                    setState(() => _followDriver = false);
+                  }
+                },
+                mapObjects: [
+                  if (routePoints != null && routePoints.length >= 2)
+                    PolylineMapObject(
+                      mapId: const MapObjectId('route'),
+                      polyline: Polyline(points: latLngListToPoints(routePoints)),
+                      strokeColor: AppPalette.teal,
+                      strokeWidth: 4,
+                      outlineColor: Colors.white.withValues(alpha: 0.9),
+                      outlineWidth: 1.5,
+                    ),
+                  if (p != null && _pinA != null) _routeMarker(p, isStart: true),
+                  if (d != null && _pinB != null) _routeMarker(d, isStart: false),
+                  // Driver markeri — real-vaqt poll'dan kelgan lokatsiya
+                  // ustun, fallback accept_lat/lng. Faqat driver yo'lda
+                  // bo'lgan bosqichlarda; rejali buyurtmada olib ketish
+                  // vaqti kelmaguncha ko'rsatilmaydi.
+                  if ((s == 3 || s == 4 || s == 6 || s == 7 || s == 8) &&
+                      !_isScheduledBeforePickup &&
+                      _driverIcon != null &&
+                      (_liveDriverLocation ?? _acceptPoint) != null)
+                    _driverMarker((_liveDriverLocation ?? _acceptPoint)!),
                 ],
               ),
             ),

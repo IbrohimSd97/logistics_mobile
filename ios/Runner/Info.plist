@@ -6,6 +6,16 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- Yandex MapKit kaliti — qiymat xcconfig'dan keladi (Secrets.xcconfig),
+	     shuning uchun repoda ochiq saqlanmaydi. -->
+	<key>YandexMapKitApiKey</key>
+	<string>$(YANDEX_MAPKIT_API_KEY)</string>
+	<!-- Buyurtma manzilini xaritada belgilash va haydovchi joylashuvini
+	     kuzatish uchun. Bu matnlarsiz iOS ruxsat so'ramaydi. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Manzilni xaritada belgilash va yetkazib berishni kuzatish uchun joylashuvingiz kerak.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Buyurtma bajarilayotganda joylashuvingiz mijozga yetkazib berish holatini ko'rsatish uchun ishlatiladi.</string>
 	<key>CFBundleDisplayName</key>
 	<string>ALIX</string>
 	<key>CFBundleExecutable</key>

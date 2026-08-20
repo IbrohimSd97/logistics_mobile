@@ -1,19 +1,19 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:yandex_mapkit/yandex_mapkit.dart';
 
 import '../i18n/i18n.dart';
 import '../location/current_location.dart';
 import '../location/my_location_button.dart';
+import '../location/yandex_geocoder.dart';
+import '../location/yandex_point.dart';
 import '../theme/app_palette.dart';
 import 'gradient_button.dart';
 
 /// Map orqali manzil tanlash sahifasi.
-/// OpenStreetMap tile'lari + Nominatim geocoding (bepul, API key kerak emas).
+/// Yandex MapKit — xarita, manzil qidiruv va reverse geocoding.
 ///
 /// Qaytaradi: [LocationPickerResult]? — null bo'lsa user cancelladi.
 class LocationPickerPage extends StatefulWidget {
@@ -50,27 +50,19 @@ class LocationPickerResult {
 class _LocationPickerPageState extends State<LocationPickerPage> {
   static const _toshkent = LatLng(41.311081, 69.240562);
 
-  /// O'zbekiston chegarasi (taxminiy bounding box). Xarita ham, manzil qidiruvi
-  /// ham (countrycodes=uz) faqat shu hududga cheklangan.
-  static final _uzbekistanBounds = LatLngBounds(
-    const LatLng(37.0, 55.9), // janubi-g'arbiy burchak
-    const LatLng(45.7, 73.2), // shimoli-sharqiy burchak
-  );
-
-  final _mapCtrl = MapController();
+  YandexMapController? _mapCtrl;
   final _searchCtrl = TextEditingController();
   Timer? _reverseDebounce;
 
   LatLng _center = _toshkent;
+  double _zoom = 13;
   String _address = '';
   bool _resolving = false;
   bool _locating = false;
 
   // Search results dropdown
-  List<_NominatimHit> _searchResults = [];
+  List<GeoHit> _searchResults = [];
   bool _searching = false;
-
-  static const _userAgent = 'ALIX-Logistics/1.0 (mening_ilovam)';
 
   @override
   void initState() {
@@ -116,13 +108,18 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   /// Kamerani berilgan nuqtaga olib boradi.
   void _moveCamera(LatLng p, double zoom) {
-    _mapCtrl.move(p, zoom);
+    _zoom = zoom;
+    _mapCtrl?.moveCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: latLngToPoint(p), zoom: zoom),
+      ),
+      animation: const MapAnimation(type: MapAnimationType.smooth, duration: 0.3),
+    );
   }
 
   @override
   void dispose() {
     _reverseDebounce?.cancel();
-    _mapCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -134,26 +131,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   Future<void> _reverseGeocode(LatLng p) async {
     setState(() => _resolving = true);
-    try {
-      final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?lat=${p.latitude}&lon=${p.longitude}&format=json&accept-language=uz,ru,en',
-      );
-      final res = await http.get(url, headers: {'User-Agent': _userAgent});
-      if (!mounted) return;
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        final addr = (body['display_name'] as String?) ?? '';
-        setState(() {
-          _address = addr;
-          _resolving = false;
-        });
-      } else {
-        setState(() => _resolving = false);
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _resolving = false);
-    }
+
+    final addr = await YandexGeocoder.reverse(p);
+    if (!mounted) return;
+
+    setState(() {
+      if (addr != null) _address = addr;
+      _resolving = false;
+    });
   }
 
   Future<void> _searchAddress(String query) async {
@@ -163,49 +148,24 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       return;
     }
     setState(() => _searching = true);
-    try {
-      // `countrycodes=uz` — qidiruv natijalari faqat O'zbekiston ichidan.
-      final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/search?q=${Uri.encodeQueryComponent(q)}'
-        '&format=json&limit=6&accept-language=uz,ru,en'
-        '&countrycodes=uz',
-      );
-      final res = await http.get(url, headers: {'User-Agent': _userAgent});
-      if (!mounted) return;
-      if (res.statusCode == 200) {
-        final list = jsonDecode(res.body) as List;
-        final hits = list
-            .whereType<Map<String, dynamic>>()
-            .map(_NominatimHit.fromMap)
-            .whereType<_NominatimHit>()
-            .toList();
-        setState(() {
-          _searchResults = hits;
-          _searching = false;
-        });
-      } else {
-        setState(() {
-          _searchResults = [];
-          _searching = false;
-        });
-      }
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _searchResults = [];
-        _searching = false;
-      });
-    }
+
+    final hits = await YandexGeocoder.search(q);
+    if (!mounted) return;
+
+    setState(() {
+      _searchResults = hits;
+      _searching = false;
+    });
   }
 
-  void _pickHit(_NominatimHit h) {
+  void _pickHit(GeoHit h) {
     setState(() {
-      _center = h.latLng;
-      _address = h.displayName;
-      _searchCtrl.text = h.displayName;
+      _center = h.point;
+      _address = h.fullAddress;
+      _searchCtrl.text = h.fullAddress;
       _searchResults = [];
     });
-    _moveCamera(h.latLng, 15.5);
+    _moveCamera(h.point, 15.5);
   }
 
   void _confirm() {
@@ -253,40 +213,33 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       ),
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapCtrl,
-            options: MapOptions(
-              initialCenter: _center,
-              initialZoom: 13,
-              minZoom: 5,
-              maxZoom: 18,
-              // Xarita faqat O'zbekiston hududida — tashqariga surib bo'lmaydi.
-              cameraConstraint: CameraConstraint.contain(bounds: _uzbekistanBounds),
-              // Markaz-pin usuli: tanlangan nuqta — xarita markazi. Kamera
-              // gesture bilan harakatlanganda manzilni reverse-geocode qilamiz.
-              onPositionChanged: (camera, hasGesture) {
-                if (!hasGesture) return;
-                _center = camera.center;
-                setState(() {});
-                _scheduleReverse(camera.center);
-              },
-              onTap: (tap, latlng) {
-                _center = latlng;
-                _moveCamera(latlng, _mapCtrl.camera.zoom);
-                setState(() {});
-                _scheduleReverse(latlng);
-              },
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: isDark
-                    // CartoDB dark tiles (OSM compatible) — dark mode uchun.
-                    ? 'https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
-                    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.mening_ilovam',
-                subdomains: const ['a', 'b', 'c', 'd'],
-              ),
-            ],
+          YandexMap(
+            nightModeEnabled: isDark,
+            onMapCreated: (controller) async {
+              _mapCtrl = controller;
+              await controller.moveCamera(
+                CameraUpdate.newCameraPosition(
+                  CameraPosition(target: latLngToPoint(_center), zoom: _zoom),
+                ),
+              );
+            },
+            // Markaz-pin usuli: tanlangan nuqta — xarita markazi. Kamera
+            // gesture bilan to'xtaganda manzilni reverse-geocode qilamiz.
+            onCameraPositionChanged: (position, reason, finished) {
+              _zoom = position.zoom;
+              if (reason != CameraUpdateReason.gestures) return;
+
+              _center = pointToLatLng(position.target);
+              setState(() {});
+              if (finished) _scheduleReverse(_center);
+            },
+            onMapTap: (point) {
+              final p = pointToLatLng(point);
+              _center = p;
+              setState(() {});
+              _moveCamera(p, _zoom);
+              _scheduleReverse(p);
+            },
           ),
           // Center pin (markerni xarita o'rtasiga sahna ustidan qo'yamiz)
           IgnorePointer(
@@ -367,8 +320,12 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                           return ListTile(
                             dense: true,
                             leading: const Icon(Icons.place_outlined, size: 20),
-                            title: Text(h.displayName,
-                                maxLines: 2, overflow: TextOverflow.ellipsis),
+                            title: Text(h.title,
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: h.subtitle.isEmpty
+                                ? null
+                                : Text(h.subtitle,
+                                    maxLines: 1, overflow: TextOverflow.ellipsis),
                             onTap: () => _pickHit(h),
                           );
                         },
@@ -456,18 +413,3 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 }
 
-class _NominatimHit {
-  const _NominatimHit({required this.displayName, required this.latLng});
-
-  final String displayName;
-  final LatLng latLng;
-
-  static _NominatimHit? fromMap(Map<String, dynamic> m) {
-    final lat = double.tryParse('${m['lat']}');
-    final lon = double.tryParse('${m['lon']}');
-    if (lat == null || lon == null) return null;
-    final name = (m['display_name'] as String?) ?? '';
-    if (name.isEmpty) return null;
-    return _NominatimHit(displayName: name, latLng: LatLng(lat, lon));
-  }
-}

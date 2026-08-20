@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../core/location/current_location.dart';
-import 'package:http/http.dart' as http;
+import '../core/location/yandex_geocoder.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../core/api/api_exception.dart';
@@ -646,19 +645,7 @@ class DriverHomeBodyState extends State<DriverHomeBody>
     }
   }
 
-  Future<String?> _reverseGeocode(LatLng p) async {
-    try {
-      final url = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse?lat=${p.latitude}&lon=${p.longitude}&format=json&accept-language=uz,ru,en',
-      );
-      final res = await http.get(url, headers: const {'User-Agent': 'ALIX-Logistics/1.0'}).timeout(const Duration(seconds: 5));
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        return (body['display_name'] as String?);
-      }
-    } catch (_) {}
-    return null;
-  }
+  Future<String?> _reverseGeocode(LatLng p) => YandexGeocoder.reverse(p);
 
   Future<void> _loadActive() async {
     setState(() {

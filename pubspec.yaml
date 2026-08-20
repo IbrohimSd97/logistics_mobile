@@ -40,8 +40,10 @@ dependencies:
   http_parser: ^4.1.2
   shared_preferences: ^2.5.4
   image_picker: ^1.2.1
-  flutter_map: ^7.0.2
+  # latlong2 — ilova ichidagi umumiy koordinata tipi (GPS, API modellari).
+  # Yandex `Point`ga faqat xarita chegarasida o'giriladi (core/location/yandex_point.dart).
   latlong2: ^0.9.1
+  yandex_mapkit: ^4.3.0
   wakelock_plus: ^1.2.8
   geolocator: ^14.0.0
   url_launcher: ^6.3.1
