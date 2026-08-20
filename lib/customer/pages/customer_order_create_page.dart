@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/cargo_types_api.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/location/yandex_route.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/location_picker_page.dart';
 import '../../core/widgets/refresh_icon_button.dart';
@@ -259,6 +260,11 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
     }
     setState(() => _submitting = true);
     try {
+      // Yo'l vaqtini Yandex'dan olamiz — u tirbandlikni hisobga oladi,
+      // serverdagi OSRM esa yo'q. Marshrut topilmasa `null` yuboriladi va
+      // server o'z hisobiga qaytadi.
+      final route = await MapRoute.fetch(_pickup!, _delivery!);
+
       final r = await CustomerApi.instance.createOrder(
         cargoTypeId: _selected!.id,
         pickupAddress: pickupAddr,
@@ -270,6 +276,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
         cargoWeightKg: w,
         comment: _comment.text.trim().isEmpty ? null : _comment.text.trim(),
         scheduledPickupAt: _scheduledMode ? _scheduledAt : null,
+        durationMin: route?.durationMin,
       );
       if (!mounted) return;
       setState(() => _submitting = false);

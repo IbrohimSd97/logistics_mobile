@@ -82,6 +82,10 @@ class CustomerApi {
     required int cargoWeightKg,
     String? comment,
     DateTime? scheduledPickupAt,
+    /// Yandex MapKit hisoblagan yo'l vaqti (daqiqa) — tirbandlik bilan.
+    /// Server OSRM'dan tirbandliksiz vaqt oladi, shuning uchun bu aniqroq.
+    /// Server qiymatni o'z hisobiga nisbatan chegaralab qabul qiladi.
+    int? durationMin,
   }) async {
     final token = await _requireBearer();
     final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/orders/create');
@@ -98,6 +102,7 @@ class CustomerApi {
       if (comment != null && comment.isNotEmpty) 'comment': comment,
       if (scheduledPickupAt != null)
         'scheduled_pickup_at': scheduledPickupAt.toUtc().toIso8601String(),
+      if (durationMin != null && durationMin > 0) 'duration_min': durationMin,
     };
     final res = await http.post(
       url,
