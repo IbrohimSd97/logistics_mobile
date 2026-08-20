@@ -93,7 +93,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   bool _autoTransitionTriggered = false;
   static const double _autoTransitionDistanceM = 100.0;
 
-  /// OSRM ni qayta chaqirishda throttle: oxirgi route boshlangan
+  /// Marshrutni qayta so'rashda throttle: oxirgi route boshlangan
   /// nuqta. Driver bundan ≥ 500 m uzoqlashsa qayta hisoblanadi (fallback).
   LatLng? _lastRouteFromLoc;
   static const double _routeRecalcDistanceM = 500.0;
@@ -103,7 +103,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   /// Shu tufayli "update qilmaguncha o'zgarmaydi" muammosi yo'qoladi.
   static const double _offRouteThresholdM = 45.0;
 
-  /// OSRM ni juda tez-tez urmaslik uchun — qayta hisoblashlar orasidagi
+  /// Marshrut xizmatini juda tez-tez urmaslik uchun — qayta hisoblashlar orasidagi
   /// minimal interval.
   DateTime? _lastRouteFetchAt;
   static const Duration _minRecalcInterval = Duration(seconds: 4);
@@ -356,7 +356,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       //   - driver chizilgan yo'ldan _offRouteThresholdM (~45m) uzoqlashsa —
       //     yo'nalish o'zgargan, DARHOL qayta hisoblanadi (kutish shart emas), yoki
       //   - _routeRecalcDistanceM (500m) dan ko'p siljigan bo'lsa (fallback).
-      // Min interval bilan throttle qilingan — OSRM'ni ortiqcha urmaymiz.
+      // Min interval bilan throttle qilingan — marshrutni ortiqcha so'ramaymiz.
       if (s == 3 || s == 4 || s == 6 || s == 7) {
         final route = _route;
         final movedFromLast = _lastRouteFromLoc == null
@@ -846,7 +846,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       initialCenter = p ?? d ?? _toshkent;
     }
 
-    // Faqat aniq OSRM route bo'lsa chizamiz. Default holat (status 2 yoki yo'q
+    // Faqat aniq marshrut bo'lsa chizamiz. Default holat (status 2 yoki yo'q
     // route) — faqat pinlar, A↔B to'g'ri chiziq emas (talab bo'yicha).
     final routePoints = _route?.points;
 
@@ -1384,7 +1384,7 @@ class _NavHud extends StatelessWidget {
   final String? nextTurnInstruction;
   final double remainingMeters;
 
-  /// OSRM maneuver modifier (`left`, `right`, `straight`, `slight left`, ...)
+  /// Burilish yo'nalishi (`left`, `right`, `straight`)
   /// uchun mos ikon va o'zbekcha qisqa matn.
   (IconData, String) _maneuverPresentation() {
     final m = (nextTurnInstruction ?? '').toLowerCase();
