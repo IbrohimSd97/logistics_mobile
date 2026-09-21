@@ -61,7 +61,7 @@ class OrderTimeline extends StatelessWidget {
             final st = steps[i];
             final isLast = i == steps.length - 1;
             final hasTime = (st.timeIso ?? '').isNotEmpty;
-            final activeColor = hasTime ? AppPalette.teal : cs.outlineVariant;
+            final activeColor = hasTime ? AppPalette.orange : cs.outlineVariant;
             final textColor = hasTime ? cs.onSurface : cs.onSurfaceVariant;
 
             return IntrinsicHeight(

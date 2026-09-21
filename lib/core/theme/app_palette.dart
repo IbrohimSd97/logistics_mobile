@@ -1,53 +1,89 @@
 import 'package:flutter/material.dart';
 
-/// ALIX Logistics dizayn palitra. Light va Dark rejimlar uchun.
+/// ALIX brend palitrasi.
+///
+/// Brend ikki rangdan iborat: **orange** (#FF6A13) va **charcoal** (#3A3A3A).
+/// Qolgani — shu ikkisiga xizmat qiladigan neytral yuzalar. Yangi rang
+/// qo'shishdan oldin o'ylab ko'ring: ko'pincha mavjud tokenning bosqichi
+/// (soft / deep) yetarli bo'ladi.
+///
+/// Ranglar logotip fayllaridan olingan, `tool/brand/alix_mark.py` bilan bir xil.
 class AppPalette {
   AppPalette._();
 
-  // ─── Brand (har ikki rejimda bir xil) ───
-  static const Color amber = Color(0xFFFBBF24);
-  static const Color amberDeep = Color(0xFFD97706);
-  static const Color teal = Color(0xFF14B8A6);
-  static const Color tealDeep = Color(0xFF0D9488);
+  // ─── Brend ─────────────────────────────────────────────────────────────
+  /// Asosiy brend rangi — CTA, faol holat, marshrut chizig'i.
+  static const Color orange = Color(0xFFFF6A13);
 
-  // Status
-  static const Color danger = Color(0xFF991B1B);
-  static const Color dangerLight = Color(0xFFEF4444);
-  static const Color success = Color(0xFF10B981);
-  static const Color warning = Color(0xFFF59E0B);
+  /// Bosilgan/hover holati va gradient oxiri.
+  static const Color orangeDeep = Color(0xFFE05605);
 
-  // ─── Dark rejim ───
-  static const Color darkBg = Color(0xFF070B12);
-  static const Color darkCard = Color(0xFF111827);
-  static const Color darkCardElevated = Color(0xFF1A2230);
-  static const Color darkBorder = Color(0xFF1F2937);
-  static const Color darkOn = Color(0xFFF3F4F6);
-  static const Color darkMuted = Color(0xFF9CA3AF);
+  /// Yorug' fonda orange ustidagi yumshoq to'ldirish (chip, banner).
+  static const Color orangeSoft = Color(0xFFFFF0E6);
 
-  // ─── Light rejim ───
-  static const Color lightBg = Color(0xFFF8FAFC);
+  /// Brendning to'q rangi — matn, to'q kartalar, ikkilamchi CTA.
+  static const Color ink = Color(0xFF3A3A3A);
+
+  /// Eng to'q daraja — to'q kartalar foni (tracking kartasi kabi).
+  static const Color inkStrong = Color(0xFF1E1E1E);
+
+  /// Ikkinchi darajali matn.
+  static const Color inkMuted = Color(0xFF616161);
+
+  /// Krem yuza — ro'yxat kartalari, ikkilamchi bloklar.
+  static const Color sand = Color(0xFFF4F2EE);
+
+  /// Krem yuzaning chegarasi.
+  static const Color sandBorder = Color(0xFFE8E6E2);
+
+  // ─── Holat ranglari (brenddan tashqari, faqat ma'no uchun) ─────────────
+  static const Color success = Color(0xFF12A150);
+  static const Color successSoft = Color(0xFFE7F6EE);
+
+  /// Kutilmoqda / diqqat — brend orange bilan chalkashmasligi uchun sariq.
+  static const Color amber = Color(0xFFF5A524);
+  static const Color amberSoft = Color(0xFFFEF3E0);
+
+  static const Color danger = Color(0xFFB3261E);
+  static const Color dangerLight = Color(0xFFE5484D);
+  static const Color dangerSoft = Color(0xFFFDECEC);
+
+  // ─── Yorug' rejim yuzalari ─────────────────────────────────────────────
+  static const Color lightBg = Color(0xFFFFFFFF);
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightCardElevated = Color(0xFFF1F5F9);
-  static const Color lightBorder = Color(0xFFE2E8F0);
-  static const Color lightOn = Color(0xFF0F172A);
-  static const Color lightMuted = Color(0xFF64748B);
+  static const Color lightCardElevated = sand;
+  static const Color lightBorder = Color(0xFFE6E4E0);
+  static const Color lightOn = ink;
+  static const Color lightMuted = inkMuted;
 
-  // ─── Backwards-compat aliases (login_screen `AppPalette.bg/card/...` ishlatadi) ───
-  /// Login sahifa yaratilganda dark fon ishlatadi (gradient, grid painter), shu yerda
-  /// `bg`, `card`, `border`, `onDark`, `muted` doim dark variantni qaytaradi.
-  static const Color bg = darkBg;
-  static const Color card = darkCard;
-  static const Color border = darkBorder;
-  static const Color onDark = darkOn;
-  static const Color muted = darkMuted;
+  // ─── To'q rejim yuzalari ───────────────────────────────────────────────
+  static const Color darkBg = Color(0xFF141414);
+  static const Color darkCard = Color(0xFF1E1E1E);
+  static const Color darkCardElevated = Color(0xFF262626);
+  static const Color darkBorder = Color(0xFF333333);
+  static const Color darkOn = Color(0xFFF4F2EE);
+  static const Color darkMuted = Color(0xFFA3A3A3);
 
-  /// Brand gradient — amber → amberDeep (asosiy CTA)
-  static const LinearGradient amberGradient = LinearGradient(
-    colors: [amber, amberDeep],
+  // ─── Gradientlar ───────────────────────────────────────────────────────
+  /// Asosiy CTA. Brend tekis rangda ishlaydi, gradient faqat sezilarli
+  /// bo'lmagan chuqurlik beradi — shuning uchun ikki bosqich juda yaqin.
+  static const LinearGradient orangeGradient = LinearGradient(
+    colors: [orange, orangeDeep],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   );
 
-  /// Brand gradient — teal → tealDeep
-  static const LinearGradient tealGradient = LinearGradient(
-    colors: [teal, tealDeep],
+  /// Ikkilamchi CTA — to'q charcoal (brend vizitkasidagi tugma kabi).
+  static const LinearGradient inkGradient = LinearGradient(
+    colors: [ink, inkStrong],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
   );
+
+  // ─── O'lchovlar ────────────────────────────────────────────────────────
+  /// Brendda burchaklar yumshoq: kartalar 18, tugmalar 16, chiplar 12.
+  static const double radiusCard = 18;
+  static const double radiusButton = 16;
+  static const double radiusChip = 12;
+  static const double radiusField = 14;
 }

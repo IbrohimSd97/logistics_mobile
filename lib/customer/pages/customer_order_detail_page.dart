@@ -86,7 +86,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
   Future<void> _prepareMarkerIcons() async {
     final a = await MapMarkers.abPin('A', AppPalette.success);
     final b = await MapMarkers.abPin('B', AppPalette.dangerLight);
-    final driver = await MapMarkers.driverArrow(AppPalette.teal);
+    final driver = await MapMarkers.driverArrow(AppPalette.orange);
     if (!mounted) return;
     setState(() {
       _pinA = a;
@@ -671,7 +671,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                     PolylineMapObject(
                       mapId: const MapObjectId('route'),
                       polyline: Polyline(points: latLngListToPoints(routePoints)),
-                      strokeColor: AppPalette.teal,
+                      strokeColor: AppPalette.orange,
                       strokeWidth: 4,
                       outlineColor: Colors.white.withValues(alpha: 0.9),
                       outlineWidth: 1.5,
@@ -1161,7 +1161,7 @@ class _StatusChip extends StatelessWidget {
     switch (status) {
       case 2:
         bg = AppPalette.amber;
-        fg = const Color(0xFF111827);
+        fg = AppPalette.inkStrong;
         break;
       case 3:
       case 4:

@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_palette.dart';
 
-/// Send-OTP page'dagi tugma stilida — amber→amberDeep gradient, soya, qalin matn.
-/// Asosiy CTA tugmalarda ishlatish kerak.
+/// ALIX asosiy CTA tugmasi — to'ldirilgan orange, oq matn, yumshoq soya.
+///
+/// Brendda tugmalar tekis rangda; `orangeGradient` ikki juda yaqin bosqichdan
+/// iborat, u faqat sezilmas chuqurlik beradi. Boshqa rang kerak bo'lsa
+/// `gradient` orqali beriladi (masalan [AlixInkButton] charcoal variantda).
 class GradientButton extends StatelessWidget {
   const GradientButton({
     super.key,
@@ -13,7 +16,7 @@ class GradientButton extends StatelessWidget {
     this.loading = false,
     this.gradient,
     this.height = 52,
-    this.borderRadius = 14,
+    this.borderRadius = AppPalette.radiusButton,
     this.foregroundColor,
   });
 
@@ -29,14 +32,14 @@ class GradientButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final disabled = onPressed == null || loading;
-    final grad = gradient ?? AppPalette.amberGradient;
-    final fg = foregroundColor ?? const Color(0xFF111827);
-    final shadowColor = grad.colors.first.withValues(alpha: disabled ? 0.0 : 0.32);
+    final grad = gradient ?? AppPalette.orangeGradient;
+    final fg = foregroundColor ?? Colors.white;
+    final shadowColor = grad.colors.first.withValues(alpha: disabled ? 0.0 : 0.28);
 
     return SizedBox(
       height: height,
       child: AnimatedOpacity(
-        opacity: disabled ? 0.6 : 1.0,
+        opacity: disabled ? 0.55 : 1.0,
         duration: const Duration(milliseconds: 150),
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -45,7 +48,7 @@ class GradientButton extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: shadowColor,
-                blurRadius: 16,
+                blurRadius: 18,
                 offset: const Offset(0, 8),
               ),
             ],
@@ -58,8 +61,8 @@ class GradientButton extends StatelessWidget {
               child: Center(
                 child: loading
                     ? SizedBox(
-                        width: 24,
-                        height: 24,
+                        width: 22,
+                        height: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.4,
                           color: fg,
@@ -78,7 +81,6 @@ class GradientButton extends StatelessWidget {
                               color: fg,
                               fontWeight: FontWeight.w700,
                               fontSize: 16,
-                              letterSpacing: 0.2,
                             ),
                           ),
                         ],
@@ -92,9 +94,10 @@ class GradientButton extends StatelessWidget {
   }
 }
 
-/// Teal varianti (secondary CTA uchun).
-class GradientTealButton extends StatelessWidget {
-  const GradientTealButton({
+/// Ikkilamchi CTA — brendning to'q (charcoal) tugmasi.
+/// Orange tugma bilan yonma-yon turganda ikkinchi darajali amal uchun.
+class AlixInkButton extends StatelessWidget {
+  const AlixInkButton({
     super.key,
     required this.label,
     required this.onPressed,
@@ -109,13 +112,18 @@ class GradientTealButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // To'q rejimda charcoal tugma fonga singib ketadi, shuning uchun u
+    // teskarisiga aylanadi: krem plastinka + to'q matn.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GradientButton(
       label: label,
       onPressed: onPressed,
       icon: icon,
       loading: loading,
-      gradient: AppPalette.tealGradient,
-      foregroundColor: Colors.white,
+      gradient: isDark
+          ? const LinearGradient(colors: [AppPalette.darkOn, Color(0xFFE2DFD8)])
+          : AppPalette.inkGradient,
+      foregroundColor: isDark ? AppPalette.inkStrong : Colors.white,
     );
   }
 }

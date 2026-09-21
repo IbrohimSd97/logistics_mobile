@@ -73,33 +73,27 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  assets:
+    # Brend rasm fayllari. Ilova ichidagi logotip vektor sifatida
+    # (core/brand/alix_logo.dart) chiziladi, bu PNG'lar esa share-preview va
+    # boshqa raster kerak bo'ladigan joylar uchun. Native ikonkalar va splash
+    # to'g'ridan-to'g'ri android/ios/web papkalarida yotadi.
+    - assets/brand/
 
-  # An image asset can refer to one or more resolution-specific "variants", see
-  # https://flutter.dev/to/resolution-aware-images
-
-  # For details regarding adding assets from package dependencies, see
-  # https://flutter.dev/to/asset-from-package
-
-  # To add custom fonts to your application, add a fonts section here,
-  # in this "flutter" section. Each entry in this list should have a
-  # "family" key with the font family name, and a "fonts" key with a
-  # list giving the asset and other descriptors for the font. For
-  # example:
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
-  # For details regarding fonts from package dependencies,
-  # see https://flutter.dev/to/font-from-package
+  fonts:
+    # Manrope — brend shrifti. Lotin, kirill va o'zbekcha ʻ belgisini
+    # qo'llab-quvvatlaydi, shuning uchun uz/ru/en uchun bitta oila yetadi.
+    # Statik og'irliklar `tool/brand/` dagi ko'rsatma bo'yicha variable
+    # fayldan ajratib olingan (OFL litsenziyasi assets/fonts/OFL.txt da).
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Manrope-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Manrope-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Manrope-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Manrope-ExtraBold.ttf
+          weight: 800

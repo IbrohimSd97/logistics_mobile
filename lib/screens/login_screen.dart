@@ -8,7 +8,9 @@ import '../core/api/auth_api.dart';
 import '../core/config/api_config.dart';
 import '../core/i18n/i18n.dart';
 import '../core/session/session_store.dart';
+import '../core/brand/alix_logo.dart';
 import '../core/theme/app_palette.dart';
+import '../core/widgets/gradient_button.dart';
 import '../core/util/network_error_message.dart';
 import '../core/util/phone_util.dart';
 import '../driver/driver_api.dart';
@@ -100,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen>
         content: Text(msg, style: const TextStyle(height: 1.35)),
         behavior: SnackBarBehavior.floating,
         duration: duration ?? Duration(seconds: error ? 6 : 3),
-        backgroundColor: error ? const Color(0xFF991B1B) : const Color(0xFF1F2937),
+        backgroundColor: error ? AppPalette.danger : AppPalette.inkStrong,
       ),
     );
   }
@@ -138,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen>
         content: Text(content, style: const TextStyle(height: 1.35)),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 10),
-        backgroundColor: const Color(0xFF991B1B),
+        backgroundColor: AppPalette.danger,
         action: SnackBarAction(
           label: I18n.t('auth.details_action'),
           textColor: Colors.white,
@@ -402,87 +404,36 @@ class _LoginScreenState extends State<LoginScreen>
     _phoneFocus.requestFocus();
   }
 
+  /// Maydon bezagi — ranglar `AppTheme.inputDecorationTheme` dan keladi,
+  /// shuning uchun bu yerda faqat matn, ikonka va xato qoladi.
   InputDecoration _fieldDecoration(String label, String hint,
       {Widget? prefix, String? errorText}) {
-    const errorColor = Color(0xFFE53935);
     return InputDecoration(
       labelText: label,
       hintText: hint,
       errorText: errorText,
-      errorStyle: const TextStyle(color: errorColor, height: 1.3),
-      labelStyle: const TextStyle(color: AppPalette.muted),
-      hintStyle: TextStyle(color: AppPalette.muted.withValues(alpha: 0.65)),
       prefixIcon: prefix,
-      filled: true,
-      fillColor: AppPalette.card,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppPalette.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppPalette.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppPalette.teal, width: 1.4),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: errorColor, width: 1.4),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: errorColor, width: 1.6),
-      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final showExchangeRetry = _otpSent && _exchangeFailed && _isVerifiedUser == true;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final muted = cs.onSurfaceVariant;
 
     return Scaffold(
-      backgroundColor: AppPalette.bg,
       body: Stack(
         children: [
+          // Brend foni: logotip panellaridan olingan diagonal naqsh va
+          // yumshoq orange nur. Juda past kontrastda — matnga xalaqit bermaydi.
           Positioned.fill(
-            child: CustomPaint(painter: _LogisticsGridPainter()),
-          ),
-          Positioned(
-            top: -120,
-            right: -80,
             child: IgnorePointer(
-              child: Container(
-                width: 280,
-                height: 280,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppPalette.amber.withValues(alpha: 0.14),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -60,
-            left: -40,
-            child: IgnorePointer(
-              child: Container(
-                width: 220,
-                height: 220,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppPalette.teal.withValues(alpha: 0.12),
-                      Colors.transparent,
-                    ],
-                  ),
+              child: CustomPaint(
+                painter: _BrandBackdropPainter(
+                  lineColor: cs.onSurface.withValues(alpha: 0.055),
+                  glowColor: AppPalette.orange.withValues(alpha: 0.13),
                 ),
               ),
             ),
@@ -490,69 +441,25 @@ class _LoginScreenState extends State<LoginScreen>
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 420),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              gradient: const LinearGradient(
-                                colors: [AppPalette.amber, AppPalette.amberDeep],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppPalette.amber.withValues(alpha: 0.35),
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.route_rounded,
-                              color: Color(0xFF111827),
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'ALIX',
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                        color: AppPalette.onDark,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 1.6,
-                                      ),
-                                ),
-                                Text(
-                                  'Logistics',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: AppPalette.amber,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: 0.6,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: AlixLogo(height: 28),
+                      ),
+                      const SizedBox(height: 36),
+                      Text(
+                        I18n.t('auth.login_title'),
+                        style: theme.textTheme.headlineMedium,
                       ),
                       const SizedBox(height: 8),
                       Text(
                         I18n.t('auth.login_with_phone'),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppPalette.muted,
-                              height: 1.35,
-                            ),
+                        style: theme.textTheme.bodyMedium?.copyWith(color: muted),
                       ),
                       const SizedBox(height: 28),
                       TextFormField(
@@ -561,8 +468,12 @@ class _LoginScreenState extends State<LoginScreen>
                         enabled: !_otpSent,
                         keyboardType: TextInputType.phone,
                         textInputAction: TextInputAction.next,
-                        style: const TextStyle(color: AppPalette.onDark, fontSize: 16),
-                        cursorColor: AppPalette.teal,
+                        style: TextStyle(
+                          color: cs.onSurface,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        cursorColor: AppPalette.orange,
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(RegExp(r'[\d+\s\-]')),
                           _MaxDigitsFormatter(12),
@@ -570,7 +481,7 @@ class _LoginScreenState extends State<LoginScreen>
                         decoration: _fieldDecoration(
                           I18n.t('auth.phone_number'),
                           I18n.t('auth.phone_hint'),
-                          prefix: const Icon(Icons.phone_iphone_rounded, color: AppPalette.muted),
+                          prefix: const Icon(Icons.phone_iphone_rounded),
                         ),
                         onFieldSubmitted: (_) =>
                             _otpSent ? _otpFocus.requestFocus() : _sendOtp(),
@@ -583,18 +494,18 @@ class _LoginScreenState extends State<LoginScreen>
                           keyboardType: TextInputType.number,
                           maxLength: 6,
                           textInputAction: TextInputAction.done,
-                          style: const TextStyle(
-                            color: AppPalette.onDark,
+                          style: TextStyle(
+                            color: cs.onSurface,
                             fontSize: 22,
                             letterSpacing: 10,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                           ),
-                          cursorColor: AppPalette.amber,
+                          cursorColor: AppPalette.orange,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           decoration: _fieldDecoration(
                             I18n.t('auth.sms_code_label'),
                             '• • • • • •',
-                            prefix: const Icon(Icons.shield_outlined, color: AppPalette.muted),
+                            prefix: const Icon(Icons.shield_outlined),
                             errorText: _otpError,
                           ).copyWith(counterText: ''),
                           onChanged: (v) {
@@ -618,15 +529,12 @@ class _LoginScreenState extends State<LoginScreen>
                               ? Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.timer_outlined,
-                                        size: 16,
-                                        color: AppPalette.muted.withValues(alpha: 0.8)),
+                                    Icon(Icons.timer_outlined, size: 16, color: muted),
                                     const SizedBox(width: 6),
                                     Text(
                                       I18n.t('auth.otp_expires_in',
                                           {'time': _fmtMmSs(_otpRemaining)}),
-                                      style: const TextStyle(
-                                          color: AppPalette.muted, fontSize: 13),
+                                      style: theme.textTheme.bodySmall,
                                     ),
                                   ],
                                 )
@@ -634,11 +542,9 @@ class _LoginScreenState extends State<LoginScreen>
                                   onPressed: _loading ? null : _sendOtp,
                                   icon: const Icon(Icons.refresh_rounded, size: 18),
                                   style: TextButton.styleFrom(
-                                    foregroundColor: AppPalette.amber,
                                     padding: EdgeInsets.zero,
                                     minimumSize: const Size(0, 0),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   ),
                                   label: Text(I18n.t('auth.resend_otp')),
                                 ),
@@ -648,15 +554,15 @@ class _LoginScreenState extends State<LoginScreen>
                           Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: AppPalette.card,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: AppPalette.teal.withValues(alpha: 0.45)),
+                              color: cs.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(AppPalette.radiusField),
+                              border: Border.all(color: cs.outlineVariant),
                             ),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.developer_mode_rounded,
-                                    color: AppPalette.teal.withValues(alpha: 0.9), size: 22),
+                                const Icon(Icons.developer_mode_rounded,
+                                    color: AppPalette.orange, size: 22),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
@@ -664,7 +570,7 @@ class _LoginScreenState extends State<LoginScreen>
                                       'code': _devCodeHint ?? '',
                                       'rest': _otpExpiresSec != null ? ' · ${_otpExpiresSec}s' : '',
                                     }),
-                                    style: const TextStyle(color: AppPalette.muted, height: 1.35),
+                                    style: theme.textTheme.bodySmall,
                                   ),
                                 ),
                               ],
@@ -675,69 +581,26 @@ class _LoginScreenState extends State<LoginScreen>
                           const SizedBox(height: 12),
                           Text(
                             I18n.t('auth.token_exchange_failed_retry'),
-                            style: TextStyle(color: AppPalette.muted.withValues(alpha: 0.9), height: 1.35),
+                            style: theme.textTheme.bodySmall,
                           ),
                         ],
                       ],
-                      const SizedBox(height: 22),
-                      SizedBox(
-                        height: 52,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: const LinearGradient(
-                              colors: [AppPalette.amber, AppPalette.amberDeep],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppPalette.amber.withValues(alpha: 0.28),
-                                blurRadius: 16,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(14),
-                              onTap: _loading
-                                  ? null
-                                  : (_otpSent ? _verifyOtp : _sendOtp),
-                              child: Center(
-                                child: _loading
-                                    ? const SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.4,
-                                          color: Color(0xFF111827),
-                                        ),
-                                      )
-                                    : Text(
-                                        _otpSent
-                                            ? (showExchangeRetry
-                                                ? I18n.t('auth.retry_exchange')
-                                                : I18n.t('auth.verify'))
-                                            : I18n.t('auth.send_otp'),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 16,
-                                          color: Color(0xFF111827),
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ),
-                        ),
+                      const SizedBox(height: 24),
+                      GradientButton(
+                        label: _otpSent
+                            ? (showExchangeRetry
+                                ? I18n.t('auth.retry_exchange')
+                                : I18n.t('auth.verify'))
+                            : I18n.t('auth.send_otp'),
+                        loading: _loading,
+                        onPressed: _loading ? null : (_otpSent ? _verifyOtp : _sendOtp),
                       ),
                       if (_otpSent) ...[
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
                         TextButton(
                           onPressed: _loading ? null : _resetOtpStep,
-                          child: Text(
-                            I18n.t('auth.change_number'),
-                            style: const TextStyle(color: AppPalette.muted),
-                          ),
+                          style: TextButton.styleFrom(foregroundColor: muted),
+                          child: Text(I18n.t('auth.change_number')),
                         ),
                       ],
                     ],
@@ -752,26 +615,49 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
-class _LogisticsGridPainter extends CustomPainter {
+/// Login foni — logotipdagi vertikal panellarni eslatuvchi diagonal chiziqlar
+/// va yuqori o'ng burchakdagi orange nur. Kontrast ataylab juda past.
+class _BrandBackdropPainter extends CustomPainter {
+  const _BrandBackdropPainter({required this.lineColor, required this.glowColor});
+
+  final Color lineColor;
+  final Color glowColor;
+
   @override
   void paint(Canvas canvas, Size size) {
+    final glowCenter = Offset(size.width * 0.92, -size.height * 0.05);
+    final glowRadius = size.width * 0.75;
+    canvas.drawCircle(
+      glowCenter,
+      glowRadius,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [glowColor, glowColor.withValues(alpha: 0)],
+        ).createShader(Rect.fromCircle(center: glowCenter, radius: glowRadius)),
+    );
+
+    // Logotip panellarining ritmi — faqat yuqori o'ng burchakda, nur ichida.
+    // Butun ekranga yoyilsa fon shovqinga aylanadi, shuning uchun qirqilgan.
+    canvas.save();
+    canvas.clipRect(
+      Rect.fromLTWH(size.width * 0.42, -size.height * 0.1,
+          size.width * 0.75, size.height * 0.46),
+    );
     final line = Paint()
-      ..color = Colors.white.withValues(alpha: 0.035)
-      ..strokeWidth = 1;
-    const step = 42.0;
-    for (var x = 0.0; x < size.width + size.height; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x + size.height * 0.55, size.height), line);
+      ..color = lineColor
+      ..strokeWidth = 12
+      ..strokeCap = StrokeCap.round;
+    const step = 34.0;
+    final slant = size.height * 0.30;
+    for (var x = size.width * 0.35; x < size.width + slant; x += step) {
+      canvas.drawLine(Offset(x, size.height), Offset(x + slant, 0), line);
     }
-    final dot = Paint()..color = Colors.white.withValues(alpha: 0.05);
-    for (var y = 0.0; y < size.height; y += step) {
-      for (var x = 0.0; x < size.width; x += step) {
-        canvas.drawCircle(Offset(x, y), 1.2, dot);
-      }
-    }
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(_BrandBackdropPainter old) =>
+      old.lineColor != lineColor || old.glowColor != glowColor;
 }
 
 /// Max N ta **raqam** kiritishga ruxsat beradi (+/spaces/dashes hisobga olinmaydi).

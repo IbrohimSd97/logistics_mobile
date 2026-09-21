@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/api/api_exception.dart';
+import '../core/brand/alix_splash.dart';
 import '../core/session/session_store.dart';
 import '../driver/driver_api.dart';
 import '../driver/driver_models.dart';
@@ -126,9 +127,7 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    // Sessiya tekshirilayotgan qisqa oniy holat uchun splash.
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
+    // Sessiya tekshirilayotgan qisqa oniy holat uchun brend splash ekrani.
+    return const AlixSplash();
   }
 }

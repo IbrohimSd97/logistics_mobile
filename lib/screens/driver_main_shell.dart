@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../core/brand/alix_logo.dart';
+import '../core/theme/app_palette.dart';
 import '../core/location/current_location.dart';
 import '../core/location/yandex_geocoder.dart';
 import 'package:latlong2/latlong.dart';
@@ -172,7 +174,11 @@ class _DriverMainShellState extends State<DriverMainShell>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_index]),
+        // Bosh sahifada brend lockup'i, qolgan tab'larda bo'lim nomi —
+        // logotip ilovaning birinchi ekranida darrov ko'zga tashlanadi.
+        title: _index == 0
+            ? const AlixLogo(height: 22)
+            : Text(_titles[_index]),
         actions: [
           IconButton(
             tooltip: I18n.t('common.refresh'),
@@ -1150,7 +1156,7 @@ class _AbRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = isStart ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    final color = isStart ? AppPalette.success : AppPalette.dangerLight;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1203,8 +1209,8 @@ class _MiniStatusChip extends StatelessWidget {
     Color fg;
     switch (status) {
       case 2:
-        bg = const Color(0xFFFBBF24);
-        fg = const Color(0xFF111827);
+        bg = AppPalette.amber;
+        fg = AppPalette.inkStrong;
         break;
       case 3:
       case 4:
@@ -1217,12 +1223,12 @@ class _MiniStatusChip extends StatelessWidget {
         break;
       case 9:
       case 10:
-        bg = const Color(0xFF10B981);
+        bg = AppPalette.success;
         fg = Colors.white;
         break;
       case 11:
       case 12:
-        bg = const Color(0xFFEF4444);
+        bg = AppPalette.dangerLight;
         fg = Colors.white;
         break;
       default:
@@ -2241,7 +2247,7 @@ class _DriverAbRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = isStart ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+    final color = isStart ? AppPalette.success : AppPalette.dangerLight;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2294,8 +2300,8 @@ class _DriverMiniStatusChip extends StatelessWidget {
     Color fg;
     switch (status) {
       case 2:
-        bg = const Color(0xFFFBBF24);
-        fg = const Color(0xFF111827);
+        bg = AppPalette.amber;
+        fg = AppPalette.inkStrong;
         break;
       case 3:
       case 4:
@@ -2308,7 +2314,7 @@ class _DriverMiniStatusChip extends StatelessWidget {
         break;
       case 9:
       case 10:
-        bg = const Color(0xFF10B981);
+        bg = AppPalette.success;
         fg = Colors.white;
         break;
       case 11:

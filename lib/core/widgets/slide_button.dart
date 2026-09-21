@@ -58,8 +58,8 @@ class _SlideButtonState extends State<SlideButton> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    final grad = widget.gradient ?? AppPalette.amberGradient;
-    final fg = widget.foregroundColor ?? const Color(0xFF111827);
+    final grad = widget.gradient ?? AppPalette.orangeGradient;
+    final fg = widget.foregroundColor ?? Colors.white;
 
     return LayoutBuilder(
       builder: (context, constraints) {

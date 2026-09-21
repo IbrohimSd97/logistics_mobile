@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- To'q rejimdagi splash foni. Belgining krem varianti
+         `drawable-night-*/splash_logo.png` da yotadi. -->
+    <color name="alix_splash_background">#FF141414</color>
+</resources>

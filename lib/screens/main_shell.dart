@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/brand/alix_logo.dart';
 import '../core/api/api_exception.dart';
 import '../core/api/auth_api.dart';
 import '../core/i18n/i18n.dart';
@@ -395,7 +396,11 @@ class _MainShellState extends State<MainShell>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_index]),
+        // Bosh sahifada brend lockup'i, qolgan tab'larda bo'lim nomi —
+        // logotip ilovaning birinchi ekranida darrov ko'zga tashlanadi.
+        title: _index == 0
+            ? const AlixLogo(height: 22)
+            : Text(_titles[_index]),
         actions: _mode == 'customer'
             ? [
                 IconButton(

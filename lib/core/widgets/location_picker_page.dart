@@ -249,7 +249,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                 child: Icon(
                   Icons.location_pin,
                   size: 48,
-                  color: AppPalette.tealDeep,
+                  color: AppPalette.orangeDeep,
                   shadows: const [
                     Shadow(blurRadius: 8, color: Colors.black45, offset: Offset(0, 4)),
                   ],
