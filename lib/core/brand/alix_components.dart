@@ -410,3 +410,91 @@ class AlixBanner extends StatelessWidget {
     );
   }
 }
+
+/// Pul harakati qatori — hamyon tarixida (mijoz va haydovchi) bir xil.
+///
+/// Model turlari ikki tomonda har xil bo'lgani uchun bu yerga faqat tayyor
+/// matnlar uzatiladi.
+class AlixTxRow extends StatelessWidget {
+  const AlixTxRow({
+    super.key,
+    required this.title,
+    required this.amount,
+    this.meta,
+    this.negative = false,
+    this.icon,
+  });
+
+  final String title;
+
+  /// Formatlangan summa (valyutasi bilan yoki usiz).
+  final String amount;
+
+  /// Sana, buyurtma raqami va shunga o'xshash ikkinchi darajali ma'lumot.
+  final String? meta;
+
+  /// Chiqim bo'lsa `true` — summa neytral rangda chiqadi.
+  /// Chiqim xato emas, shuning uchun qizil ishlatilmaydi.
+  final bool negative;
+
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final accent = negative ? cs.onSurface : AppPalette.success;
+
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(AppPalette.radiusChip),
+            ),
+            child: Icon(
+              icon ??
+                  (negative ? Icons.north_east_rounded : Icons.south_west_rounded),
+              size: 18,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if ((meta ?? '').isNotEmpty)
+                  Text(
+                    meta!,
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            amount,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

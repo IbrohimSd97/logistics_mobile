@@ -1373,8 +1373,8 @@ class _WalletBalanceCard extends StatelessWidget {
   }
 }
 
-/// Tranzaksiya qatori: chapda yo'nalish ikonkasi, o'ngda summa.
-/// Kirim yashil, chiqim neytral — chiqim "xato" emas, shuning uchun qizil emas.
+/// Tranzaksiya qatori — ko'rinish umumiy komponentda (`AlixTxRow`), bu
+/// yerda faqat modeldan matn yasaladi.
 class _WalletTxRow extends StatelessWidget {
   const _WalletTxRow({required this.tx});
 
@@ -1382,69 +1382,20 @@ class _WalletTxRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isNegative = tx.amount?.startsWith('-') ?? false;
-    final accent = isNegative ? cs.onSurface : AppPalette.success;
-
     final meta = [
       if (tx.orderId != null) I18n.t('wallet.tx.order_ref', {'number': tx.orderId}),
       if (_formatDateTime(tx.createdAt).isNotEmpty) _formatDateTime(tx.createdAt),
     ].join(' · ');
 
-    return AlixCard(
-      tone: AlixSurfaceTone.cream,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(AppPalette.radiusChip),
-            ),
-            child: Icon(
-              isNegative ? Icons.north_east_rounded : Icons.south_west_rounded,
-              size: 18,
-              color: accent,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  walletTxLabel(
-                    transactionType: tx.transactionType,
-                    rawDescription: tx.title,
-                    amount: double.tryParse(tx.amount ?? ''),
-                  ),
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (meta.isNotEmpty)
-                  Text(
-                    meta,
-                    style: theme.textTheme.bodySmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            _formatNumber(tx.amount),
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: accent,
-            ),
-          ),
-        ],
+    return AlixTxRow(
+      title: walletTxLabel(
+        transactionType: tx.transactionType,
+        rawDescription: tx.title,
+        amount: double.tryParse(tx.amount ?? ''),
       ),
+      meta: meta,
+      amount: _formatNumber(tx.amount),
+      negative: tx.amount?.startsWith('-') ?? false,
     );
   }
 }

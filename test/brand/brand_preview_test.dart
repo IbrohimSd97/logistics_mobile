@@ -9,6 +9,7 @@ import 'package:mening_ilovam/core/widgets/gradient_button.dart';
 import 'package:mening_ilovam/customer/pages/customer_order_create_page.dart';
 import 'package:mening_ilovam/customer/pages/customer_wallet_topup_page.dart';
 import 'package:mening_ilovam/screens/customer_main_shell.dart';
+import 'package:mening_ilovam/screens/driver_main_shell.dart';
 import 'package:mening_ilovam/screens/login_screen.dart';
 
 import 'fake_api.dart';
@@ -161,6 +162,43 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       await expectLater(find.byType(CustomerWalletTopupPage),
           matchesGoldenFile('preview_wallet_topup.png'));
+    });
+  }, skip: !_enabled);
+
+  testWidgets('driver home', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 860));
+      await tester.pumpWidget(_app(Scaffold(
+        appBar: AppBar(title: const AlixLogo(height: 22)),
+        body: DriverHomeBody(
+          phoneDisplay: '+998 90 000 00 00',
+          userId: 7,
+          refreshTick: 0,
+          onOpenDetail: (_, __) {},
+        ),
+      )));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(
+          find.byType(DriverHomeBody), matchesGoldenFile('preview_driver_home.png'));
+    });
+  }, skip: !_enabled);
+
+  testWidgets('driver profile', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 860));
+      await tester.pumpWidget(_app(Scaffold(
+        appBar: AppBar(title: const Text('Profil')),
+        body: DriverProfileBody(
+          phoneDisplay: '+998 90 000 00 00',
+          userId: 7,
+          onLogout: () {},
+          onSwitchToCustomer: () {},
+        ),
+      )));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(
+          find.byType(DriverProfileBody), matchesGoldenFile('preview_driver_profile.png'));
     });
   }, skip: !_enabled);
 

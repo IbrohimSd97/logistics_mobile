@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../core/brand/alix_components.dart';
+import '../core/brand/order_status_tone.dart';
 import '../core/brand/alix_logo.dart';
 import '../core/theme/app_palette.dart';
 import '../core/location/current_location.dart';
@@ -685,157 +687,57 @@ class DriverHomeBodyState extends State<DriverHomeBody>
     }
   }
 
-  String _statusLabel(int? s) => statusLabelDriver(s);
-
-  String _formatDistance(double? meters, String? km) {
-    if (meters != null) {
-      if (meters >= 1000) {
-        return '${(meters / 1000).toStringAsFixed(1)} ${I18n.t('common.km')}';
-      }
-      return '${meters.round()} m';
-    }
-    if (km != null) return '$km ${I18n.t('common.km')}';
-    return '—';
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-
     return RefreshIndicator(
       onRefresh: () async {
         await _loadCurrent();
         if (_online && _current == null) await _loadActive();
       },
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 110),
         children: [
-          if (_current != null) ...[
-            Row(
-              children: [
-                Icon(Icons.local_shipping_rounded, size: 18, color: cs.primary),
-                const SizedBox(width: 6),
-                Text(I18n.t('driver.current_order'), style: theme.textTheme.titleMedium),
-              ],
+          // Smena holati — ekrandagi eng muhim element: haydovchi birinchi
+          // navbatda "men liniyadamanmi?" degan savolga javob izlaydi.
+          // Shuning uchun online holat brendning to'q plastinkasida.
+          _ShiftCard(
+            online: _online,
+            busy: _busy,
+            address: _pickedAddress,
+            onToggle: _busy ? null : _toggleOnline,
+            onRefreshLocation:
+                _busy ? null : () => _sendCurrentGpsLocation(asOnline: false),
+          ),
+          if (_busy)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: LinearProgressIndicator(minHeight: 3),
             ),
-            const SizedBox(height: 8),
-            // Joriy buyurtma — feed kartochkasi bilan bir xil dizayn
-            // (sarlavha + status + narx + A→B + masofa + chevron). Driver
-            // ko'rinishida `_pickedLocation` GPS asosida A gacha masofani
-            // ham ko'rsatadi.
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            AlixBanner(
+              message: _error!,
+              icon: Icons.error_outline_rounded,
+              action: TextButton(
+                onPressed: _online ? _loadActive : _retryGoOnline,
+                child: Text(I18n.t('driver.retry_btn_short')),
+              ),
+            ),
+          ],
+          if (_current != null) ...[
+            const SizedBox(height: 24),
+            AlixSectionTitle(I18n.t('driver.current_order')),
             _DriverFeedOrderCard(
               order: _current!,
               driverLocation: _pickedLocation,
               onTap: () => widget.onOpenDetail(_current!, _pickedLocation),
             ),
-            const SizedBox(height: 16),
           ],
-          Card(
-            color: _online ? cs.tertiaryContainer : cs.surfaceContainerHighest,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        _online ? Icons.online_prediction_rounded : Icons.signal_wifi_off_rounded,
-                        color: _online ? cs.onTertiaryContainer : cs.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _online ? I18n.t('driver.online') : I18n.t('driver.offline'),
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: _online ? cs.onTertiaryContainer : cs.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _online
-                                  ? (_pickedAddress ?? I18n.t('driver.location_pending'))
-                                  : I18n.t('driver.online_hint'),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: _online ? cs.onTertiaryContainer : cs.onSurfaceVariant,
-                                height: 1.35,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: _online,
-                        onChanged: _busy ? null : (_) => _toggleOnline(),
-                      ),
-                    ],
-                  ),
-                  if (_online) ...[
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed:
-                            _busy ? null : () => _sendCurrentGpsLocation(asOnline: false),
-                        icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: Text(I18n.t('driver.refresh_location')),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          if (_busy) const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
-          if (_error != null)
-            Card(
-              color: cs.errorContainer,
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.error_outline_rounded,
-                            color: cs.onErrorContainer, size: 22),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _error!,
-                            style: TextStyle(
-                                color: cs.onErrorContainer, height: 1.35),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton.tonal(
-                        onPressed: _online ? _loadActive : _retryGoOnline,
-                        child: Text(I18n.t('driver.retry_btn_short')),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
           // ── Joriy / Reja tabbar ──
           // Ikkala tab har doim ko'rinadi. Joriy — radius bo'yicha yangi
           // buyurtmalar (joriy bandlikda yashiriladi). Reja — rejali
           // buyurtmalar (joriy bilan band bo'lsa ham ko'rinadi).
           if (_online) ...[
+            const SizedBox(height: 24),
             _DriverFeedTabsHeader(
               activeCount: _current == null ? _active.length : 0,
               scheduledCount: _scheduled.length,
@@ -843,35 +745,25 @@ class DriverHomeBodyState extends State<DriverHomeBody>
               selectedIndex: _feedTabIndex,
               onSelect: (i) => setState(() => _feedTabIndex = i),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             if (_feedTabIndex == 0) ...[
               // Joriy (radius)
               if (_current != null)
-                Card(
-                  color: cs.tertiaryContainer,
-                  child: ListTile(
-                    leading: Icon(Icons.info_outline_rounded, color: cs.onTertiaryContainer),
-                    title: Text(
-                      I18n.t('driver.busy_with_current'),
-                      style: TextStyle(color: cs.onTertiaryContainer, fontWeight: FontWeight.w700),
-                    ),
-                    subtitle: Text(
-                      I18n.t('driver.busy_with_current_subtitle'),
-                      style: TextStyle(color: cs.onTertiaryContainer),
-                    ),
-                  ),
+                AlixBanner(
+                  message: '${I18n.t('driver.busy_with_current')}\n'
+                      '${I18n.t('driver.busy_with_current_subtitle')}',
+                  tone: AlixTone.warning,
+                  icon: Icons.info_outline_rounded,
                 )
               else if (_active.isEmpty && !_busy)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.inbox_outlined),
-                    title: Text(I18n.t('driver.no_orders_now')),
-                    subtitle: Text(I18n.t('driver.archive_subtitle_empty')),
-                  ),
+                AlixEmptyState(
+                  icon: Icons.inbox_outlined,
+                  title: I18n.t('driver.no_orders_now'),
+                  message: I18n.t('driver.archive_subtitle_empty'),
                 )
               else
                 ..._active.map((o) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: _DriverFeedOrderCard(
                         order: o,
                         driverLocation: _pickedLocation,
@@ -881,16 +773,14 @@ class DriverHomeBodyState extends State<DriverHomeBody>
             ] else ...[
               // Reja
               if (_scheduled.isEmpty && !_busy)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.event_busy_rounded),
-                    title: Text(I18n.t('driver.no_scheduled_orders')),
-                    subtitle: Text(I18n.t('driver.no_scheduled_orders_subtitle')),
-                  ),
+                AlixEmptyState(
+                  icon: Icons.event_busy_rounded,
+                  title: I18n.t('driver.no_scheduled_orders'),
+                  message: I18n.t('driver.no_scheduled_orders_subtitle'),
                 )
               else
                 ..._scheduled.map((o) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: _DriverFeedOrderCard(
                         order: o,
                         driverLocation: _pickedLocation,
@@ -898,6 +788,92 @@ class DriverHomeBodyState extends State<DriverHomeBody>
                       ),
                     )),
             ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Smena kartasi: online bo'lsa to'q plastinka va orange indikator,
+/// offline bo'lsa jim krem karta. Holat bir qarashda o'qilishi kerak.
+class _ShiftCard extends StatelessWidget {
+  const _ShiftCard({
+    required this.online,
+    required this.busy,
+    required this.address,
+    required this.onToggle,
+    required this.onRefreshLocation,
+  });
+
+  final bool online;
+  final bool busy;
+  final String? address;
+  final VoidCallback? onToggle;
+  final VoidCallback? onRefreshLocation;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final onCard = online ? Colors.white : cs.onSurface;
+    final onCardMuted =
+        online ? Colors.white.withValues(alpha: 0.72) : cs.onSurfaceVariant;
+
+    return AlixCard(
+      tone: online ? AlixSurfaceTone.ink : AlixSurfaceTone.cream,
+      padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: online ? AppPalette.orange : cs.outlineVariant,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  online ? I18n.t('driver.online') : I18n.t('driver.offline'),
+                  style: theme.textTheme.titleLarge?.copyWith(color: onCard),
+                ),
+              ),
+              Switch(
+                value: online,
+                onChanged: onToggle == null ? null : (_) => onToggle!(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            online
+                ? (address ?? I18n.t('driver.location_pending'))
+                : I18n.t('driver.online_hint'),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(color: onCardMuted),
+          ),
+          if (online) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: onRefreshLocation,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: Text(I18n.t('driver.refresh_location')),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppPalette.orange,
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
           ],
         ],
       ),
@@ -965,10 +941,16 @@ class DriverOrdersArchiveBodyState extends State<DriverOrdersArchiveBody> {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null && _list.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
         children: [
-          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          TextButton(onPressed: _load, child: Text(I18n.t('common.retry'))),
+          AlixBanner(
+            message: _error!,
+            icon: Icons.error_outline_rounded,
+            action: TextButton(
+              onPressed: _load,
+              child: Text(I18n.t('common.retry')),
+            ),
+          ),
         ],
       );
     }
@@ -977,11 +959,13 @@ class DriverOrdersArchiveBodyState extends State<DriverOrdersArchiveBody> {
         onRefresh: _load,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
+          padding: const EdgeInsets.fromLTRB(20, 28, 20, 96),
           children: [
-            const Icon(Icons.inventory_2_outlined, size: 56),
-            const SizedBox(height: 12),
-            Text(I18n.t('driver.archive_empty'), textAlign: TextAlign.center),
+            AlixEmptyState(
+              icon: Icons.inventory_2_outlined,
+              title: I18n.t('driver.archive_empty'),
+              message: I18n.t('driver.archive_subtitle_empty'),
+            ),
           ],
         ),
       );
@@ -989,9 +973,9 @@ class DriverOrdersArchiveBodyState extends State<DriverOrdersArchiveBody> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
         itemCount: _list.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, i) {
           return _DriverOrderCard(
             order: _list[i],
@@ -1015,90 +999,66 @@ class _DriverOrderCard extends StatelessWidget {
   final DriverOrder order;
   final VoidCallback onTap;
 
+  /// Buyurtma qachon yopilgan: yakunlangan, bekor qilingan yoki yetkazilgan.
+  String? _orderEndIso(DriverOrder o) =>
+      o.completedAt ?? o.cancelledAt ?? o.deliveredAt;
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final s = order.status;
-    return Material(
-      color: cs.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.all(16),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              // Header
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      order.orderNumber ?? I18n.t('customer.order_number_fallback', {'id': order.id}),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+              Expanded(
+                child: Text(
+                  order.orderNumber ??
+                      I18n.t('customer.order_number_fallback', {'id': order.id}),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
                   ),
-                  const SizedBox(width: 8),
-                  _MiniStatusChip(status: s),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${_formatMoney(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: cs.primary,
-                    ),
-              ),
-              const SizedBox(height: 12),
-
-              // A → B
-              _AbRow(
-                isStart: true,
-                label: 'A',
-                address: order.pickupAddress ?? '—',
-              ),
-              const SizedBox(height: 6),
-              _AbRow(
-                isStart: false,
-                label: 'B',
-                address: order.deliveryAddress ?? '—',
-              ),
-
-              const SizedBox(height: 12),
-              Divider(height: 1, color: cs.outlineVariant),
-              const SizedBox(height: 10),
-
-              // Boshlanish va tugash vaqtlari + chevron
-              Row(
-                children: [
-                  Expanded(
-                    child: _TimeRangeRow(
-                      start: order.acceptedAt ?? order.createdAt,
-                      end: _orderEndIso(order),
-                    ),
-                  ),
-                  Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-                ],
-              ),
+              _MiniStatusChip(status: order.status),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            '${_formatMoney(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')}',
+            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 14),
+          _DriverRoute(
+            pickup: order.pickupAddress ?? '—',
+            delivery: order.deliveryAddress ?? '—',
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: cs.outlineVariant),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _TimeRangeRow(
+                  start: order.acceptedAt ?? order.createdAt,
+                  end: _orderEndIso(order),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+            ],
+          ),
+        ],
       ),
     );
-  }
-
-  String? _orderEndIso(DriverOrder o) {
-    return o.completedAt ?? o.cancelledAt ?? o.deliveredAt;
   }
 }
 
@@ -1142,61 +1102,6 @@ class _TimeRangeRow extends StatelessWidget {
   }
 }
 
-class _AbRow extends StatelessWidget {
-  const _AbRow({
-    required this.isStart,
-    required this.label,
-    required this.address,
-  });
-
-  final bool isStart;
-  final String label;
-  final String address;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final color = isStart ? AppPalette.success : AppPalette.dangerLight;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 10,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            address,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: cs.onSurface,
-              fontWeight: FontWeight.w600,
-              height: 1.3,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _MiniStatusChip extends StatelessWidget {
   const _MiniStatusChip({required this.status});
 
@@ -1204,49 +1109,12 @@ class _MiniStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    Color bg;
-    Color fg;
-    switch (status) {
-      case 2:
-        bg = AppPalette.amber;
-        fg = AppPalette.inkStrong;
-        break;
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-      case 8:
-        bg = cs.primary;
-        fg = cs.onPrimary;
-        break;
-      case 9:
-      case 10:
-        bg = AppPalette.success;
-        fg = Colors.white;
-        break;
-      case 11:
-      case 12:
-        bg = AppPalette.dangerLight;
-        fg = Colors.white;
-        break;
-      default:
-        bg = cs.surfaceContainerHighest;
-        fg = cs.onSurfaceVariant;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(
-        statusLabelDriver(status),
-        style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 11),
-      ),
+    return AlixStatusChip(
+      label: statusLabelDriver(status),
+      tone: orderStatusTone(status),
     );
   }
 }
-
-// ─────────────────────────────── Wallet ───────────────────────────────
 
 class DriverWalletBody extends StatefulWidget {
   const DriverWalletBody({required this.refreshTick});
@@ -1312,54 +1180,34 @@ class DriverWalletBodyState extends State<DriverWalletBody> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final isFleet = _fleet?.isFleet ?? false;
+
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
         children: [
-          if (_loading) const LinearProgressIndicator(),
-          if (_error != null)
-            Card(
-              color: cs.errorContainer,
-              child: ListTile(
-                leading: Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
-                title: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
-                trailing: FilledButton.tonal(onPressed: _load, child: Text(I18n.t('common.retry_short'))),
+          if (_loading) const LinearProgressIndicator(minHeight: 3),
+          if (_error != null) ...[
+            AlixBanner(
+              message: _error!,
+              icon: Icons.error_outline_rounded,
+              action: TextButton(
+                onPressed: _load,
+                child: Text(I18n.t('common.retry_short')),
               ),
             ),
-          // Fleet driver — avtopark hamyoni va balans ko'rsatilmaydi.
-          // Faqat shaxsiy tushumlar tarixi (pastda) ko'rinadi.
-          if (_fleet != null && _fleet!.isFleet) ...[
-            // Hech narsa: balans va wallet ham ko'rsatilmaydi.
-          ] else
-            // Independent driver — shaxsiy hamyon asosiy.
-            Card(
-              color: cs.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(I18n.t('driver.fleet_earnings_balance'),
-                        style: theme.textTheme.titleMedium?.copyWith(color: cs.onPrimaryContainer)),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${_formatMoney(_w?.balance)} ${_w?.currency ?? I18n.t('common.uzs')}',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: cs.onPrimaryContainer,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 14),
+          ],
+          // Avtopark haydovchisida shaxsiy balans bo'lmaydi — pul avtoparkka
+          // tushadi, shuning uchun unga faqat tushumlar tarixi ko'rsatiladi.
+          if (!isFleet) ...[
+            _DriverBalanceCard(
+              label: I18n.t('driver.fleet_earnings_balance'),
+              amount:
+                  '${_formatMoney(_w?.balance)} ${_w?.currency ?? I18n.t('common.uzs')}',
             ),
-          // "Pul yechib olish" tugmasi faqat independent driver'ga ko'rinadi.
-          // Fleet driverda yechib olish avtopark tomonidan amalga oshiriladi.
-          if (!(_fleet?.isFleet ?? false)) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1370,67 +1218,102 @@ class DriverWalletBodyState extends State<DriverWalletBody> {
               label: Text(I18n.t('driver.withdraw_card_btn')),
             ),
           ],
-          const SizedBox(height: 20),
-          Text(
-            (_fleet?.isFleet ?? false) ? I18n.t('driver.income_section') : I18n.t('driver.tx_section'),
-            style: theme.textTheme.titleSmall,
+          const SizedBox(height: 26),
+          AlixSectionTitle(
+            isFleet ? I18n.t('driver.income_section') : I18n.t('driver.tx_section'),
           ),
-          if ((_fleet?.isFleet ?? false)) ...[
+          if (isFleet) ...[
             if (_fleet!.recentMyEarnings.isEmpty)
-              Card(child: ListTile(title: Text(I18n.t('driver.fleet_no_earnings'))))
+              AlixEmptyState(
+                icon: Icons.receipt_long_outlined,
+                title: I18n.t('driver.fleet_no_earnings'),
+              )
             else
-              ..._fleet!.recentMyEarnings.map((e) => Card(
-                    child: ListTile(
-                      leading: Icon(Icons.local_shipping_outlined, color: cs.primary),
-                      title: Text(walletTxLabel(
-                        transactionType: e.transactionType,
-                        rawDescription: e.title,
-                        amount: double.tryParse(e.amount ?? ''),
-                      )),
-                      subtitle: Text([
-                        if (e.orderId != null)
-                          I18n.t('wallet.tx.order_ref', {'number': e.orderId}),
-                        if ((e.createdAt ?? '').isNotEmpty) e.createdAt!,
-                      ].join(' · ')),
-                      trailing: Text(
-                        '+${_formatMoney(e.amount)}',
-                        style: TextStyle(fontWeight: FontWeight.w700, color: Colors.green.shade700),
-                      ),
+              ..._fleet!.recentMyEarnings.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: AlixTxRow(
+                    icon: Icons.local_shipping_outlined,
+                    title: walletTxLabel(
+                      transactionType: e.transactionType,
+                      rawDescription: e.title,
+                      amount: double.tryParse(e.amount ?? ''),
                     ),
-                  )),
-          ] else if (_tx.isEmpty)
-            Card(child: ListTile(title: Text(I18n.t('driver.no_tx'))))
-          else
-            ..._tx.map((e) {
-              final isNeg = e.amount?.startsWith('-') ?? false;
-              return Card(
-                child: ListTile(
-                  leading: Icon(
-                    isNeg
-                        ? Icons.arrow_circle_up_outlined
-                        : Icons.arrow_circle_down_outlined,
-                    color: isNeg ? Colors.redAccent : Colors.green.shade700,
+                    meta: _txMeta(e.orderId, e.createdAt),
+                    amount: '+${_formatMoney(e.amount)}',
                   ),
-                  title: Text(walletTxLabel(
+                ),
+              ),
+          ] else if (_tx.isEmpty)
+            AlixEmptyState(
+              icon: Icons.receipt_long_outlined,
+              title: I18n.t('driver.no_tx'),
+            )
+          else
+            ..._tx.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: AlixTxRow(
+                  title: walletTxLabel(
                     transactionType: e.transactionType,
                     rawDescription: e.title,
                     amount: double.tryParse(e.amount ?? ''),
-                  )),
-                  subtitle: Text([
-                    if (e.orderId != null)
-                      I18n.t('wallet.tx.order_ref', {'number': e.orderId}),
-                    if ((e.createdAt ?? '').isNotEmpty) e.createdAt!,
-                  ].join(' · ')),
-                  trailing: Text(
-                    _formatMoney(e.amount),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isNeg ? Colors.redAccent : Colors.green.shade700,
-                    ),
                   ),
+                  meta: _txMeta(e.orderId, e.createdAt),
+                  amount: _formatMoney(e.amount),
+                  negative: e.amount?.startsWith('-') ?? false,
                 ),
-              );
-            }),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Qatorning ikkinchi satri: buyurtma raqami va sana (mahalliy vaqtda).
+  String _txMeta(int? orderId, String? createdAtIso) {
+    final dt = DateTime.tryParse(createdAtIso ?? '')?.toLocal();
+    String p2(int v) => v.toString().padLeft(2, '0');
+    return [
+      if (orderId != null) I18n.t('wallet.tx.order_ref', {'number': orderId}),
+      if (dt != null)
+        '${p2(dt.day)}.${p2(dt.month)}.${dt.year} ${p2(dt.hour)}:${p2(dt.minute)}',
+    ].join(' · ');
+  }
+}
+
+/// Haydovchi balansi — mijoz hamyonidagi kabi to'q plastinka.
+class _DriverBalanceCard extends StatelessWidget {
+  const _DriverBalanceCard({required this.label, required this.amount});
+
+  final String label;
+  final String amount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlixCard(
+      tone: AlixSurfaceTone.ink,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.72),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              amount,
+              style: theme.textTheme.displaySmall?.copyWith(color: Colors.white),
+            ),
+          ),
         ],
       ),
     );
@@ -1462,20 +1345,23 @@ class DriverProfileBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
       children: [
         Row(
           children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor: cs.primaryContainer,
+            Container(
+              width: 64,
+              height: 64,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppPalette.radiusCard),
+              ),
               child: Text(
                 _initial,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: cs.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
               ),
             ),
             const SizedBox(width: 16),
@@ -1483,26 +1369,29 @@ class DriverProfileBody extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(I18n.t('driver.role_title'),
-                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                  Text(phoneDisplay,
-                      style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
-                  Text('ID: $userId',
-                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(I18n.t('driver.role_title'), style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 2),
+                  Text(
+                    phoneDisplay,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  Text('ID: $userId', style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
         DriverRoleSegmented(
           current: 'driver',
           onSelect: (role) {
             if (role == 'customer') onSwitchToCustomer();
           },
         ),
-        const SizedBox(height: 12),
-        Card(
+        const SizedBox(height: 22),
+        AlixSectionTitle(I18n.t('settings.title')),
+        AlixCard(
+          padding: EdgeInsets.zero,
           child: Column(
             children: [
               AnimatedBuilder(
@@ -1524,18 +1413,19 @@ class DriverProfileBody extends StatelessWidget {
                   );
                 },
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: cs.outlineVariant),
               const LanguagePickerTile(),
-              const Divider(height: 1),
+              Divider(height: 1, color: cs.outlineVariant),
               ListTile(
                 leading: const Icon(Icons.security_rounded),
                 title: Text(I18n.t('settings.security')),
                 subtitle: Text(I18n.t('settings.security_subtitle')),
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: cs.outlineVariant),
               ListTile(
                 leading: const Icon(Icons.help_outline_rounded),
                 title: Text(I18n.t('settings.help')),
+                trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(I18n.t('driver.help_about_driver'))),
@@ -1545,15 +1435,14 @@ class DriverProfileBody extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 26),
         OutlinedButton.icon(
           onPressed: onLogout,
           icon: const Icon(Icons.logout_rounded),
           label: Text(I18n.t('auth.logout')),
           style: OutlinedButton.styleFrom(
             foregroundColor: cs.error,
-            side: BorderSide(color: cs.error.withValues(alpha: 0.6)),
-            minimumSize: const Size.fromHeight(48),
+            side: BorderSide(color: cs.error.withValues(alpha: 0.5)),
           ),
         ),
       ],
@@ -1608,140 +1497,6 @@ String _formatMoney(String? raw) {
   }
   return neg ? '-$buf' : buf.toString();
 }
-
-/// "Rejali buyurtma" karta — kelajakdagi olib ketish vaqti va countdown.
-/// Driver radius'siz alohida bo'limda ko'radi.
-class _ScheduledOrderCard extends StatelessWidget {
-  const _ScheduledOrderCard({
-    required this.order,
-    required this.onTap,
-    required this.formatMoney,
-  });
-
-  final DriverOrder order;
-  final VoidCallback onTap;
-  final String Function(String?) formatMoney;
-
-  /// Kun.oy HH:mm — qisqa va o'qish oson, badge'ga sig'adi.
-  String _shortDateTime(DateTime dt) {
-    final two = (int v) => v.toString().padLeft(2, '0');
-    return '${two(dt.day)}.${two(dt.month)} ${two(dt.hour)}:${two(dt.minute)}';
-  }
-
-  /// Kelajakdagi vaqtgacha qancha qolganini odamga tushunarli ko'rinishda.
-  String _countdown(DateTime target) {
-    final diff = target.difference(DateTime.now());
-    if (diff.isNegative) return I18n.t('driver.time_passed');
-    final h = diff.inHours;
-    final m = diff.inMinutes.remainder(60);
-    if (h >= 24) {
-      final d = diff.inDays;
-      final hh = diff.inHours.remainder(24);
-      return I18n.t('driver.days_hours_left', {'d': d, 'h': hh});
-    }
-    if (h >= 1) return I18n.t('driver.hours_minutes_left', {'h': h, 'm': m});
-    return I18n.t('driver.minutes_left', {'m': diff.inMinutes});
-  }
-
-  /// Address matni "lat,lng" formatda bo'lsa (reverse-geocode muvaffaqiyatsiz
-  /// bo'lganda fallback), uni "Koordinata: …" deb tepalashtirib chiqaramiz —
-  /// haqiqiy manzilday ko'rinmasin.
-  String _displayAddress(String raw) {
-    final t = raw.trim();
-    final looksLikeCoord = RegExp(r'^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$').hasMatch(t);
-    if (looksLikeCoord) {
-      return I18n.t('driver.coords_label', {'value': t});
-    }
-    return t;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    DateTime? scheduled;
-    if (order.scheduledPickupAt != null) {
-      scheduled = DateTime.tryParse(order.scheduledPickupAt!)?.toLocal();
-    }
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      order.orderNumber ?? I18n.t('customer.order_number_fallback', {'id': order.id}),
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  if (scheduled != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: cs.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.event_rounded, size: 13, color: cs.onPrimaryContainer),
-                              const SizedBox(width: 4),
-                              Text(
-                                _shortDateTime(scheduled),
-                                style: TextStyle(
-                                  color: cs.onPrimaryContainer,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _countdown(scheduled),
-                            style: TextStyle(
-                              color: cs.onPrimaryContainer.withValues(alpha: 0.85),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (order.pickupAddress != null)
-                Text('A: ${_displayAddress(order.pickupAddress!)}',
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-              if (order.deliveryAddress != null)
-                Text('B: ${_displayAddress(order.deliveryAddress!)}',
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 4),
-              Text(
-                '${formatMoney(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')} · ${order.cargoWeightKg ?? '—'} ${I18n.t('common.kg')}',
-                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Yuk turi multi-select bottom sheet — driver onlayn bo'lganda chiqadi.
 class _CargoTypesPickerSheet extends StatefulWidget {
   const _CargoTypesPickerSheet();
 
@@ -1904,10 +1659,10 @@ class DriverRoleSegmented extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-        child: Column(
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(I18n.t('customer.mode_label'), style: Theme.of(context).textTheme.titleSmall),
@@ -1915,9 +1670,8 @@ class DriverRoleSegmented extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cs.outlineVariant),
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(AppPalette.radiusField),
               ),
               child: Row(
                 children: [
@@ -1942,7 +1696,6 @@ class DriverRoleSegmented extends StatelessWidget {
               ),
             ),
           ],
-        ),
       ),
     );
   }
@@ -1967,14 +1720,14 @@ class _RoleSeg extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppPalette.radiusChip),
         onTap: selected ? null : onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: BoxDecoration(
             color: selected ? cs.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppPalette.radiusChip),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2142,145 +1895,126 @@ class _DriverFeedOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final s = order.status;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final distM = _distanceToPickupMeters();
 
-    return Material(
-      color: cs.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.all(16),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      order.orderNumber ?? I18n.t('customer.order_number_fallback', {'id': order.id}),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+              Expanded(
+                child: Text(
+                  order.orderNumber ??
+                      I18n.t('customer.order_number_fallback', {'id': order.id}),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
                   ),
-                  if (order.scheduledPickupAt != null) ...[
-                    const SizedBox(width: 6),
-                    _DriverScheduledBadge(scheduledAtIso: order.scheduledPickupAt!),
-                  ],
-                  const SizedBox(width: 8),
-                  _DriverMiniStatusChip(status: s),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${_formatMoney(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: cs.primary,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              _DriverAbRow(isStart: true, label: 'A', address: order.pickupAddress ?? '—'),
-              const SizedBox(height: 6),
-              _DriverAbRow(isStart: false, label: 'B', address: order.deliveryAddress ?? '—'),
-              const SizedBox(height: 12),
-              Divider(height: 1, color: cs.outlineVariant),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(Icons.my_location_rounded, size: 16, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Text(
-                    distM != null
-                        ? I18n.t('driver.distance_to_a', {'value': _formatDistanceShort(distM)})
-                        : I18n.t('driver.distance_to_a_unknown'),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Icon(Icons.scale_rounded, size: 16, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${order.cargoWeightKg ?? '—'} ${I18n.t('common.kg')}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-                ],
-              ),
+              if (order.scheduledPickupAt != null) ...[
+                const SizedBox(width: 6),
+                _DriverScheduledBadge(scheduledAtIso: order.scheduledPickupAt!),
+                const SizedBox(width: 6),
+              ],
+              _DriverMiniStatusChip(status: order.status),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            '${_formatMoney(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')}',
+            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 14),
+          _DriverRoute(
+            pickup: order.pickupAddress ?? '—',
+            delivery: order.deliveryAddress ?? '—',
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: cs.outlineVariant),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(Icons.my_location_rounded, size: 15, color: cs.onSurfaceVariant),
+              const SizedBox(width: 5),
+              Text(
+                distM != null
+                    ? I18n.t('driver.distance_to_a',
+                        {'value': _formatDistanceShort(distM)})
+                    : I18n.t('driver.distance_to_a_unknown'),
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 14),
+              Icon(Icons.scale_rounded, size: 15, color: cs.onSurfaceVariant),
+              const SizedBox(width: 5),
+              Text(
+                '${order.cargoWeightKg ?? '—'} ${I18n.t('common.kg')}',
+                style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _DriverAbRow extends StatelessWidget {
-  const _DriverAbRow({
-    required this.isStart,
-    required this.label,
-    required this.address,
-  });
+/// Yo'nalish bloki — mijoz ro'yxatidagi bilan bir xil til: to'q nuqta
+/// olib ketish, orange nuqta yetkazish, orasida bog'lovchi chiziq.
+class _DriverRoute extends StatelessWidget {
+  const _DriverRoute({required this.pickup, required this.delivery});
 
-  final bool isStart;
-  final String label;
-  final String address;
+  final String pickup;
+  final String delivery;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final color = isStart ? AppPalette.success : AppPalette.dangerLight;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    Widget dot(Color color) => Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        );
+
+    Widget address(String value) => Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(fontWeight: FontWeight.w600, height: 1),
+        );
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 10,
-              ),
-            ),
-          ),
+        Column(
+          children: [
+            dot(cs.onSurface),
+            Container(width: 2, height: 22, color: cs.outlineVariant),
+            dot(AppPalette.orange),
+          ],
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            address,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: cs.onSurface,
-              fontWeight: FontWeight.w600,
-              height: 1.3,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              address(pickup),
+              const SizedBox(height: 18),
+              address(delivery),
+            ],
           ),
         ),
       ],
@@ -2295,47 +2029,10 @@ class _DriverMiniStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    Color bg;
-    Color fg;
-    switch (status) {
-      case 2:
-        bg = AppPalette.amber;
-        fg = AppPalette.inkStrong;
-        break;
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-      case 8:
-        bg = cs.primary;
-        fg = cs.onPrimary;
-        break;
-      case 9:
-      case 10:
-        bg = AppPalette.success;
-        fg = Colors.white;
-        break;
-      case 11:
-      case 12:
-        bg = cs.errorContainer;
-        fg = cs.onErrorContainer;
-        break;
-      default:
-        bg = cs.surfaceContainerHigh;
-        fg = cs.onSurface;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        statusLabelDriver(status),
-        style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 11),
-      ),
+    // Rang mijoz ekranlaridagi bilan bitta manbadan olinadi.
+    return AlixStatusChip(
+      label: statusLabelDriver(status),
+      tone: orderStatusTone(status),
     );
   }
 }
