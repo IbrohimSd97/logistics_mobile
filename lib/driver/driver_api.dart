@@ -249,7 +249,7 @@ class DriverApi {
 
   /// POST /api/driver/registration/step3 (auth.temp, multipart)
   /// vehicleOwnership: 1=O'zimniki, 2=Boshqa hujjat asosida (ownershipFile required)
-  /// legalEntityType: 1=YATT, 2=O'z-o'zini band, 3=Jismoniy
+  /// legalEntityType: 1=YATT, 4=Yuridik shaxs (v1'da faqat shu ikkitasi)
   Future<DriverStepResult> registrationStep3({
     required String sessionId,
     required int vehicleOwnership,
@@ -275,7 +275,7 @@ class DriverApi {
     if (vehicleOwnership == 2 && ownershipFile != null) {
       req.files.add(await _filePart('ownership_contract_file', ownershipFile));
     }
-    if ((legalEntityType == 1 || legalEntityType == 2) && legalCertificatePdf != null) {
+    if ((legalEntityType == 1 || legalEntityType == 4) && legalCertificatePdf != null) {
       req.files.add(
         await _filePart(
           'legal_certificate_pdf',

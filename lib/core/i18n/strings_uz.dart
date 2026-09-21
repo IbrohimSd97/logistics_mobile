@@ -791,12 +791,13 @@ const Map<String, String> kStringsUz = {
   'driver.reg.ownership_other_subtitle': 'Dovernost yoki ijara shartnomasi',
   'driver.reg.ownership_doc': 'Egalik hujjati *',
   'driver.reg.legal_title': 'Yuridik holat *',
+  'driver.reg.legal_business_only_note':
+      'Haydovchi tadbirkorlik sub‘ekti bo‘lishi shart. To‘lovlar bank hisob raqamiga o‘tkaziladi.',
   'driver.reg.legal_yatt': 'YATT',
   'driver.reg.legal_yatt_subtitle': 'Guvohnoma PDF talab qilinadi',
-  'driver.reg.legal_self_employed': 'O‘z-o‘zini band qilish',
-  'driver.reg.legal_self_employed_subtitle': 'Guvohnoma PDF talab qilinadi',
-  'driver.reg.legal_individual': 'Jismoniy shaxs',
-  'driver.reg.legal_individual_subtitle': 'Hujjat talab qilinmaydi',
+  'driver.reg.legal_entity': 'Yuridik shaxs (MChJ, QK va b.)',
+  'driver.reg.legal_entity_subtitle':
+      'Davlat ro‘yxatidan o‘tganlik guvohnomasi PDF talab qilinadi',
   'driver.reg.legal_pdf': 'Guvohnoma (PDF) *',
   'driver.reg.avtopark_title': 'Avtopark tanlash (ixtiyoriy)',
   'driver.reg.avtopark_label': 'Avtopark',

@@ -42,8 +42,9 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   XFile? _ownershipFile;
   String? _ownershipUrl; // server'dagi mavjud hujjat (prefill)
 
-  /// 1=YATT, 2=O'z-o'zini band qilish, 3=Jismoniy shaxs
-  int _legalType = 3;
+  /// v1: faqat tadbirkorlik sub'ekti — 1=YATT, 4=Yuridik shaxs.
+  /// Jismoniy shaxs (3) va o'z-o'zini band qilish (2) yopilgan.
+  int _legalType = 1;
   XFile? _legalPdf;
   String? _legalUrl; // server'dagi mavjud hujjat (prefill)
 
@@ -65,7 +66,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
       final own = widget.data!.i3('vehicle_ownership');
       if (own == 1 || own == 2) _ownership = own!;
       final lt = widget.data!.i3('legal_entity_type');
-      if (lt == 1 || lt == 2 || lt == 3) _legalType = lt!;
+      if (lt == 1 || lt == 4) _legalType = lt!;
       _ownershipUrl = widget.data!.s3('ownership_contract_img_url');
       _legalUrl = widget.data!.s3('legal_certificate_img_url');
     }
@@ -179,7 +180,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
       _toast(I18n.t('driver.reg.upload_ownership_doc'));
       return;
     }
-    if ((_legalType == 1 || _legalType == 2) &&
+    if ((_legalType == 1 || _legalType == 4) &&
         _legalPdf == null &&
         (_legalUrl ?? '').isEmpty) {
       _toast(I18n.t('driver.reg.upload_legal_pdf'));
@@ -205,7 +206,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
             await DriverApi.instance.downloadToTempFile(_ownershipUrl!);
       }
       XFile? legalPdf = _legalPdf;
-      if ((_legalType == 1 || _legalType == 2) &&
+      if ((_legalType == 1 || _legalType == 4) &&
           legalPdf == null &&
           (_legalUrl ?? '').isNotEmpty) {
         legalPdf = await DriverApi.instance.downloadToTempFile(_legalUrl!);
@@ -319,31 +320,30 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
             const Divider(height: 32),
             Text(I18n.t('driver.reg.legal_title'),
                 style: Theme.of(context).textTheme.titleSmall),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                I18n.t('driver.reg.legal_business_only_note'),
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
             RadioListTile<int>(
               value: 1,
               groupValue: _legalType,
               title: Text(I18n.t('driver.reg.legal_yatt')),
               subtitle: Text(I18n.t('driver.reg.legal_yatt_subtitle')),
-              onChanged: (v) => setState(() => _legalType = v ?? 3),
+              onChanged: (v) => setState(() => _legalType = v ?? 1),
               contentPadding: EdgeInsets.zero,
             ),
             RadioListTile<int>(
-              value: 2,
+              value: 4,
               groupValue: _legalType,
-              title: Text(I18n.t('driver.reg.legal_self_employed')),
-              subtitle: Text(I18n.t('driver.reg.legal_self_employed_subtitle')),
-              onChanged: (v) => setState(() => _legalType = v ?? 3),
+              title: Text(I18n.t('driver.reg.legal_entity')),
+              subtitle: Text(I18n.t('driver.reg.legal_entity_subtitle')),
+              onChanged: (v) => setState(() => _legalType = v ?? 1),
               contentPadding: EdgeInsets.zero,
             ),
-            RadioListTile<int>(
-              value: 3,
-              groupValue: _legalType,
-              title: Text(I18n.t('driver.reg.legal_individual')),
-              subtitle: Text(I18n.t('driver.reg.legal_individual_subtitle')),
-              onChanged: (v) => setState(() => _legalType = v ?? 3),
-              contentPadding: EdgeInsets.zero,
-            ),
-            if (_legalType == 1 || _legalType == 2)
+            if (_legalType == 1 || _legalType == 4)
               _fileRow(I18n.t('driver.reg.legal_pdf'), _legalPdf, _legalUrl,
                   () async {
                 final f = await _pickPdfPlaceholder();

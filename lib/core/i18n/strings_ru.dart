@@ -789,12 +789,13 @@ const Map<String, String> kStringsRu = {
   'driver.reg.ownership_other_subtitle': 'Доверенность или договор аренды',
   'driver.reg.ownership_doc': 'Документ собственности *',
   'driver.reg.legal_title': 'Юридический статус *',
+  'driver.reg.legal_business_only_note':
+      'Водитель должен быть субъектом предпринимательства. Выплаты идут на банковский счёт.',
   'driver.reg.legal_yatt': 'ЯТТ',
   'driver.reg.legal_yatt_subtitle': 'Требуется PDF свидетельства',
-  'driver.reg.legal_self_employed': 'Самозанятый',
-  'driver.reg.legal_self_employed_subtitle': 'Требуется PDF свидетельства',
-  'driver.reg.legal_individual': 'Физическое лицо',
-  'driver.reg.legal_individual_subtitle': 'Документ не требуется',
+  'driver.reg.legal_entity': 'Юридическое лицо (ООО и др.)',
+  'driver.reg.legal_entity_subtitle':
+      'Требуется PDF свидетельства о госрегистрации',
   'driver.reg.legal_pdf': 'Свидетельство (PDF) *',
   'driver.reg.avtopark_title': 'Выбор автопарка (опционально)',
   'driver.reg.avtopark_label': 'Автопарк',
