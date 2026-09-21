@@ -9,6 +9,8 @@ import 'package:mening_ilovam/core/widgets/gradient_button.dart';
 import 'package:mening_ilovam/customer/pages/customer_order_create_page.dart';
 import 'package:mening_ilovam/customer/pages/customer_wallet_topup_page.dart';
 import 'package:mening_ilovam/screens/customer_main_shell.dart';
+import 'package:mening_ilovam/driver/pages/driver_pending_page.dart';
+import 'package:mening_ilovam/driver/pages/driver_registration_step1_page.dart';
 import 'package:mening_ilovam/screens/driver_main_shell.dart';
 import 'package:mening_ilovam/screens/login_screen.dart';
 
@@ -199,6 +201,28 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       await expectLater(
           find.byType(DriverProfileBody), matchesGoldenFile('preview_driver_profile.png'));
+    });
+  }, skip: !_enabled);
+
+  testWidgets('driver registration step 1', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      await tester.pumpWidget(
+          _app(const DriverRegistrationStep1Page(phoneDisplay: '+998 90 000 00 00')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(find.byType(DriverRegistrationStep1Page),
+          matchesGoldenFile('preview_driver_reg_step1.png'));
+    });
+  }, skip: !_enabled);
+
+  testWidgets('driver pending', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 800));
+      await tester.pumpWidget(
+          _app(const DriverPendingPage(phoneDisplay: '+998 90 000 00 00', userId: 7)));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(find.byType(DriverPendingPage),
+          matchesGoldenFile('preview_driver_pending.png'));
     });
   }, skip: !_enabled);
 

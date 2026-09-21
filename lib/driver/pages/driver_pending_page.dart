@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/brand/alix_components.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../screens/login_screen.dart';
@@ -157,8 +159,17 @@ class _DriverPendingPageState extends State<DriverPendingPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.hourglass_empty_rounded, size: 80, color: cs.primary),
-              const SizedBox(height: 16),
+              Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppPalette.radiusCard),
+                ),
+                child: const Icon(Icons.hourglass_empty_rounded,
+                    size: 40, color: AppPalette.orange),
+              ),
+              const SizedBox(height: 18),
               Text(
                 I18n.t('driver.pending.heading'),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -171,31 +182,28 @@ class _DriverPendingPageState extends State<DriverPendingPage>
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              Card(
-                color: cs.surfaceContainerHighest,
+              AlixCard(
+                tone: AlixSurfaceTone.cream,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: ListTile(
+                  contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.phone_outlined),
                   title: Text(I18n.t('driver.pending.phone_label')),
                   subtitle: Text(widget.phoneDisplay),
                 ),
               ),
-              if (_status != null && _status!.rejectCount > 0)
-                Card(
-                  color: cs.tertiaryContainer,
-                  child: ListTile(
-                    leading: Icon(Icons.info_outline, color: cs.onTertiaryContainer),
-                    title: Text(I18n.t('driver.pending.reject_count', {'count': _status!.rejectCount}),
-                        style: TextStyle(color: cs.onTertiaryContainer)),
-                  ),
+              if (_status != null && _status!.rejectCount > 0) ...[
+                const SizedBox(height: 10),
+                AlixBanner(
+                  message: I18n.t('driver.pending.reject_count',
+                      {'count': _status!.rejectCount}),
+                  tone: AlixTone.warning,
                 ),
-              if (_error != null)
-                Card(
-                  color: cs.errorContainer,
-                  child: ListTile(
-                    leading: Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
-                    title: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
-                  ),
-                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                AlixBanner(message: _error!, icon: Icons.error_outline_rounded),
+              ],
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: _checking ? null : _check,

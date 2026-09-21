@@ -7,6 +7,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/auth_api.dart';
 import '../../core/config/app_links.dart';
+import '../../core/brand/alix_components.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../core/widgets/gradient_button.dart';
@@ -282,16 +284,18 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
             onPressed: (_submitting || _loadingAvtoparks) ? null : _loadAvtoparks,
           ),
         ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(4),
-          child: LinearProgressIndicator(value: 3 / 3),
-        ),
       ),
       body: AbsorbPointer(
         absorbing: _submitting,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
+            AlixStepHeader(
+              step: 3,
+              total: 3,
+              label: I18n.t('driver.reg.step_of', {'n': 3, 'total': 3}),
+            ),
+            const SizedBox(height: 20),
             Text(I18n.t('driver.reg.ownership_title'),
                 style: Theme.of(context).textTheme.titleSmall),
             RadioListTile<int>(
@@ -409,52 +413,57 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   }
 
   Widget _fileRow(String label, XFile? f, String? existingUrl, VoidCallback onPick) {
-    Widget thumb;
+    final cs = Theme.of(context).colorScheme;
     final hasExisting = f == null && (existingUrl ?? '').isNotEmpty;
+    const size = 52.0;
+    const radius = AppPalette.radiusChip;
+
+    Widget thumb;
     if (hasExisting) {
-      // Mavjud hujjat (PDF bo'lishi mumkin) — rasm sifatida ko'rsatmaymiz,
-      // "biriktirilgan hujjat" belgisi.
+      // Mavjud hujjat PDF ham bo'lishi mumkin — rasm sifatida ko'rsatmaymiz.
       thumb = Container(
-        width: 56,
-        height: 56,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(8),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(radius),
         ),
-        child: Icon(Icons.description_rounded,
-            color: Theme.of(context).colorScheme.onPrimaryContainer),
+        child: const Icon(Icons.description_rounded, color: AppPalette.orange),
       );
     } else if (f == null) {
       thumb = Container(
-        width: 56,
-        height: 56,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(radius),
         ),
-        child: const Icon(Icons.attach_file_rounded),
+        child: Icon(Icons.attach_file_rounded, color: cs.onSurfaceVariant),
       );
     } else if (kIsWeb) {
       thumb = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(f.path, width: 56, height: 56, fit: BoxFit.cover),
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.network(f.path, width: size, height: size, fit: BoxFit.cover),
       );
     } else {
       thumb = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.file(File(f.path), width: 56, height: 56, fit: BoxFit.cover),
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.file(File(f.path), width: size, height: size, fit: BoxFit.cover),
       );
     }
-    final subtitle = f?.name ??
-        (hasExisting
-            ? I18n.t('driver.reg.existing_image')
-            : I18n.t('driver.reg.not_picked'));
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: thumb,
-      title: Text(label),
-      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: IconButton(icon: const Icon(Icons.upload_file_rounded), onPressed: onPick),
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AlixUploadRow(
+        label: label,
+        status: f?.name ??
+            (hasExisting
+                ? I18n.t('driver.reg.existing_image')
+                : I18n.t('driver.reg.not_picked')),
+        filled: f != null || hasExisting,
+        thumbnail: thumb,
+        onPick: onPick,
+      ),
     );
   }
 }

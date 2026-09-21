@@ -107,6 +107,25 @@ Splash konfiguratsiyasi:
 * **To'q karta** — `AppPalette.inkStrong`, ichida orange progress (tracking).
 * **Inputlar** — krem to'ldirish, fokusda orange chegara 1.6 px.
 
+Qayta ishlatiladigan bloklar `lib/core/brand/alix_components.dart` da:
+
+| Komponent | Vazifasi |
+|---|---|
+| `AlixCard` | Oq / krem / to'q yuzali karta |
+| `AlixSectionTitle` | Bo'lim sarlavhasi (kichik, katta harfli) |
+| `AlixStatTile` | Raqamli ko'rsatkich kartasi |
+| `AlixTrackingCard` | Faol buyurtmaning to'q kartasi (progress + foiz) |
+| `AlixStatusChip` | Holat chipi (neutral / progress / success / warning / danger) |
+| `AlixEmptyState` | Bo'sh ro'yxat o'rniga keyingi qadam taklifi |
+| `AlixBanner` | Ekran tepasidagi xato / ogohlantirish / ma'lumot |
+| `AlixTxRow` | Hamyondagi pul harakati qatori |
+| `AlixStepHeader` | Ko'p qadamli formada bosqich ko'rsatkichi |
+| `AlixUploadRow` | Hujjat / rasm yuklash qatori |
+
+Buyurtma statusining rangi `lib/core/brand/order_status_tone.dart` da —
+bitta manba, shuning uchun bir buyurtma ro'yxatda, tafsilotda va haydovchi
+ekranida bir xil rangda ko'rinadi.
+
 ## 6. Ko'rinish namunalari
 
 `test/brand/` dagi golden rasmlar: splash, login, komponentlar (yorug' va to'q).

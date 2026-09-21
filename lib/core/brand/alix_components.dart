@@ -498,3 +498,137 @@ class AlixTxRow extends StatelessWidget {
     );
   }
 }
+
+/// Ko'p qadamli formalar uchun bosqich ko'rsatkichi.
+///
+/// Ingichka `LinearProgressIndicator` dan farqli — foydalanuvchi nechta qadam
+/// borligini va qaysi biridaligini aniq ko'radi.
+class AlixStepHeader extends StatelessWidget {
+  const AlixStepHeader({
+    super.key,
+    required this.step,
+    required this.total,
+    required this.label,
+    this.title,
+  });
+
+  /// Joriy qadam, 1 dan boshlanadi.
+  final int step;
+  final int total;
+
+  /// "Qadam 2 / 3" ko'rinishidagi tayyor matn.
+  final String label;
+
+  /// Qadamning nomi (ixtiyoriy).
+  final String? title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: List.generate(total, (i) {
+            final done = i < step;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: i == total - 1 ? 0 : 6),
+                child: Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: done ? AppPalette.orange : cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 10),
+        Text(label, style: theme.textTheme.titleSmall),
+        if (title != null) ...[
+          const SizedBox(height: 4),
+          Text(title!, style: theme.textTheme.headlineSmall),
+        ],
+      ],
+    );
+  }
+}
+
+/// Hujjat/rasm yuklash qatori — ro'yxatdan o'tish formalarida.
+///
+/// Tanlangan bo'lsa yashil belgi, bo'lmasa orange kamera ikonkasi: foydalanuvchi
+/// nima qolganini ro'yxatga qaramasdan ko'radi.
+class AlixUploadRow extends StatelessWidget {
+  const AlixUploadRow({
+    super.key,
+    required this.label,
+    required this.status,
+    required this.onPick,
+    required this.filled,
+    this.thumbnail,
+  });
+
+  final String label;
+
+  /// Fayl nomi yoki "tanlanmagan" matni.
+  final String status;
+
+  final VoidCallback onPick;
+
+  /// Fayl tanlangan yoki serverda mavjud.
+  final bool filled;
+
+  /// Rasm oldindan ko'rinishi (bo'lmasa joy egallovchi ikonka chiziladi).
+  final Widget? thumbnail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.all(12),
+      onTap: onPick,
+      child: Row(
+        children: [
+          thumbnail ??
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(AppPalette.radiusChip),
+                ),
+                child: Icon(Icons.image_outlined, color: cs.onSurfaceVariant),
+              ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  status,
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(
+            filled ? Icons.check_circle_rounded : Icons.photo_camera_outlined,
+            color: filled ? AppPalette.success : AppPalette.orange,
+          ),
+        ],
+      ),
+    );
+  }
+}

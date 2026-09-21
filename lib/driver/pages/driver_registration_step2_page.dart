@@ -7,6 +7,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/config/api_config.dart';
+import '../../core/brand/alix_components.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/offerta_link.dart';
@@ -338,10 +340,6 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
             onPressed: (_submitting || _loadingTariffs) ? null : _loadTariffs,
           ),
         ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(4),
-          child: LinearProgressIndicator(value: 2 / 3),
-        ),
       ),
       body: AbsorbPointer(
         absorbing: _submitting,
@@ -349,8 +347,14 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
           key: _formKey,
           autovalidateMode: AutovalidateMode.onUserInteraction,
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
             children: [
+              AlixStepHeader(
+                step: 2,
+                total: 3,
+                label: I18n.t('driver.reg.step_of', {'n': 2, 'total': 3}),
+              ),
+              const SizedBox(height: 20),
               if (_loadingTariffs)
                 const LinearProgressIndicator()
               else if (_tariffsError != null)
@@ -582,56 +586,63 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   }
 
   Widget _imgRow(String label, XFile? f, String? existingUrl, VoidCallback onPick) {
-    Widget thumb;
+    final cs = Theme.of(context).colorScheme;
     final hasExisting = f == null && (existingUrl ?? '').isNotEmpty;
+    const size = 52.0;
+    const radius = AppPalette.radiusChip;
+
+    Widget thumb;
     if (f == null && !hasExisting) {
       thumb = Container(
-        width: 56,
-        height: 56,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(radius),
         ),
-        child: const Icon(Icons.image_outlined),
+        child: Icon(Icons.image_outlined, color: cs.onSurfaceVariant),
       );
     } else if (hasExisting) {
       // Server'dagi mavjud rasm (prefill).
       thumb = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(radius),
         child: Image.network(
           _fullUrl(existingUrl!),
-          width: 56,
-          height: 56,
+          width: size,
+          height: size,
           fit: BoxFit.cover,
           errorBuilder: (_, _, _) => Container(
-            width: 56,
-            height: 56,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: const Icon(Icons.broken_image_outlined),
+            width: size,
+            height: size,
+            color: cs.surface,
+            child: Icon(Icons.broken_image_outlined, color: cs.onSurfaceVariant),
           ),
         ),
       );
     } else if (kIsWeb) {
       thumb = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(f!.path, width: 56, height: 56, fit: BoxFit.cover),
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.network(f!.path, width: size, height: size, fit: BoxFit.cover),
       );
     } else {
       thumb = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.file(File(f!.path), width: 56, height: 56, fit: BoxFit.cover),
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.file(File(f!.path), width: size, height: size, fit: BoxFit.cover),
       );
     }
-    final subtitle = f?.name ??
-        (hasExisting
-            ? I18n.t('driver.reg.existing_image')
-            : I18n.t('driver.reg.not_picked'));
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: thumb,
-      title: Text(label),
-      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: IconButton(icon: const Icon(Icons.photo_camera_outlined), onPressed: onPick),
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AlixUploadRow(
+        label: label,
+        status: f?.name ??
+            (hasExisting
+                ? I18n.t('driver.reg.existing_image')
+                : I18n.t('driver.reg.not_picked')),
+        filled: f != null || hasExisting,
+        thumbnail: thumb,
+        onPick: onPick,
+      ),
     );
   }
 

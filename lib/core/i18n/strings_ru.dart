@@ -740,6 +740,7 @@ const Map<String, String> kStringsRu = {
   'driver.reg.choose_vehicle_type': 'Выберите тип автомобиля',
   'driver.reg.choose_cargo_types': 'Выберите типы грузов',
   'driver.reg.step1_appbar': 'Шаг 1 — Личные данные',
+  'driver.reg.step_of': 'Шаг {n} / {total}',
   'driver.reg.step2_appbar': 'Шаг 2 — Данные автомобиля',
   'driver.reg.step3_appbar': 'Шаг 3 — Собственность и юр. статус',
   'driver.reg.prefill_hint':

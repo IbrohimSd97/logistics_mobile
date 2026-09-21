@@ -9,6 +9,8 @@ import 'package:yandex_mapkit/yandex_mapkit.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/cancel_reasons_api.dart';
+import '../../core/brand/alix_components.dart';
+import '../../core/brand/order_status_tone.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/location/current_location.dart';
 import '../../core/location/map_markers.dart';
@@ -1055,7 +1057,6 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                       _formatMoney(_order.totalPrice),
                                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                             fontWeight: FontWeight.w800,
-                                            color: cs.primary,
                                           ),
                                     ),
                                     Text(
@@ -1319,7 +1320,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     return Padding(
       padding: const EdgeInsets.all(8),
       child: Material(
-        color: Colors.black.withValues(alpha: 0.55),
+        color: AppPalette.inkStrong.withValues(alpha: 0.72),
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
@@ -1528,44 +1529,10 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    Color bg;
-    Color fg;
-    switch (status) {
-      case 2:
-        bg = AppPalette.amber;
-        fg = AppPalette.inkStrong;
-        break;
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-      case 8:
-        bg = cs.primary;
-        fg = cs.onPrimary;
-        break;
-      case 9:
-      case 10:
-        bg = AppPalette.success;
-        fg = Colors.white;
-        break;
-      case 11:
-      case 12:
-        bg = AppPalette.dangerLight;
-        fg = Colors.white;
-        break;
-      default:
-        bg = cs.surfaceContainerHighest;
-        fg = cs.onSurfaceVariant;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(
-        statusLabelDriver(status),
-        style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 12),
-      ),
+    // Rang mijoz ekranlaridagi bilan bitta manbadan.
+    return AlixStatusChip(
+      label: statusLabelDriver(status),
+      tone: orderStatusTone(status),
     );
   }
 }
@@ -1608,19 +1575,23 @@ class _StageHint extends StatelessWidget {
         return const SizedBox.shrink();
     }
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.primaryContainer,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppPalette.radiusCard),
       ),
       child: Row(
         children: [
-          Icon(icon, color: cs.onPrimaryContainer),
-          const SizedBox(width: 10),
+          Icon(icon, color: cs.onPrimaryContainer, size: 20),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(color: cs.onPrimaryContainer, height: 1.35, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: cs.onPrimaryContainer,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -1745,22 +1716,22 @@ class _AddressRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = isStart ? AppPalette.success : AppPalette.dangerLight;
+    // Boshlanish to'q, manzil orange — buyurtmalar ro'yxatidagi bilan bir xil.
+    final color = isStart ? cs.onSurface : AppPalette.orange;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: 24,
           height: 24,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
-          ),
-          child: Center(
-            child: Text(
-              isStart ? 'A' : 'B',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          child: Text(
+            isStart ? 'A' : 'B',
+            style: TextStyle(
+              color: isStart ? cs.surface : Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
             ),
           ),
         ),
@@ -1825,17 +1796,16 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant),
+        borderRadius: BorderRadius.circular(AppPalette.radiusField),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: cs.primary),
-          const SizedBox(height: 6),
+          Icon(icon, size: 18, color: AppPalette.orange),
+          const SizedBox(height: 8),
           Text(
             label,
             style: TextStyle(

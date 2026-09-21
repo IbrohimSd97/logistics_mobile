@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/brand/alix_components.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../screens/login_screen.dart';
@@ -49,8 +51,8 @@ class DriverFailedPage extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.do_not_disturb_alt_rounded, size: 80, color: cs.error),
-              const SizedBox(height: 16),
+              _StatusBadge(icon: Icons.do_not_disturb_alt_rounded, color: cs.error),
+              const SizedBox(height: 18),
               Text(
                 I18n.t('driver.failed.title_short'),
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -63,17 +65,22 @@ class DriverFailedPage extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              Card(
-                color: cs.primaryContainer,
+              AlixCard(
+                tone: AlixSurfaceTone.cream,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: ListTile(
-                  leading: Icon(Icons.support_agent_rounded, color: cs.onPrimaryContainer),
-                  title: Text(I18n.t('common.app_name'), style: TextStyle(color: cs.onPrimaryContainer)),
-                  subtitle: Text('+998 71 200 00 00', style: TextStyle(color: cs.onPrimaryContainer)),
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.support_agent_rounded, color: AppPalette.orange),
+                  title: Text(I18n.t('common.app_name')),
+                  subtitle: const Text('+998 71 200 00 00'),
                 ),
               ),
-              Card(
-                color: cs.surfaceContainerHighest,
+              const SizedBox(height: 10),
+              AlixCard(
+                tone: AlixSurfaceTone.cream,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: ListTile(
+                  contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.phone_outlined),
                   title: Text(I18n.t('driver.failed.your_phone')),
                   subtitle: Text(phoneDisplay),
@@ -89,6 +96,29 @@ class DriverFailedPage extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Holat ekranlaridagi katta belgi — yumaloq plastinka ichida ikonka.
+/// Yalang'och 80px ikonkadan ko'ra tartibli ko'rinadi va brend
+/// yuzalari bilan bir xil tilda.
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.icon, required this.color});
+
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 84,
+      height: 84,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppPalette.radiusCard),
+      ),
+      child: Icon(icon, size: 40, color: color),
     );
   }
 }

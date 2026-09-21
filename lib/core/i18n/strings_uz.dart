@@ -742,6 +742,7 @@ const Map<String, String> kStringsUz = {
   'driver.reg.choose_vehicle_type': 'Avtomobil turini tanlang',
   'driver.reg.choose_cargo_types': 'Yuk turlarini tanlang',
   'driver.reg.step1_appbar': 'Step 1 — Shaxsiy ma‘lumotlar',
+  'driver.reg.step_of': 'Qadam {n} / {total}',
   'driver.reg.step2_appbar': 'Step 2 — Mashina ma‘lumotlari',
   'driver.reg.step3_appbar': 'Step 3 — Egalik va yuridik holat',
   'driver.reg.prefill_hint':

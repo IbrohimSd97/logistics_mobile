@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/auth_api.dart';
+import '../../core/brand/alix_components.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../screens/login_screen.dart';
@@ -243,45 +244,17 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
-            Card(
-              color: cs.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.report_gmailerrorred_rounded, color: cs.onErrorContainer),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            I18n.t('driver.rejected.body_heading'),
-                            style: TextStyle(
-                              color: cs.onErrorContainer,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            I18n.t('driver.rejected.fix_body'),
-                            style: TextStyle(color: cs.onErrorContainer, height: 1.35),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            I18n.t('driver.rejected.rejected_count', {'count': widget.status.rejectCount}),
-                            style: TextStyle(color: cs.onErrorContainer, fontWeight: FontWeight.w600),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            // Rad etilgan holat — xabar ohangi bo'yicha xato bloki.
+            AlixBanner(
+              icon: Icons.report_gmailerrorred_rounded,
+              message: [
+                I18n.t('driver.rejected.body_heading'),
+                I18n.t('driver.rejected.fix_body'),
+                I18n.t('driver.rejected.rejected_count',
+                    {'count': widget.status.rejectCount}),
+              ].join('\n'),
             ),
             const SizedBox(height: 12),
             if (_loading) const LinearProgressIndicator(),
