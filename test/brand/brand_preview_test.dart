@@ -9,6 +9,8 @@ import 'package:mening_ilovam/core/widgets/gradient_button.dart';
 import 'package:mening_ilovam/screens/customer_main_shell.dart';
 import 'package:mening_ilovam/screens/login_screen.dart';
 
+import 'fake_api.dart';
+
 Widget _app(Widget child, {Brightness brightness = Brightness.light}) {
   return MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -81,6 +83,63 @@ void main() {
         find.byType(CustomerHomeBody), matchesGoldenFile('preview_customer_home.png'));
   }, skip: !_enabled);
 
+  testWidgets('customer orders', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 860));
+      await tester.pumpWidget(_app(Scaffold(
+        appBar: AppBar(title: const Text('Buyurtmalar')),
+        body: const CustomerOrdersBody(
+          hasRefreshSession: true,
+          refreshTick: 0,
+          onOpenDetail: _noop,
+        ),
+      )));
+      // Soxta API javobi kelishi uchun bir necha kadr.
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(
+          find.byType(CustomerOrdersBody), matchesGoldenFile('preview_customer_orders.png'));
+    });
+  }, skip: !_enabled);
+
+  testWidgets('customer wallet', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 860));
+      await tester.pumpWidget(_app(Scaffold(
+        appBar: AppBar(title: const Text('Hamyon')),
+        body: CustomerWalletBody(
+          hasRefreshSession: true,
+          refreshTick: 0,
+          onTopUp: () {},
+        ),
+      )));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(
+          find.byType(CustomerWalletBody), matchesGoldenFile('preview_customer_wallet.png'));
+    });
+  }, skip: !_enabled);
+
+  testWidgets('customer profile', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      await tester.pumpWidget(_app(Scaffold(
+        appBar: AppBar(title: const Text('Profil')),
+        body: CustomerProfileBody(
+          phoneDisplay: '+998 90 000 00 00',
+          userId: 1042,
+          hasRefreshSession: true,
+          onLogout: () {},
+          onBecomeDriver: () {},
+          onOpenRegistration: () async {},
+        ),
+      )));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(
+          find.byType(CustomerProfileBody), matchesGoldenFile('preview_customer_profile.png'));
+    });
+  }, skip: !_enabled);
+
   testWidgets('components light', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 760));
     await tester.pumpWidget(_app(const _Showcase()));
@@ -95,6 +154,8 @@ void main() {
     await expectLater(find.byType(_Showcase), matchesGoldenFile('preview_components_dark.png'));
   }, skip: !_enabled);
 }
+
+void _noop(Object _) {}
 
 class _Showcase extends StatelessWidget {
   const _Showcase();

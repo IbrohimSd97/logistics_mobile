@@ -26,6 +26,17 @@ import '../driver/pages/driver_rejected_page.dart';
 import 'driver_main_shell.dart';
 import 'login_screen.dart';
 
+/// ISO sanani mahalliy vaqtda "DD.MM.YYYY HH:mm" ko'rinishida beradi.
+/// Backend UTC yuboradi, foydalanuvchi esa o'z vaqtini kutadi.
+String _formatDateTime(String? iso) {
+  final dt = DateTime.tryParse(iso ?? '');
+  if (dt == null) return '';
+  final local = dt.toLocal();
+  String p2(int v) => v.toString().padLeft(2, '0');
+  return '${p2(local.day)}.${p2(local.month)}.${local.year} '
+      '${p2(local.hour)}:${p2(local.minute)}';
+}
+
 String _formatNumber(String? raw) {
   if (raw == null || raw.isEmpty) return '—';
   final n = num.tryParse(raw);
@@ -798,16 +809,20 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
       initialIndex: widget.initialTab.clamp(0, 1),
       child: Column(
         children: [
-          Material(
-            color: cs.surfaceContainerHighest,
+          // Tab'lar sahifa fonida turadi — brendda ular alohida "panel" emas,
+          // matn + orange indikator.
+          DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: cs.outlineVariant)),
+            ),
             child: TabBar(
               onTap: (_) => _load(),
+              indicatorSize: TabBarIndicatorSize.label,
+              indicatorWeight: 2.5,
               tabs: [
                 Tab(text: I18n.t('customer.tab_current')),
                 Tab(text: I18n.t('customer.tab_archive')),
               ],
-              labelColor: cs.primary,
-              unselectedLabelColor: cs.onSurfaceVariant,
             ),
           ),
           Expanded(
@@ -829,30 +844,38 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
     if (err != null && list.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
         children: [
-          Text(err),
-          TextButton(onPressed: _load, child: Text(I18n.t('common.retry'))),
+          AlixBanner(
+            message: err,
+            icon: Icons.error_outline_rounded,
+            action: TextButton(
+              onPressed: _load,
+              child: Text(I18n.t('common.retry')),
+            ),
+          ),
         ],
       );
     }
     if (list.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 96),
         children: [
-          const Icon(Icons.inventory_2_outlined, size: 56),
-          const SizedBox(height: 12),
-          Text(I18n.t('customer.empty_list'), textAlign: TextAlign.center),
+          AlixEmptyState(
+            icon: Icons.inventory_2_outlined,
+            title: I18n.t('customer.empty_list'),
+            message: I18n.t('customer.no_active_order_hint'),
+          ),
         ],
       );
     }
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
         itemCount: list.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
         itemBuilder: (_, i) {
           final o = list[i];
           return _CustomerOrderCard(order: o, onTap: () => onTap(o));
@@ -879,86 +902,63 @@ class _CustomerOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final s = order.status;
-    return Material(
-      color: cs.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.all(16),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              // Header
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      order.orderNumber ?? I18n.t('customer.order_number_fallback', {'id': order.id}),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+              Expanded(
+                child: Text(
+                  order.orderNumber ??
+                      I18n.t('customer.order_number_fallback', {'id': order.id}),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
                   ),
-                  if (order.scheduledPickupAt != null) ...[
-                    const SizedBox(width: 6),
-                    _ScheduledBadge(scheduledAtIso: order.scheduledPickupAt!),
-                  ],
-                  const SizedBox(width: 8),
-                  _OrderMiniStatusChip(status: s),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${_formatNumber(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: cs.primary,
-                    ),
-              ),
-              const SizedBox(height: 12),
-
-              // A → B
-              _OrderAbRow(
-                isStart: true,
-                label: 'A',
-                address: order.pickupAddress ?? '—',
-              ),
-              const SizedBox(height: 6),
-              _OrderAbRow(
-                isStart: false,
-                label: 'B',
-                address: order.deliveryAddress ?? '—',
-              ),
-
-              const SizedBox(height: 12),
-              Divider(height: 1, color: cs.outlineVariant),
-              const SizedBox(height: 10),
-
-              // Boshlanish va tugash vaqtlari + chevron
-              Row(
-                children: [
-                  Expanded(
-                    child: _OrderTimeRangeRow(
-                      start: order.acceptedAt ?? order.createdAt,
-                      end: _orderEndIso(order),
-                    ),
-                  ),
-                  Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-                ],
-              ),
+              if (order.scheduledPickupAt != null) ...[
+                const SizedBox(width: 6),
+                _ScheduledBadge(scheduledAtIso: order.scheduledPickupAt!),
+                const SizedBox(width: 6),
+              ],
+              _OrderMiniStatusChip(status: order.status),
             ],
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            '${_formatNumber(order.totalPrice)} ${order.currency ?? I18n.t('common.uzs')}',
+            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 14),
+          _OrderRoute(
+            pickup: order.pickupAddress ?? '—',
+            delivery: order.deliveryAddress ?? '—',
+          ),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: cs.outlineVariant),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _OrderTimeRangeRow(
+                  start: order.acceptedAt ?? order.createdAt,
+                  end: _orderEndIso(order),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -981,23 +981,25 @@ class _ScheduledBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final dt = DateTime.tryParse(scheduledAtIso)?.toLocal();
+    // Yonida status chipi turadi, shuning uchun bu yorliq neytral: ikkita
+    // rangli chip yonma-yon bo'lsa, ko'z qaysi biri muhimligini ajratolmaydi.
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: cs.primaryContainer,
-        borderRadius: BorderRadius.circular(20),
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(AppPalette.radiusChip),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.event_rounded, size: 12, color: cs.onPrimaryContainer),
+          Icon(Icons.event_rounded, size: 12, color: cs.onSurfaceVariant),
           const SizedBox(width: 4),
           Text(
             dt != null
                 ? I18n.t('customer.scheduled_badge_full', {'value': _short(dt)})
                 : I18n.t('customer.scheduled_badge_short'),
             style: TextStyle(
-              color: cs.onPrimaryContainer,
+              color: cs.onSurfaceVariant,
               fontSize: 11,
               fontWeight: FontWeight.w700,
             ),
@@ -1048,58 +1050,86 @@ class _OrderTimeRangeRow extends StatelessWidget {
   }
 }
 
-class _OrderAbRow extends StatelessWidget {
-  const _OrderAbRow({
-    required this.isStart,
-    required this.label,
-    required this.address,
-  });
+/// Yo'nalish bloki: A va B nuqtalari va ular orasidagi bog'lovchi chiziq.
+/// Chiziq yukning bir nuqtadan ikkinchisiga borishini ko'rsatadi — alohida
+/// ikkita qatordan ko'ra tezroq o'qiladi.
+class _OrderRoute extends StatelessWidget {
+  const _OrderRoute({required this.pickup, required this.delivery});
 
-  final bool isStart;
-  final String label;
-  final String address;
+  final String pickup;
+  final String delivery;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = isStart ? AppPalette.success : AppPalette.dangerLight;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 22,
-          height: 22,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 10,
-              ),
-            ),
-          ),
+        Column(
+          children: [
+            _dot(color: cs.onSurface),
+            Container(width: 2, height: 22, color: cs.outlineVariant),
+            _dot(color: AppPalette.orange),
+          ],
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            address,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: cs.onSurface,
-              fontWeight: FontWeight.w600,
-              height: 1.3,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _address(context, pickup),
+              const SizedBox(height: 18),
+              _address(context, delivery),
+            ],
           ),
         ),
       ],
     );
+  }
+
+  Widget _dot({required Color color}) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+
+  Widget _address(BuildContext context, String value) {
+    return Text(
+      value,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            height: 1,
+          ),
+    );
+  }
+}
+
+/// Buyurtma statusining ohangi: orange faqat "jarayonda" holatiga tegishli,
+/// shunda u CTA tugmalari bilan bir xil ma'noda o'qiladi.
+AlixTone orderStatusTone(int? status) {
+  switch (status) {
+    case 2:
+      return AlixTone.warning;
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+      return AlixTone.progress;
+    case 9:
+    case 10:
+      return AlixTone.success;
+    case 11:
+    case 12:
+      return AlixTone.danger;
+    default:
+      return AlixTone.neutral;
   }
 }
 
@@ -1110,44 +1140,9 @@ class _OrderMiniStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    Color bg;
-    Color fg;
-    switch (status) {
-      case 2:
-        bg = AppPalette.amber;
-        fg = AppPalette.inkStrong;
-        break;
-      case 3:
-      case 4:
-      case 5:
-      case 6:
-      case 7:
-      case 8:
-        bg = cs.primary;
-        fg = cs.onPrimary;
-        break;
-      case 9:
-      case 10:
-        bg = AppPalette.success;
-        fg = Colors.white;
-        break;
-      case 11:
-      case 12:
-        bg = AppPalette.dangerLight;
-        fg = Colors.white;
-        break;
-      default:
-        bg = cs.surfaceContainerHighest;
-        fg = cs.onSurfaceVariant;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(
-        _statusLabel(status),
-        style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 11),
-      ),
+    return AlixStatusChip(
+      label: _statusLabel(status),
+      tone: orderStatusTone(status),
     );
   }
 }
@@ -1236,217 +1231,241 @@ class CustomerWalletBodyState extends State<CustomerWalletBody> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final corporate = _billing?.isCorporateBilling ?? false;
 
     if (!widget.hasRefreshSession) {
       return Center(child: Text(I18n.t('customer.wallet_session_required')));
     }
 
+    // Korporativ xodimda shaxsiy balans bo'lmaydi — buyurtmalar kompaniya
+    // hamyonidan to'lanadi, shuning uchun tarix ham kompaniyaniki.
+    final transactions = corporate ? _billing!.recentCompanyTx : _tx;
+
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
         children: [
-          if (_loading) const LinearProgressIndicator(),
-          if (_error != null)
-            Card(
-              color: cs.errorContainer,
-              child: ListTile(
-                leading: Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
-                title: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
-                trailing: FilledButton.tonal(onPressed: _load, child: Text(I18n.t('common.retry_short'))),
+          if (_loading) const LinearProgressIndicator(minHeight: 3),
+          if (_error != null) ...[
+            AlixBanner(
+              message: _error!,
+              icon: Icons.error_outline_rounded,
+              action: TextButton(
+                onPressed: _load,
+                child: Text(I18n.t('common.retry_short')),
               ),
             ),
-          if (_error != null) const SizedBox(height: 12),
-          // Korporativ xodim — kompaniya hamyoni asosiy karta, shaxsiy ostida.
-          if (_billing != null && _billing!.isCorporateBilling) ...[
-            Card(
-              color: cs.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.business_rounded, size: 18, color: cs.onPrimaryContainer),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            I18n.t('customer.wallet.corporate_title'),
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: cs.onPrimaryContainer.withValues(alpha: 0.85),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: cs.onPrimaryContainer.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            I18n.t('customer.wallet.corporate_badge'),
-                            style: TextStyle(
-                              color: cs.onPrimaryContainer,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _billing!.companyName ?? '—',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: cs.onPrimaryContainer.withValues(alpha: 0.9),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '${_formatNumber(_billing!.companyBalance)} ${_billing!.companyCurrency ?? I18n.t('common.uzs')}',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: cs.onPrimaryContainer,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      I18n.t('customer.wallet.corporate_hint'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onPrimaryContainer.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Korporativ xodimda shaxsiy hamyon ko'rsatilmaydi — xodimda
-            // alohida balans bo'lmaydi, buyurtmalar faqat kompaniya hamyonidan.
-            Card(
-              color: cs.surfaceContainerHighest,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded, size: 18, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        I18n.t('customer.wallet.admin_only_hint'),
-                        style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ] else
-            // Oddiy mijoz — shaxsiy hamyon asosiy karta.
-            Card(
-              color: cs.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(I18n.t('customer.wallet.balance'), style: theme.textTheme.titleMedium?.copyWith(color: cs.onPrimaryContainer)),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${_formatNumber(_w?.balance)} ${_w?.currency ?? I18n.t('common.uzs')}',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: cs.onPrimaryContainer,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
-          // Korporativ xodimga top-up tugmasi ko'rsatilmaydi —
-          // kompaniya hamyonini faqat administrator to'ldira oladi.
-          if (!(_billing?.isCorporateBilling ?? false))
-            OutlinedButton.icon(
+            const SizedBox(height: 14),
+          ],
+          _WalletBalanceCard(
+            label: corporate
+                ? I18n.t('customer.wallet.corporate_title')
+                : I18n.t('customer.wallet.balance'),
+            amount: corporate
+                ? '${_formatNumber(_billing!.companyBalance)} ${_billing!.companyCurrency ?? I18n.t('common.uzs')}'
+                : '${_formatNumber(_w?.balance)} ${_w?.currency ?? I18n.t('common.uzs')}',
+            subtitle: corporate ? _billing!.companyName : null,
+            badge: corporate ? I18n.t('customer.wallet.corporate_badge') : null,
+            hint: corporate ? I18n.t('customer.wallet.corporate_hint') : null,
+          ),
+          const SizedBox(height: 14),
+          if (corporate)
+            AlixBanner(
+              message: I18n.t('customer.wallet.admin_only_hint'),
+              tone: AlixTone.neutral,
+            )
+          else
+            GradientButton(
+              label: I18n.t('customer.wallet.topup_btn'),
+              icon: Icons.add_card_rounded,
               onPressed: widget.onTopUp,
-              icon: const Icon(Icons.add_card_rounded),
-              label: Text(I18n.t('customer.wallet.topup_btn')),
             ),
-          const SizedBox(height: 20),
-          // Korporativ bo'lsa kompaniya tarixi, aks holda shaxsiy.
-          Text(
-            (_billing?.isCorporateBilling ?? false)
+          const SizedBox(height: 26),
+          AlixSectionTitle(
+            corporate
                 ? I18n.t('customer.wallet.company_tx')
                 : I18n.t('customer.wallet.tx'),
-            style: theme.textTheme.titleSmall,
           ),
-          if ((_billing?.isCorporateBilling ?? false) &&
-              _billing!.recentCompanyTx.isNotEmpty) ...[
-            ..._billing!.recentCompanyTx.map(
-              (e) => Card(
-                child: ListTile(
-                  leading: Icon(Icons.business_center_outlined, color: cs.primary),
-                  title: Text(walletTxLabel(
-                    transactionType: e.transactionType,
-                    rawDescription: e.title,
-                    amount: double.tryParse(e.amount ?? ''),
-                  )),
-                  subtitle: Text([
-                    if (e.orderId != null)
-                      I18n.t('wallet.tx.order_ref', {'number': e.orderId}),
-                    if ((e.createdAt ?? '').isNotEmpty) e.createdAt!,
-                  ].join(' · ')),
-                  trailing: Text(
-                    _formatNumber(e.amount),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: (e.amount?.startsWith('-') ?? false)
-                          ? Colors.redAccent
-                          : Colors.green.shade700,
+          if (transactions.isEmpty)
+            AlixEmptyState(
+              icon: Icons.receipt_long_outlined,
+              title: I18n.t('customer.wallet.no_entries'),
+            )
+          else
+            ...transactions.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _WalletTxRow(tx: e),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Hamyon balansi — brendning to'q plastinkasi. Ekrandagi eng muhim raqam
+/// shu yerda, shuning uchun u boshqa hech narsa bilan raqobatlashmaydi.
+class _WalletBalanceCard extends StatelessWidget {
+  const _WalletBalanceCard({
+    required this.label,
+    required this.amount,
+    this.subtitle,
+    this.badge,
+    this.hint,
+  });
+
+  final String label;
+  final String amount;
+
+  /// Korporativ hamyonda — kompaniya nomi.
+  final String? subtitle;
+
+  /// O'ng yuqoridagi kichik yorliq ("Korporativ").
+  final String? badge;
+
+  /// Kartaning pastidagi tushuntirish.
+  final String? hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final faded = Colors.white.withValues(alpha: 0.72);
+
+    return AlixCard(
+      tone: AlixSurfaceTone.ink,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label.toUpperCase(),
+                  style: theme.textTheme.titleSmall?.copyWith(color: faded),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (badge != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppPalette.orange,
+                    borderRadius: BorderRadius.circular(AppPalette.radiusChip),
+                  ),
+                  child: Text(
+                    badge!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-              ),
+            ],
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              subtitle!,
+              style: theme.textTheme.bodyMedium?.copyWith(color: faded),
             ),
-          ] else if (_tx.isEmpty)
-            Card(child: ListTile(title: Text(I18n.t('customer.wallet.no_entries'))))
-          else
-            ..._tx.map(
-              (e) {
-                final isNeg = e.amount?.startsWith('-') ?? false;
-                return Card(
-                  child: ListTile(
-                    leading: Icon(
-                      isNeg
-                          ? Icons.arrow_circle_up_outlined
-                          : Icons.arrow_circle_down_outlined,
-                      color: isNeg ? Colors.redAccent : Colors.green.shade700,
-                    ),
-                    title: Text(walletTxLabel(
-                      transactionType: e.transactionType,
-                      rawDescription: e.title,
-                      amount: double.tryParse(e.amount ?? ''),
-                    )),
-                    subtitle: Text([
-                      if (e.orderId != null)
-                        I18n.t('wallet.tx.order_ref', {'number': e.orderId}),
-                      if ((e.createdAt ?? '').isNotEmpty) e.createdAt!,
-                    ].join(' · ')),
-                    trailing: Text(
-                      _formatNumber(e.amount),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: isNeg ? Colors.redAccent : Colors.green.shade700,
-                      ),
-                    ),
+          ],
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              amount,
+              style: theme.textTheme.displaySmall?.copyWith(color: Colors.white),
+            ),
+          ),
+          if (hint != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              hint!,
+              style: theme.textTheme.bodySmall?.copyWith(color: faded),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Tranzaksiya qatori: chapda yo'nalish ikonkasi, o'ngda summa.
+/// Kirim yashil, chiqim neytral — chiqim "xato" emas, shuning uchun qizil emas.
+class _WalletTxRow extends StatelessWidget {
+  const _WalletTxRow({required this.tx});
+
+  final WalletTransaction tx;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isNegative = tx.amount?.startsWith('-') ?? false;
+    final accent = isNegative ? cs.onSurface : AppPalette.success;
+
+    final meta = [
+      if (tx.orderId != null) I18n.t('wallet.tx.order_ref', {'number': tx.orderId}),
+      if (_formatDateTime(tx.createdAt).isNotEmpty) _formatDateTime(tx.createdAt),
+    ].join(' · ');
+
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(AppPalette.radiusChip),
+            ),
+            child: Icon(
+              isNegative ? Icons.north_east_rounded : Icons.south_west_rounded,
+              size: 18,
+              color: accent,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  walletTxLabel(
+                    transactionType: tx.transactionType,
+                    rawDescription: tx.title,
+                    amount: double.tryParse(tx.amount ?? ''),
                   ),
-                );
-              },
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (meta.isNotEmpty)
+                  Text(
+                    meta,
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
             ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            _formatNumber(tx.amount),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: accent,
+            ),
+          ),
         ],
       ),
     );
@@ -1482,19 +1501,21 @@ class CustomerProfileBody extends StatelessWidget {
     final cs = theme.colorScheme;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
       children: [
         Row(
           children: [
-            CircleAvatar(
-              radius: 36,
-              backgroundColor: cs.primaryContainer,
+            Container(
+              width: 64,
+              height: 64,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppPalette.radiusCard),
+              ),
               child: Text(
                 _initial,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  color: cs.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
               ),
             ),
             const SizedBox(width: 16),
@@ -1502,50 +1523,85 @@ class CustomerProfileBody extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(I18n.t('customer.role_title'), style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                  Text(phoneDisplay, style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(I18n.t('customer.role_title'), style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 2),
+                  Text(
+                    phoneDisplay,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                   if (userId != null)
-                    Text('ID: $userId', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    Text('ID: $userId', style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
         if (!hasRefreshSession)
-          Card(
-            color: cs.secondaryContainer,
-            child: ListTile(
-              leading: Icon(Icons.app_registration_rounded, color: cs.onSecondaryContainer),
-              title: Text(
-                I18n.t('customer.physical_register_title'),
-                style: TextStyle(color: cs.onSecondaryContainer, fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                I18n.t('customer.physical_register_subtitle'),
-                style: TextStyle(color: cs.onSecondaryContainer.withValues(alpha: 0.9)),
-              ),
-              trailing: Icon(Icons.chevron_right_rounded, color: cs.onSecondaryContainer),
-              onTap: () => onOpenRegistration(),
+          AlixCard(
+            tone: AlixSurfaceTone.cream,
+            onTap: () => onOpenRegistration(),
+            child: Row(
+              children: [
+                const Icon(Icons.app_registration_rounded, color: AppPalette.orange),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        I18n.t('customer.physical_register_title'),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        I18n.t('customer.physical_register_subtitle'),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+              ],
             ),
           )
         else
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.verified_outlined),
-              title: Text(I18n.t('customer.session_active')),
-              subtitle: Text(I18n.t('customer.account_verified'), style: TextStyle(color: cs.onSurfaceVariant)),
+          AlixCard(
+            tone: AlixSurfaceTone.cream,
+            child: Row(
+              children: [
+                const Icon(Icons.verified_rounded, color: AppPalette.success),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        I18n.t('customer.session_active'),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        I18n.t('customer.account_verified'),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 22),
         _RoleSegmented(
           current: 'customer',
           onSelect: (role) {
             if (role == 'driver') onBecomeDriver();
           },
         ),
-        const SizedBox(height: 12),
-        Card(
+        const SizedBox(height: 22),
+        AlixSectionTitle(I18n.t('settings.title')),
+        AlixCard(
+          padding: EdgeInsets.zero,
           child: Column(
             children: [
               AnimatedBuilder(
@@ -1567,18 +1623,19 @@ class CustomerProfileBody extends StatelessWidget {
                   );
                 },
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: cs.outlineVariant),
               const LanguagePickerTile(),
-              const Divider(height: 1),
+              Divider(height: 1, color: cs.outlineVariant),
               ListTile(
                 leading: const Icon(Icons.security_rounded),
                 title: Text(I18n.t('settings.security')),
                 subtitle: Text(I18n.t('settings.security_subtitle')),
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: cs.outlineVariant),
               ListTile(
                 leading: const Icon(Icons.help_outline_rounded),
                 title: Text(I18n.t('settings.help')),
+                trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(I18n.t('customer.help_about_customer'))),
@@ -1588,15 +1645,14 @@ class CustomerProfileBody extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 26),
         OutlinedButton.icon(
           onPressed: onLogout,
           icon: const Icon(Icons.logout_rounded),
           label: Text(I18n.t('auth.logout')),
           style: OutlinedButton.styleFrom(
             foregroundColor: cs.error,
-            side: BorderSide(color: cs.error.withValues(alpha: 0.6)),
-            minimumSize: const Size.fromHeight(48),
+            side: BorderSide(color: cs.error.withValues(alpha: 0.5)),
           ),
         ),
       ],
@@ -1618,10 +1674,10 @@ class _RoleSegmented extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-        child: Column(
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -1632,9 +1688,8 @@ class _RoleSegmented extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cs.outlineVariant),
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(AppPalette.radiusField),
               ),
               child: Row(
                 children: [
@@ -1659,7 +1714,6 @@ class _RoleSegmented extends StatelessWidget {
               ),
             ),
           ],
-        ),
       ),
     );
   }
@@ -1684,14 +1738,14 @@ class _RoleSegment extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppPalette.radiusChip),
         onTap: selected ? null : onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
           decoration: BoxDecoration(
             color: selected ? cs.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppPalette.radiusChip),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
