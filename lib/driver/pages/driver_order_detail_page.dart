@@ -127,8 +127,10 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   }
 
   Future<void> _prepareMarkerIcons() async {
-    final a = await MapMarkers.abPin('A', AppPalette.success);
-    final b = await MapMarkers.abPin('B', AppPalette.dangerLight);
+    // Xaritadagi A/B ro'yxat va tafsilotdagi yo'nalish bloki bilan bir xil:
+    // boshlanish to'q (ink), manzil brend orange.
+    final a = await MapMarkers.abPin('A', AppPalette.ink);
+    final b = await MapMarkers.abPin('B', AppPalette.orange);
     final driver = await MapMarkers.driverArrow(AppPalette.orange);
     if (!mounted) return;
     setState(() {

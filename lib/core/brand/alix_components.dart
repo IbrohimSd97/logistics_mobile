@@ -472,7 +472,9 @@ class AlixTxRow extends StatelessWidget {
                 Text(
                   title,
                   style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  maxLines: 1,
+                  // Tranzaksiya nomlari uzun ("Buyurtma bekor qilindi — to'lov
+                  // qaytarildi"), bir qatorda ma'no yo'qoladi.
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if ((meta ?? '').isNotEmpty)
