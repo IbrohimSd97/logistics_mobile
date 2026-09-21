@@ -575,7 +575,25 @@ const Map<String, String> kStringsUz = {
   'payment.total_label': 'Jami: {amount} {currency}',
   'payment.network_error_label': 'Tarmoq xatosi: {msg}',
   'payment.topup_title': 'Hamyonni to‘ldirish',
-  'payment.topup_intro': 'VISA / MasterCard ma’lumotlarini kiriting. To‘lov xizmati keyingi versiyada ulanadi.',
+  'payment.topup_intro':
+      'Summani kiriting — keyin Kapitalbank to‘lov sahifasi ochiladi. Karta ma’lumotlari faqat o‘sha yerda kiritiladi.',
+  'payment.topup_secure_note':
+      'Karta raqami va CVV ilovaga saqlanmaydi — ular to‘g‘ridan-to‘g‘ri bankka yuboriladi.',
+  'payment.topup_credited': 'To‘lov qabul qilindi, hamyon to‘ldirildi.',
+  'payment.topup_pending':
+      'To‘lov tekshirilmoqda. Hamyon balansi bir necha soniyada yangilanadi.',
+  'payment.topup_expired': 'To‘lov havolasining muddati tugagan. Qaytadan urinib ko‘ring.',
+  'payment.topup_history_title': 'So‘nggi to‘ldirishlar',
+  'payment.topup_history_empty': 'Hali to‘ldirish qilinmagan.',
+  'payment.topup_status_paid': 'To‘landi',
+  'payment.topup_status_pending': 'Kutilmoqda',
+  'payment.topup_status_expired': 'Muddati tugagan',
+  'payment.topup_not_credited_yet': 'yozilmoqda',
+  'payment.webview_title': 'Karta orqali to‘lov',
+  'payment.webview_leave_title': 'To‘lovni bekor qilasizmi?',
+  'payment.webview_leave_body':
+      'To‘lov hali yakunlanmagan. Chiqsangiz, u bekor qilinishi mumkin.',
+  'payment.webview_leave_confirm': 'Chiqish',
   'payment.amount_field': 'Summa (so‘m) *',
   'payment.amount_hint': '50000',
   'payment.amount_min_1000': 'Kamida 1 000 so‘m',

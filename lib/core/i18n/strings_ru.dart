@@ -573,7 +573,25 @@ const Map<String, String> kStringsRu = {
   'payment.total_label': 'Итого: {amount} {currency}',
   'payment.network_error_label': 'Ошибка сети: {msg}',
   'payment.topup_title': 'Пополнение кошелька',
-  'payment.topup_intro': 'Введите данные VISA / MasterCard. Платёжный шлюз будет подключён в следующей версии.',
+  'payment.topup_intro':
+      'Введите сумму — откроется платёжная страница Капиталбанка. Данные карты вводятся только там.',
+  'payment.topup_secure_note':
+      'Номер карты и CVV не сохраняются в приложении — они передаются напрямую банку.',
+  'payment.topup_credited': 'Платёж принят, кошелёк пополнен.',
+  'payment.topup_pending':
+      'Платёж проверяется. Баланс кошелька обновится через несколько секунд.',
+  'payment.topup_expired': 'Срок действия платёжной ссылки истёк. Попробуйте ещё раз.',
+  'payment.topup_history_title': 'Последние пополнения',
+  'payment.topup_history_empty': 'Пополнений пока нет.',
+  'payment.topup_status_paid': 'Оплачено',
+  'payment.topup_status_pending': 'В обработке',
+  'payment.topup_status_expired': 'Истёк срок',
+  'payment.topup_not_credited_yet': 'зачисляется',
+  'payment.webview_title': 'Оплата картой',
+  'payment.webview_leave_title': 'Отменить платёж?',
+  'payment.webview_leave_body':
+      'Платёж ещё не завершён. Если выйдете, он может быть отменён.',
+  'payment.webview_leave_confirm': 'Выйти',
   'payment.amount_field': 'Сумма (сум) *',
   'payment.amount_hint': '50000',
   'payment.amount_min_1000': 'Минимум 1 000 сум',

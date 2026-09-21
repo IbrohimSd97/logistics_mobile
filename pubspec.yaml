@@ -47,6 +47,9 @@ dependencies:
   wakelock_plus: ^1.2.8
   geolocator: ^14.0.0
   url_launcher: ^6.3.1
+  # Karta orqali hamyonni to'ldirish: Kapitalbank to'lov sahifasi WebView'da
+  # ochiladi. Karta ma'lumoti ilovaga ham, bizning serverga ham tegmaydi.
+  webview_flutter: ^4.10.0
 
 dev_dependencies:
   flutter_test:

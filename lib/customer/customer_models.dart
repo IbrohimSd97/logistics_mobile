@@ -530,3 +530,94 @@ List<Map<String, dynamic>> mapListFrom(dynamic v) {
   }
   return [];
 }
+
+/// Karta orqali hamyonni to'ldirish urinishi.
+///
+/// `paymentLink` — Kapitalbank to'lov sahifasi. Karta ma'lumoti FAQAT o'sha
+/// sahifada kiritiladi, ilovaga ham, bizning serverga ham tegmaydi.
+class CardTopUpSession {
+  const CardTopUpSession({
+    required this.operationId,
+    required this.paymentLink,
+    required this.redirectUrl,
+    this.amount,
+    this.currency,
+    this.status,
+    this.expiresAt,
+  });
+
+  final String operationId;
+  final String paymentLink;
+
+  /// To'lovdan keyin bank shu manzilga qaytaradi — WebView shuni ko'rib yopiladi.
+  final String redirectUrl;
+
+  final double? amount;
+  final String? currency;
+  final String? status;
+  final String? expiresAt;
+
+  static CardTopUpSession? fromData(Object? data) {
+    if (data is! Map) return null;
+    final link = data['payment_link']?.toString();
+    final op = data['operation_id']?.toString();
+    if (link == null || link.isEmpty || op == null || op.isEmpty) return null;
+
+    return CardTopUpSession(
+      operationId: op,
+      paymentLink: link,
+      redirectUrl: data['redirect_url']?.toString() ?? '',
+      amount: double.tryParse(data['amount']?.toString() ?? ''),
+      currency: data['currency']?.toString(),
+      status: data['status']?.toString(),
+      expiresAt: data['expires_at']?.toString(),
+    );
+  }
+}
+
+/// To'ldirish holati.
+///
+/// `status` bank buyurtmasi holati (CREATED / PAID / EXPIRED), `credited` esa
+/// pul hamyonga yozilganini bildiradi. Ikkalasi bir vaqtda bo'lmasligi mumkin:
+/// bank "PAID" desa ham yozish bir necha soniya keyin tugashi mumkin.
+class CardTopUpStatus {
+  const CardTopUpStatus({
+    required this.operationId,
+    required this.status,
+    required this.credited,
+    this.amount,
+    this.currency,
+    this.maskedPan,
+    this.createdAt,
+  });
+
+  final String operationId;
+  final String status;
+  final bool credited;
+  final double? amount;
+  final String? currency;
+  final String? maskedPan;
+
+  /// Faqat tarix ro'yxatida to'ldiriladi — holat so'rovida server uni bermaydi.
+  final DateTime? createdAt;
+
+  bool get isPaid => status.toUpperCase() == 'PAID';
+  bool get isExpired => status.toUpperCase() == 'EXPIRED';
+  bool get isPending => !isPaid && !isExpired;
+
+  static CardTopUpStatus? fromData(Object? data) {
+    if (data is! Map) return null;
+    final op = data['operation_id']?.toString();
+    if (op == null || op.isEmpty) return null;
+
+    return CardTopUpStatus(
+      operationId: op,
+      status: data['status']?.toString() ?? 'UNKNOWN',
+      credited: data['credited'] == true,
+      amount: double.tryParse(data['amount']?.toString() ?? ''),
+      currency: data['currency']?.toString(),
+      maskedPan: data['masked_pan']?.toString(),
+      createdAt: DateTime.tryParse(data['created_at']?.toString() ?? '')?.toLocal(),
+    );
+  }
+}

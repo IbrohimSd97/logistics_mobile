@@ -263,6 +263,61 @@ class CustomerApi {
     _decodeResponse(res);
   }
 
+  /// POST /api/customer/wallet/topup/init
+  ///
+  /// Karta ma'lumoti BU SO'ROVGA KIRMAYDI — javobdagi `payment_link`
+  /// Kapitalbank sahifasi, mijoz kartani o'sha yerda kiritadi.
+  Future<CardTopUpSession> topUpInit(double amount, {String? description}) async {
+    final token = await _requireBearer();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/wallet/topup/init');
+    final res = await http.post(
+      url,
+      headers: _jsonAuth(token),
+      body: jsonEncode({
+        'amount': amount,
+        if (description != null && description.isNotEmpty) 'description': description,
+      }),
+    );
+    final map = _decodeResponse(res);
+    final session = CardTopUpSession.fromData(map['data']);
+    if (session == null) {
+      throw ApiException('To`lov havolasi olinmadi');
+    }
+    return session;
+  }
+
+  /// GET /api/customer/wallet/topup/{operationId}
+  ///
+  /// WebView yopilgandan keyin chaqiriladi. Webhook biroz kechikishi mumkin,
+  /// shuning uchun server holatni bankdan ham tekshiradi.
+  Future<CardTopUpStatus> topUpStatus(String operationId) async {
+    final token = await _requireBearer();
+    final url = Uri.parse(
+      '${ApiConfig.baseUrl}/api/customer/wallet/topup/$operationId',
+    );
+    final res = await http.get(url, headers: _jsonAuth(token));
+    final map = _decodeResponse(res);
+    final status = CardTopUpStatus.fromData(map['data']);
+    if (status == null) {
+      throw ApiException('To`ldirish holati olinmadi');
+    }
+    return status;
+  }
+
+  /// GET /api/customer/wallet/topup/history
+  Future<List<CardTopUpStatus>> topUpHistory({int limit = 20}) async {
+    final token = await _requireBearer();
+    final url = Uri.parse(
+      '${ApiConfig.baseUrl}/api/customer/wallet/topup/history?limit=$limit',
+    );
+    final res = await http.get(url, headers: _jsonAuth(token));
+    final map = _decodeResponse(res);
+    return mapListFrom(map['data'])
+        .map(CardTopUpStatus.fromData)
+        .whereType<CardTopUpStatus>()
+        .toList();
+  }
+
   int? _int(Object? v) {
     if (v == null) return null;
     if (v is int) return v;
