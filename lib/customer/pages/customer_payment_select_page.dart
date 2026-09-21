@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/brand/alix_components.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/refresh_icon_button.dart';
 import '../customer_api.dart';
@@ -105,63 +107,106 @@ class _CustomerPaymentSelectPageState extends State<CustomerPaymentSelectPage>
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
-          Card(
-            color: cs.primaryContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(I18n.t('payment.order_label', {'number': result.orderNumber ?? result.orderId}),
-                      style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Text(I18n.t('payment.distance_label', {'value': result.distanceKm ?? '—', 'km': I18n.t('common.km')}),
-                      style: Theme.of(context).textTheme.bodyMedium),
-                  Text(
-                    I18n.t('payment.base_price_label', {'amount': _fmt(result.basePrice), 'currency': result.currency ?? I18n.t('common.uzs')}),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  Text(
-                    I18n.t('payment.total_label', {'amount': _fmt(result.totalPrice), 'currency': result.currency ?? I18n.t('common.uzs')}),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.account_balance_wallet_outlined),
-              title: Text(I18n.t('payment.balance')),
-              subtitle: _loading
-                  ? Text(I18n.t('common.loading'))
-                  : _error != null
-                      ? Text(_error!, style: TextStyle(color: cs.error))
-                      : Text('${_fmt(_wallet?.balance)} ${_wallet?.currency ?? I18n.t('common.uzs')}'),
-              trailing: _loading
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _loadWallet),
-            ),
-          ),
-          if (!_loading && _error == null && !_balanceEnough)
-            Card(
-              color: cs.errorContainer,
-              child: ListTile(
-                leading: Icon(Icons.warning_amber_rounded, color: cs.onErrorContainer),
-                title: Text(I18n.t('payment.insufficient'),
-                    style: TextStyle(color: cs.onErrorContainer)),
-                subtitle: Text(
-                  (_wallet?.isCorporate ?? false)
-                      ? I18n.t('payment.insufficient_corporate')
-                      : I18n.t('payment.insufficient_personal'),
-                  style: TextStyle(color: cs.onErrorContainer),
+          // To'lanadigan summa — ekrandagi asosiy raqam, to'q plastinkada.
+          AlixCard(
+            tone: AlixSurfaceTone.ink,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  I18n.t('payment.order_label',
+                      {'number': result.orderNumber ?? result.orderId}),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.72),
+                      ),
                 ),
-              ),
+                const SizedBox(height: 12),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${_fmt(result.totalPrice)} ${result.currency ?? I18n.t('common.uzs')}',
+                    style: Theme.of(context)
+                        .textTheme
+                        .displaySmall
+                        ?.copyWith(color: Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  [
+                    I18n.t('payment.distance_label', {
+                      'value': result.distanceKm ?? '—',
+                      'km': I18n.t('common.km'),
+                    }),
+                    I18n.t('payment.base_price_label', {
+                      'amount': _fmt(result.basePrice),
+                      'currency': result.currency ?? I18n.t('common.uzs'),
+                    }),
+                  ].join('   ·   '),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.72),
+                      ),
+                ),
+              ],
             ),
-          const SizedBox(height: 8),
+          ),
+          const SizedBox(height: 14),
+          AlixCard(
+            tone: AlixSurfaceTone.cream,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                const Icon(Icons.account_balance_wallet_outlined,
+                    color: AppPalette.orange),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(I18n.t('payment.balance'),
+                          style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(height: 2),
+                      if (_loading)
+                        Text(I18n.t('common.loading'),
+                            style: Theme.of(context).textTheme.bodyMedium)
+                      else if (_error != null)
+                        Text(_error!, style: TextStyle(color: cs.error))
+                      else
+                        Text(
+                          '${_fmt(_wallet?.balance)} ${_wallet?.currency ?? I18n.t('common.uzs')}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                    ],
+                  ),
+                ),
+                if (_loading)
+                  const SizedBox(
+                      width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  IconButton(
+                    icon: const Icon(Icons.refresh_rounded),
+                    onPressed: _loadWallet,
+                  ),
+              ],
+            ),
+          ),
+          if (!_loading && _error == null && !_balanceEnough) ...[
+            const SizedBox(height: 12),
+            AlixBanner(
+              message: '${I18n.t('payment.insufficient')}\n'
+                  '${(_wallet?.isCorporate ?? false) ? I18n.t('payment.insufficient_corporate') : I18n.t('payment.insufficient_personal')}',
+              tone: AlixTone.warning,
+              icon: Icons.warning_amber_rounded,
+            ),
+          ],
+          const SizedBox(height: 20),
           GradientButton(
             label: _paying ? I18n.t('payment.paying') : I18n.t('payment.pay_btn'),
             icon: Icons.account_balance_wallet_rounded,

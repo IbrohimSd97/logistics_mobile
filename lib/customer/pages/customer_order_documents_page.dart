@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/brand/alix_components.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/widgets/refresh_icon_button.dart';
 import '../customer_api.dart';
@@ -64,15 +65,28 @@ class _CustomerOrderDocumentsPageState extends State<CustomerOrderDocumentsPage>
           return RefreshIndicator(
             onRefresh: () async => _retry(),
             child: ListView.separated(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
               itemCount: list.length,
-              separatorBuilder: (_, i) => const Divider(height: 1),
+              separatorBuilder: (_, i) => const SizedBox(height: 10),
               itemBuilder: (_, i) {
                 final e = list[i];
-                return ListTile(
-                  dense: true,
-                  title: Text(_humanizeKey(e.key)),
-                  subtitle: SelectableText(e.value, style: const TextStyle(height: 1.35)),
+                return AlixCard(
+                  tone: AlixSurfaceTone.cream,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _humanizeKey(e.key).toUpperCase(),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 6),
+                      SelectableText(
+                        e.value,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
                 );
               },
             ),

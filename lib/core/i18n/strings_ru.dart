@@ -632,6 +632,9 @@ const Map<String, String> kStringsRu = {
 
   // ── order create page (forms) ──────────────────────────────────────────
   'order.create.intro': 'Выберите на карте адреса забора и доставки, выберите тариф, укажите вес.',
+  'order.create.addresses_section': 'Адреса',
+  'order.create.details_section': 'Детали груза',
+  'order.create.schedule_section': 'Планирование',
   'order.create.pickup_required': 'Выберите адрес забора на карте.',
   'order.create.delivery_required': 'Выберите адрес доставки на карте.',
   'order.create.address_required': 'Выберите адрес на карте заново.',
@@ -682,6 +685,8 @@ const Map<String, String> kStringsRu = {
   'customer.reg.submit': 'Зарегистрироваться',
   'customer.reg.success': 'Регистрация прошла успешно',
   'customer.reg.intro': 'Требуются паспорт или водительское удостоверение и согласие с офертой.',
+  'customer.reg.personal_section': 'Личные данные',
+  'customer.reg.document_section': 'Документ',
   'customer.reg.first_name_required': 'Имя *',
   'customer.reg.last_name_required': 'Фамилия *',
   'customer.reg.middle_name_required': 'Отчество *',

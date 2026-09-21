@@ -6,6 +6,8 @@ import 'package:mening_ilovam/core/brand/alix_splash.dart';
 import 'package:mening_ilovam/core/theme/app_palette.dart';
 import 'package:mening_ilovam/core/theme/app_theme.dart';
 import 'package:mening_ilovam/core/widgets/gradient_button.dart';
+import 'package:mening_ilovam/customer/pages/customer_order_create_page.dart';
+import 'package:mening_ilovam/customer/pages/customer_wallet_topup_page.dart';
 import 'package:mening_ilovam/screens/customer_main_shell.dart';
 import 'package:mening_ilovam/screens/login_screen.dart';
 
@@ -137,6 +139,28 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       await expectLater(
           find.byType(CustomerProfileBody), matchesGoldenFile('preview_customer_profile.png'));
+    });
+  }, skip: !_enabled);
+
+  testWidgets('order create', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 980));
+      await tester.pumpWidget(_app(const CustomerOrderCreatePage()));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(find.byType(CustomerOrderCreatePage),
+          matchesGoldenFile('preview_order_create.png'));
+    });
+  }, skip: !_enabled);
+
+  testWidgets('wallet topup', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      await tester.pumpWidget(_app(const CustomerWalletTopupPage()));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(find.byType(CustomerWalletTopupPage),
+          matchesGoldenFile('preview_wallet_topup.png'));
     });
   }, skip: !_enabled);
 

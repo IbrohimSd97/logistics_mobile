@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/brand/alix_components.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../customer_api.dart';
 import '../customer_models.dart';
@@ -176,13 +178,15 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
       body: AbsorbPointer(
         absorbing: _busy,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
             Text(
               I18n.t('payment.topup_intro'),
-              style: const TextStyle(height: 1.35),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 22),
             Form(
               key: _formKey,
               autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -193,9 +197,11 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
                   FilteringTextInputFormatter.digitsOnly,
                   LengthLimitingTextInputFormatter(10),
                 ],
+                style: Theme.of(context).textTheme.headlineSmall,
                 decoration: InputDecoration(
                   labelText: I18n.t('payment.amount_field'),
                   hintText: I18n.t('payment.amount_hint'),
+                  suffixText: I18n.t('common.uzs'),
                 ),
                 validator: (v) {
                   final s = (v ?? '').trim();
@@ -224,32 +230,24 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
             ),
             if (_error != null) ...[
               const SizedBox(height: 16),
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: ListTile(
-                  leading: Icon(
-                    Icons.error_outline_rounded,
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                  ),
-                  title: Text(
-                    _error!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-                  ),
-                ),
-              ),
+              AlixBanner(message: _error!, icon: Icons.error_outline_rounded),
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             GradientButton(
               label: I18n.t('payment.topup_btn'),
               icon: Icons.credit_card_rounded,
               loading: _busy,
               onPressed: _busy ? null : _start,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Row(
               children: [
-                const Icon(Icons.lock_outline_rounded, size: 16),
-                const SizedBox(width: 6),
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     I18n.t('payment.topup_secure_note'),
@@ -258,6 +256,22 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
                 ),
               ],
             ),
+            const SizedBox(height: 28),
+            AlixSectionTitle(I18n.t('payment.topup_history_title')),
+            if (_historyLoading)
+              const LinearProgressIndicator(minHeight: 3)
+            else if (_history.isEmpty)
+              AlixEmptyState(
+                icon: Icons.receipt_long_outlined,
+                title: I18n.t('payment.topup_history_empty'),
+              )
+            else
+              ..._history.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _TopUpHistoryRow(item: e),
+                ),
+              ),
           ],
         ),
       ),
@@ -272,5 +286,80 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
       buf.write(s[i]);
     }
     return buf.toString();
+  }
+}
+
+/// To'ldirish tarixining bitta qatori.
+///
+/// Bank "PAID" desa ham pul hamyonga bir necha soniya keyin yozilishi mumkin
+/// — shuning uchun holat va `credited` alohida ko'rsatiladi, foydalanuvchi
+/// "to'lovim qayerda?" deb o'ylab qolmaydi.
+class _TopUpHistoryRow extends StatelessWidget {
+  const _TopUpHistoryRow({required this.item});
+
+  final CardTopUpStatus item;
+
+  static String _formatDate(DateTime? dt) {
+    if (dt == null) return '';
+    String p2(int v) => v.toString().padLeft(2, '0');
+    return '${p2(dt.day)}.${p2(dt.month)}.${dt.year} ${p2(dt.hour)}:${p2(dt.minute)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final (label, tone) = item.isPaid
+        ? (I18n.t('payment.topup_status_paid'), AlixTone.success)
+        : item.isExpired
+            ? (I18n.t('payment.topup_status_expired'), AlixTone.danger)
+            : (I18n.t('payment.topup_status_pending'), AlixTone.warning);
+
+    final meta = [
+      if (_formatDate(item.createdAt).isNotEmpty) _formatDate(item.createdAt),
+      if ((item.maskedPan ?? '').isNotEmpty) item.maskedPan!,
+      // To'landi, lekin hamyonga hali yozilmadi.
+      if (item.isPaid && !item.credited) I18n.t('payment.topup_not_credited_yet'),
+    ].join(' · ');
+
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(AppPalette.radiusChip),
+            ),
+            child: const Icon(Icons.credit_card_rounded, size: 18, color: AppPalette.orange),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${item.amount?.toStringAsFixed(0) ?? '—'} ${item.currency ?? I18n.t('common.uzs')}',
+                  style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                if (meta.isNotEmpty)
+                  Text(
+                    meta,
+                    style: theme.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          AlixStatusChip(label: label, tone: tone),
+        ],
+      ),
+    );
   }
 }

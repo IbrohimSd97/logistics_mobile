@@ -10,8 +10,10 @@ import '../../core/api/api_exception.dart';
 import '../../core/api/auth_api.dart';
 import '../../core/api/http_response_codec.dart';
 import '../../core/config/api_config.dart';
+import '../../core/brand/alix_components.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/offerta_link.dart';
 
@@ -289,10 +291,16 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
       body: AbsorbPointer(
         absorbing: _loading,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
           children: [
-            Text(I18n.t('customer.reg.intro'), style: const TextStyle(height: 1.35)),
-            const SizedBox(height: 16),
+            Text(
+              I18n.t('customer.reg.intro'),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 22),
+            AlixSectionTitle(I18n.t('customer.reg.personal_section')),
             TextField(controller: _last, decoration: InputDecoration(labelText: I18n.t('customer.reg.last_name_required'))),
             const SizedBox(height: 14),
             TextField(controller: _first, decoration: InputDecoration(labelText: I18n.t('customer.reg.first_name_required'))),
@@ -315,7 +323,8 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
               readOnly: true,
               decoration: InputDecoration(labelText: I18n.t('customer.reg.phone_label')),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 24),
+            AlixSectionTitle(I18n.t('customer.reg.document_section')),
             DropdownMenu<int>(
               initialSelection: _docType,
               expandedInsets: EdgeInsets.zero,
@@ -328,16 +337,21 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
             ),
             const SizedBox(height: 12),
             _imgRow(I18n.t('customer.reg.img_front'), _front, _pickFront),
+            const SizedBox(height: 10),
             _imgRow(I18n.t('customer.reg.img_back'), _back, _pickBack),
+            const SizedBox(height: 10),
             _imgRow(I18n.t('customer.reg.img_selfie'), _selfie, _pickSelfie),
+            const SizedBox(height: 18),
             CheckboxListTile(
               value: _offerta,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
               onChanged: (v) => setState(() => _offerta = v ?? false),
               title: OffertaCheckboxTitle(
                 text: I18n.t('customer.reg.offerta_checkbox'),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             GradientButton(
               label: I18n.t('customer.reg.submit_btn'),
               icon: Icons.send_rounded,
@@ -352,33 +366,62 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
   }
 
   Widget _imgRow(String label, XFile? file, VoidCallback onPick) {
+    final theme = Theme.of(context);
+    const radius = AppPalette.radiusChip;
+
     Widget thumb;
     if (file == null) {
       thumb = Container(
-        width: 56,
-        height: 56,
+        width: 52,
+        height: 52,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(radius),
         ),
-        child: const Icon(Icons.image_outlined),
+        child: Icon(Icons.image_outlined, color: theme.colorScheme.onSurfaceVariant),
       );
     } else if (kIsWeb) {
       thumb = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(file.path, width: 56, height: 56, fit: BoxFit.cover),
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.network(file.path, width: 52, height: 52, fit: BoxFit.cover),
       );
     } else {
       thumb = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.file(File(file.path), width: 56, height: 56, fit: BoxFit.cover),
+        borderRadius: BorderRadius.circular(radius),
+        child: Image.file(File(file.path), width: 52, height: 52, fit: BoxFit.cover),
       );
     }
-    return ListTile(
-      leading: thumb,
-      title: Text(label),
-      subtitle: Text(file?.name ?? I18n.t('customer.reg.not_picked')),
-      trailing: IconButton(icon: const Icon(Icons.photo_camera_outlined), onPressed: onPick),
+
+    return AlixCard(
+      tone: AlixSurfaceTone.cream,
+      padding: const EdgeInsets.all(12),
+      onTap: onPick,
+      child: Row(
+        children: [
+          thumb,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 2),
+                Text(
+                  file?.name ?? I18n.t('customer.reg.not_picked'),
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (file != null)
+            const Icon(Icons.check_circle_rounded, color: AppPalette.success)
+          else
+            const Icon(Icons.photo_camera_outlined, color: AppPalette.orange),
+        ],
+      ),
     );
   }
 }

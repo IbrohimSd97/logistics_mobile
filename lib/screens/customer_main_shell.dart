@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/brand/alix_components.dart';
+import '../core/brand/order_status_tone.dart';
 import '../core/brand/alix_logo.dart';
 import '../core/theme/app_palette.dart';
 import '../core/widgets/gradient_button.dart';
@@ -1106,30 +1107,6 @@ class _OrderRoute extends StatelessWidget {
             height: 1,
           ),
     );
-  }
-}
-
-/// Buyurtma statusining ohangi: orange faqat "jarayonda" holatiga tegishli,
-/// shunda u CTA tugmalari bilan bir xil ma'noda o'qiladi.
-AlixTone orderStatusTone(int? status) {
-  switch (status) {
-    case 2:
-      return AlixTone.warning;
-    case 3:
-    case 4:
-    case 5:
-    case 6:
-    case 7:
-    case 8:
-      return AlixTone.progress;
-    case 9:
-    case 10:
-      return AlixTone.success;
-    case 11:
-    case 12:
-      return AlixTone.danger;
-    default:
-      return AlixTone.neutral;
   }
 }
 

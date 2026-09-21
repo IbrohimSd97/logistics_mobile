@@ -634,6 +634,9 @@ const Map<String, String> kStringsUz = {
 
   // ── order create page (forms) ──────────────────────────────────────────
   'order.create.intro': 'Kartadan olib ketish va yetkazish manzilini tanlang, tarif tanlang, yuk og‘irligini kiriting.',
+  'order.create.addresses_section': 'Manzillar',
+  'order.create.details_section': 'Yuk tafsilotlari',
+  'order.create.schedule_section': 'Rejalashtirish',
   'order.create.pickup_required': 'Olib ketish manzilini kartadan tanlang.',
   'order.create.delivery_required': 'Yetkazish manzilini kartadan tanlang.',
   'order.create.address_required': 'Manzilni kartadan qaytadan tanlang.',
@@ -684,6 +687,8 @@ const Map<String, String> kStringsUz = {
   'customer.reg.submit': 'Ro‘yxatdan o‘tish',
   'customer.reg.success': 'Muvaffaqiyatli ro‘yxatdan o‘tildi',
   'customer.reg.intro': 'Passport yoki haydovchilik guvohnomasi va offerta talab qilinadi.',
+  'customer.reg.personal_section': 'Shaxsiy ma’lumotlar',
+  'customer.reg.document_section': 'Hujjat',
   'customer.reg.first_name_required': 'Ism *',
   'customer.reg.last_name_required': 'Familiya *',
   'customer.reg.middle_name_required': 'Otasining ismi *',

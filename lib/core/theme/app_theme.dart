@@ -142,7 +142,21 @@ class AppTheme {
         fillColor: fieldFill,
         labelStyle: TextStyle(fontFamily: fontFamily, color: muted),
         hintStyle: TextStyle(fontFamily: fontFamily, color: muted.withValues(alpha: 0.7)),
-        floatingLabelStyle: const TextStyle(fontFamily: fontFamily, color: AppPalette.orange),
+        // Suzuvchi yorliq faqat fokusda orange bo'ladi. Aks holda to'ldirilgan
+        // har bir maydon orange yozuv bilan chiqib, ekran shovqinga aylanadi.
+        floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
+          final focused = states.contains(WidgetState.focused);
+          final errored = states.contains(WidgetState.error);
+          return TextStyle(
+            fontFamily: fontFamily,
+            color: errored
+                ? AppPalette.dangerLight
+                : focused
+                    ? AppPalette.orange
+                    : muted,
+            fontWeight: FontWeight.w600,
+          );
+        }),
         prefixIconColor: muted,
         suffixIconColor: muted,
         border: _fieldBorder(border),
