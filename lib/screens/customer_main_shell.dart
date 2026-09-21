@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../core/brand/alix_components.dart';
 import '../core/brand/alix_logo.dart';
 import '../core/theme/app_palette.dart';
+import '../core/widgets/gradient_button.dart';
 import '../core/api/api_exception.dart';
 import '../core/api/auth_api.dart';
 import '../core/i18n/i18n.dart';
@@ -485,6 +487,10 @@ class CustomerHomeBodyState extends State<CustomerHomeBody> {
   int _currentCount = 0;
   int _archiveCount = 0;
   String? _balanceStr;
+
+  /// Bosh sahifadagi to'q kartada ko'rsatiladigan buyurtma: yo'ldagisi
+  /// birinchi o'rinda, bo'lmasa ro'yxatdagi eng birinchisi.
+  CustomerOrder? _activeOrder;
   bool _loading = false;
   String? _error;
 
@@ -519,6 +525,7 @@ class CustomerHomeBodyState extends State<CustomerHomeBody> {
         _currentCount = cur.length;
         _archiveCount = arch.length;
         _balanceStr = w.balance;
+        _activeOrder = _pickActive(cur);
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -536,10 +543,59 @@ class CustomerHomeBodyState extends State<CustomerHomeBody> {
     }
   }
 
+  /// Statusdan taxminiy progress. Buyurtma bosqichlari 1..10 bo'ylab oshadi,
+  /// shuning uchun foydalanuvchi yukning qay darajada yetganini ko'radi.
+  static double _progressFor(int? status) {
+    switch (status) {
+      case 1:
+        return 0.05;
+      case 2:
+        return 0.12;
+      case 3:
+        return 0.22;
+      case 4:
+        return 0.35;
+      case 5:
+        return 0.48;
+      case 6:
+        return 0.62;
+      case 7:
+        return 0.80;
+      case 8:
+        return 0.90;
+      case 9:
+        return 0.97;
+      case 10:
+        return 1.0;
+      default:
+        return 0.0;
+    }
+  }
+
+  /// Manzilning birinchi bo'lagi — to'q kartada butun manzil sig'maydi.
+  static String _shortAddress(String? value) {
+    final raw = (value ?? '').trim();
+    if (raw.isEmpty) return '—';
+    final head = raw.split(',').first.trim();
+    return head.isEmpty ? raw : head;
+  }
+
+  /// Yo'lda ketayotgan buyurtma (status 3..8) ustuvor — foydalanuvchi uchun
+  /// eng muhim ma'lumot o'sha.
+  static CustomerOrder? _pickActive(List<CustomerOrder> orders) {
+    if (orders.isEmpty) return null;
+    for (final o in orders) {
+      final s = o.status ?? 0;
+      if (s >= 3 && s <= 8) return o;
+    }
+    return orders.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final active = _activeOrder;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -547,159 +603,105 @@ class CustomerHomeBodyState extends State<CustomerHomeBody> {
         await _load();
       },
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
         children: [
-          if (_error != null)
-            Card(
-              color: cs.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _error!,
-                            style: TextStyle(color: cs.onErrorContainer, height: 1.35),
-                          ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: FilledButton.tonal(
-                              onPressed: _load,
-                              child: Text(I18n.t('common.retry')),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+          if (_error != null) ...[
+            AlixBanner(
+              message: _error!,
+              icon: Icons.error_outline_rounded,
+              action: TextButton(
+                onPressed: _load,
+                child: Text(I18n.t('common.retry')),
               ),
             ),
-          if (_error != null) const SizedBox(height: 12),
-          if (!widget.hasRefreshSession)
-            Card(
-              color: cs.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.info_outline, color: cs.onErrorContainer),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        I18n.t('customer.unverified_warn'),
-                        style: TextStyle(color: cs.onErrorContainer, height: 1.35),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 14),
+          ],
+          if (!widget.hasRefreshSession) ...[
+            AlixBanner(
+              message: I18n.t('customer.unverified_warn'),
+              tone: AlixTone.warning,
             ),
-          if (!widget.hasRefreshSession) const SizedBox(height: 12),
-          Text(I18n.t('customer.welcome'), style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(I18n.t('customer.your_phone', {'phone': widget.phoneDisplay}), style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
-          if (_loading) const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
-          const SizedBox(height: 16),
-          Text(I18n.t('customer.metrics'), style: theme.textTheme.titleSmall),
-          const SizedBox(height: 10),
+            const SizedBox(height: 14),
+          ],
+          Text(
+            I18n.t('customer.welcome'),
+            style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 2),
+          Text(I18n.t('customer.home_title'), style: theme.textTheme.headlineMedium),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.only(top: 14),
+              child: LinearProgressIndicator(minHeight: 3),
+            ),
+          const SizedBox(height: 22),
+          AlixSectionTitle(I18n.t('customer.active_order')),
+          if (active != null)
+            AlixTrackingCard(
+              trackingLabel:
+                  '${I18n.t('order.tracking')} · ${active.orderNumber ?? '#${active.id}'}',
+              route:
+                  '${_shortAddress(active.pickupAddress)} → ${_shortAddress(active.deliveryAddress)}',
+              statusLabel: _statusLabel(active.status),
+              progress: _progressFor(active.status),
+              onTap: () => widget.onOpenOrders(0),
+            )
+          else
+            AlixEmptyState(
+              icon: Icons.local_shipping_outlined,
+              title: I18n.t('customer.no_active_order'),
+              message: I18n.t('customer.no_active_order_hint'),
+            ),
+          const SizedBox(height: 24),
+          AlixSectionTitle(I18n.t('customer.metrics')),
           Row(
             children: [
               Expanded(
-                child: _StatCard(
-                  title: I18n.t('customer.tile_current'),
+                child: AlixStatTile(
+                  label: I18n.t('customer.tile_current'),
                   value: '$_currentCount',
-                  subtitle: I18n.t('customer.tile_current_subtitle'),
-                  cs: cs,
+                  caption: I18n.t('customer.tile_current_subtitle'),
+                  icon: Icons.inventory_2_outlined,
                   onTap: () => widget.onOpenOrders(0),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
-                child: _StatCard(
-                  title: I18n.t('customer.tile_archive'),
+                child: AlixStatTile(
+                  label: I18n.t('customer.tile_archive'),
                   value: '$_archiveCount',
-                  subtitle: I18n.t('customer.tile_archive_subtitle'),
-                  cs: cs,
+                  caption: I18n.t('customer.tile_archive_subtitle'),
+                  icon: Icons.history_rounded,
                   onTap: () => widget.onOpenOrders(1),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          _StatCard(
-            title: I18n.t('customer.tile_wallet_title'),
-            value: _balanceStr != null ? '${_formatNumber(_balanceStr)} ${I18n.t('common.uzs')}' : '—',
-            subtitle: I18n.t('customer.tile_wallet_subtitle'),
-            cs: cs,
+          const SizedBox(height: 12),
+          AlixStatTile(
+            label: I18n.t('customer.tile_wallet_title'),
+            value: _balanceStr != null
+                ? '${_formatNumber(_balanceStr)} ${I18n.t('common.uzs')}'
+                : '—',
+            caption: I18n.t('customer.tile_wallet_subtitle'),
+            icon: Icons.account_balance_wallet_outlined,
           ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
+          const SizedBox(height: 28),
+          GradientButton(
+            label: I18n.t('customer.new_order_btn'),
+            icon: Icons.add_rounded,
             onPressed: widget.onCreateOrder,
-            icon: const Icon(Icons.add_location_alt_rounded),
-            label: Text(I18n.t('customer.new_order_btn')),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
+            height: 56,
+            borderRadius: 28,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             I18n.t('customer.new_order_hint'),
             style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.cs,
-    this.onTap,
-  });
-
-  final String title;
-  final String value;
-  final String subtitle;
-  final ColorScheme cs;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final inner = Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: Theme.of(context).textTheme.labelLarge),
-          const SizedBox(height: 6),
-          Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(subtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-        ],
-      ),
-    );
-    if (onTap == null) {
-      return Card(elevation: 0, color: cs.surfaceContainerHighest, child: inner);
-    }
-    return Material(
-      color: cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(onTap: onTap, child: inner),
     );
   }
 }

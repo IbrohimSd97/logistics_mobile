@@ -6,6 +6,7 @@ import 'package:mening_ilovam/core/brand/alix_splash.dart';
 import 'package:mening_ilovam/core/theme/app_palette.dart';
 import 'package:mening_ilovam/core/theme/app_theme.dart';
 import 'package:mening_ilovam/core/widgets/gradient_button.dart';
+import 'package:mening_ilovam/screens/customer_main_shell.dart';
 import 'package:mening_ilovam/screens/login_screen.dart';
 
 Widget _app(Widget child, {Brightness brightness = Brightness.light}) {
@@ -55,6 +56,29 @@ void main() {
     await tester.pumpWidget(_app(const LoginScreen()));
     await tester.pump(const Duration(milliseconds: 300));
     await expectLater(find.byType(LoginScreen), matchesGoldenFile('preview_login.png'));
+  }, skip: !_enabled);
+
+  testWidgets('customer home', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 860));
+    await tester.pumpWidget(_app(Scaffold(
+      appBar: AppBar(
+        title: const AlixLogo(height: 22),
+        actions: const [Icon(Icons.notifications_none_rounded), SizedBox(width: 16)],
+      ),
+      body: CustomerHomeBody(
+        phoneDisplay: '+998 90 000 00 00',
+        userId: 1,
+        // Tarmoqqa chiqmasligi uchun: sessiya yo'q bo'lsa `_load()` chaqirilmaydi.
+        hasRefreshSession: false,
+        refreshTick: 0,
+        onRefreshParent: () async {},
+        onCreateOrder: () {},
+        onOpenOrders: (_) {},
+      ),
+    )));
+    await tester.pump(const Duration(milliseconds: 300));
+    await expectLater(
+        find.byType(CustomerHomeBody), matchesGoldenFile('preview_customer_home.png'));
   }, skip: !_enabled);
 
   testWidgets('components light', (tester) async {
