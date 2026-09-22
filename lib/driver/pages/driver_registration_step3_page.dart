@@ -359,16 +359,14 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
                 style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             if (_loadingAvtoparks)
-              const LinearProgressIndicator()
+              const LinearProgressIndicator(minHeight: 3)
             else if (_avtoparksError != null)
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: ListTile(
-                  leading: Icon(Icons.error_outline_rounded,
-                      color: Theme.of(context).colorScheme.onErrorContainer),
-                  title: Text(_avtoparksError!,
-                      style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer)),
-                  trailing: FilledButton.tonal(onPressed: _loadAvtoparks, child: Text(I18n.t('common.retry_short'))),
+              AlixBanner(
+                message: _avtoparksError!,
+                icon: Icons.error_outline_rounded,
+                action: TextButton(
+                  onPressed: _loadAvtoparks,
+                  child: Text(I18n.t('common.retry_short')),
                 ),
               )
             else

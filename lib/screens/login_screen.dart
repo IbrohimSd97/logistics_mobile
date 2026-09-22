@@ -115,12 +115,17 @@ class _LoginScreenState extends State<LoginScreen>
         content: SingleChildScrollView(
           child: SelectableText(
             networkFailureDetailGuide(url),
-            style: const TextStyle(height: 1.4),
+            style: Theme.of(ctx).textTheme.bodySmall?.copyWith(height: 1.45),
           ),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         actions: [
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+            ),
             child: Text(I18n.t('common.close')),
           ),
         ],

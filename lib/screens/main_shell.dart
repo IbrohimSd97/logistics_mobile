@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/brand/alix_components.dart';
 import '../core/brand/alix_logo.dart';
 import '../core/api/api_exception.dart';
 import '../core/api/auth_api.dart';
@@ -125,27 +126,16 @@ class _MainShellState extends State<MainShell>
 
   Future<void> _logout() async {
     // Tasodifiy tap qilinishidan saqlash uchun avval tasdiqlash so'raymiz.
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(I18n.t('auth.logout')),
-        content: Text(I18n.t('auth.logout_confirm')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(I18n.t('common.cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(I18n.t('auth.logout')),
-          ),
-        ],
-      ),
+    final ok = await showAlixConfirm(
+      context,
+      icon: Icons.logout_rounded,
+      title: I18n.t('auth.logout'),
+      message: I18n.t('auth.logout_confirm'),
+      confirmLabel: I18n.t('auth.logout'),
+      cancelLabel: I18n.t('common.cancel'),
+      danger: true,
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     await _session.clear();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -174,18 +164,15 @@ class _MainShellState extends State<MainShell>
     final temp = await _session.getTempRegistrationToken();
     if (temp != null && temp.isNotEmpty) {
       if (!mounted) return;
-      final go = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(I18n.t('customer.reg.required_title')),
-          content: Text(I18n.t('customer.reg.required_body')),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(I18n.t('common.later'))),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(I18n.t('customer.reg.register_btn'))),
-          ],
-        ),
+      final go = await showAlixConfirm(
+        context,
+        icon: Icons.app_registration_rounded,
+        title: I18n.t('customer.reg.required_title'),
+        message: I18n.t('customer.reg.required_body'),
+        confirmLabel: I18n.t('customer.reg.register_btn'),
+        cancelLabel: I18n.t('common.later'),
       );
-      if (go == true && mounted) {
+      if (go && mounted) {
         final ok = await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
             builder: (_) => CustomerPhysicalRegistrationPage(phoneDisplay: widget.phoneDisplay),

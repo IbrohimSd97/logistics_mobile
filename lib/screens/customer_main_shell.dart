@@ -170,18 +170,15 @@ class _CustomerMainShellState extends State<CustomerMainShell>
     final temp = await _session.getTempRegistrationToken();
     if (temp != null && temp.isNotEmpty) {
       if (!mounted) return;
-      final go = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(I18n.t('auth.registration_required')),
-          content: Text(I18n.t('auth.registration_required_body')),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(I18n.t('auth.later'))),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(I18n.t('auth.register_now'))),
-          ],
-        ),
+      final go = await showAlixConfirm(
+        context,
+        icon: Icons.app_registration_rounded,
+        title: I18n.t('auth.registration_required'),
+        message: I18n.t('auth.registration_required_body'),
+        confirmLabel: I18n.t('auth.register_now'),
+        cancelLabel: I18n.t('auth.later'),
       );
-      if (go == true && mounted) {
+      if (go && mounted) {
         final ok = await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
             builder: (_) => CustomerPhysicalRegistrationPage(phoneDisplay: widget.phoneDisplay),
@@ -200,27 +197,16 @@ class _CustomerMainShellState extends State<CustomerMainShell>
 
   Future<void> _logout() async {
     // Tasodifiy tap qilinishidan saqlash uchun avval tasdiqlash so'raymiz.
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(I18n.t('auth.logout')),
-        content: Text(I18n.t('auth.logout_confirm')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(I18n.t('common.cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(I18n.t('auth.logout')),
-          ),
-        ],
-      ),
+    final ok = await showAlixConfirm(
+      context,
+      icon: Icons.logout_rounded,
+      title: I18n.t('auth.logout'),
+      message: I18n.t('auth.logout_confirm'),
+      confirmLabel: I18n.t('auth.logout'),
+      cancelLabel: I18n.t('common.cancel'),
+      danger: true,
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     await _session.clear();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(

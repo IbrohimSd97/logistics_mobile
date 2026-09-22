@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../core/brand/alix_components.dart';
 import '../../core/i18n/i18n.dart';
 
 /// Kapitalbank to'lov sahifasini WebView'da ochadi.
@@ -81,25 +82,15 @@ class _CustomerPaymentWebviewPageState extends State<CustomerPaymentWebviewPage>
   Future<bool> _confirmLeave() async {
     if (_finished) return true;
 
-    final leave = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(I18n.t('payment.webview_leave_title')),
-        content: Text(I18n.t('payment.webview_leave_body')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(I18n.t('common.cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(I18n.t('payment.webview_leave_confirm')),
-          ),
-        ],
-      ),
+    return showAlixConfirm(
+      context,
+      icon: Icons.close_rounded,
+      title: I18n.t('payment.webview_leave_title'),
+      message: I18n.t('payment.webview_leave_body'),
+      confirmLabel: I18n.t('payment.webview_leave_confirm'),
+      cancelLabel: I18n.t('common.cancel'),
+      danger: true,
     );
-
-    return leave ?? false;
   }
 
   @override

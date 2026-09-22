@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/api/auth_api.dart';
 import '../../core/brand/alix_components.dart';
+import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
 import '../../screens/login_screen.dart';
@@ -119,18 +120,26 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
 
   Widget _stepCard(int stepNo, String title, List<dynamic>? errors, ColorScheme cs) {
     if (errors == null || errors.isEmpty) {
-      return Card(
+      return AlixCard(
+        tone: AlixSurfaceTone.cream,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         child: ListTile(
-          leading: const Icon(Icons.check_circle_outline_rounded, color: Colors.green),
-          title: Text(I18n.t('driver.rejected.step_prefix', {'n': stepNo, 'title': title})),
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.check_circle_rounded, color: AppPalette.success),
+          title: Text(
+              I18n.t('driver.rejected.step_prefix', {'n': stepNo, 'title': title})),
           subtitle: Text(I18n.t('driver.rejected.step_no_error')),
         ),
       );
     }
-    return Card(
-      color: cs.errorContainer,
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: cs.errorContainer,
+        borderRadius: BorderRadius.circular(AppPalette.radiusCard),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -257,36 +266,35 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
               ].join('\n'),
             ),
             const SizedBox(height: 12),
-            if (_loading) const LinearProgressIndicator(),
+            if (_loading) const LinearProgressIndicator(minHeight: 3),
             if (_error != null) ...[
-              Card(
-                color: cs.errorContainer,
-                child: ListTile(
-                  leading: Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
-                  title: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
-                  trailing: FilledButton.tonal(onPressed: _load, child: Text(I18n.t('driver.retry_btn_short'))),
+              AlixBanner(
+                message: _error!,
+                icon: Icons.error_outline_rounded,
+                action: TextButton(
+                  onPressed: _load,
+                  child: Text(I18n.t('driver.retry_btn_short')),
                 ),
               ),
               const SizedBox(height: 12),
             ],
             if (_rejects != null) ...[
               if ((_rejects!.comment ?? '').isNotEmpty) ...[
-                Card(
-                  color: cs.tertiaryContainer,
+                AlixCard(
+                  tone: AlixSurfaceTone.cream,
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.zero,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(I18n.t('driver.rejected.admin_comment'),
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: cs.onTertiaryContainer,
-                            )),
-                        const SizedBox(height: 6),
+                        Text(
+                          I18n.t('driver.rejected.admin_comment').toUpperCase(),
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 8),
                         Text(
                           _rejects!.comment!,
-                          style: TextStyle(color: cs.onTertiaryContainer, height: 1.4),
+                          style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],
                     ),

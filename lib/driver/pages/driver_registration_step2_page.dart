@@ -356,16 +356,14 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
               ),
               const SizedBox(height: 20),
               if (_loadingTariffs)
-                const LinearProgressIndicator()
+                const LinearProgressIndicator(minHeight: 3)
               else if (_tariffsError != null)
-                Card(
-                  color: Theme.of(context).colorScheme.errorContainer,
-                  child: ListTile(
-                    leading: Icon(Icons.error_outline_rounded,
-                        color: Theme.of(context).colorScheme.onErrorContainer),
-                    title: Text(_tariffsError!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer)),
-                    trailing: FilledButton.tonal(onPressed: _loadTariffs, child: Text(I18n.t('common.retry_short'))),
+                AlixBanner(
+                  message: _tariffsError!,
+                  icon: Icons.error_outline_rounded,
+                  action: TextButton(
+                    onPressed: _loadTariffs,
+                    child: Text(I18n.t('common.retry_short')),
                   ),
                 )
               else

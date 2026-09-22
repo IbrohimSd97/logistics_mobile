@@ -66,27 +66,16 @@ class _DriverMainShellState extends State<DriverMainShell>
 
   Future<void> _logout() async {
     // Tasodifiy tap qilinishidan saqlash uchun avval tasdiqlash so'raymiz.
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(I18n.t('auth.logout')),
-        content: Text(I18n.t('auth.logout_confirm')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(I18n.t('common.cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(I18n.t('auth.logout')),
-          ),
-        ],
-      ),
+    final ok = await showAlixConfirm(
+      context,
+      icon: Icons.logout_rounded,
+      title: I18n.t('auth.logout'),
+      message: I18n.t('auth.logout_confirm'),
+      confirmLabel: I18n.t('auth.logout'),
+      cancelLabel: I18n.t('common.cancel'),
+      danger: true,
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     await SessionStore().clear();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -1557,44 +1546,52 @@ class _CargoTypesPickerSheetState extends State<_CargoTypesPickerSheet> {
             ),
             Row(
               children: [
-                Icon(Icons.local_shipping_rounded, color: cs.primary),
-                const SizedBox(width: 8),
+                const Icon(Icons.local_shipping_rounded, color: AppPalette.orange),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     I18n.t('driver.cargo_picker_title'),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 I18n.t('driver.cargo_picker_subtitle'),
-                style: TextStyle(color: cs.onSurfaceVariant, height: 1.35),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-            const SizedBox(height: 12),
-            if (_loading) const LinearProgressIndicator(),
+            const SizedBox(height: 14),
+            if (_loading) const LinearProgressIndicator(minHeight: 3),
             if (_error != null)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(_error!, style: TextStyle(color: cs.error)),
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AlixBanner(message: _error!, icon: Icons.error_outline_rounded),
               ),
             Flexible(
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: _items.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (_, i) {
                   final c = _items[i];
                   final isSelected = _selected.contains(c.id);
+                  // Tanlangan qator orange chegara bilan ajraladi — faqat fon
+                  // rangi bilan ajratish kam sezilar edi.
                   return Material(
-                    color: isSelected ? cs.primaryContainer : cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected
+                        ? cs.primaryContainer
+                        : cs.surfaceContainerHighest,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppPalette.radiusField),
+                      side: BorderSide(
+                        color: isSelected ? AppPalette.orange : Colors.transparent,
+                        width: 1.4,
+                      ),
+                    ),
                     child: CheckboxListTile(
                       value: isSelected,
                       onChanged: (v) => setState(() {
@@ -1610,7 +1607,9 @@ class _CargoTypesPickerSheetState extends State<_CargoTypesPickerSheet> {
                               maxLines: 2, overflow: TextOverflow.ellipsis)
                           : Text(I18n.t('driver.price_per_km', {'value': c.pricePerKm ?? '—'})),
                       controlAffinity: ListTileControlAffinity.trailing,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppPalette.radiusField),
+                      ),
                     ),
                   );
                 },

@@ -1483,9 +1483,25 @@ class _CancelReasonDialogState extends State<_CancelReasonDialog> {
           ),
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(I18n.t('common.close'))),
-        FilledButton(onPressed: _submit, child: Text(I18n.t('order.cancel.confirm_btn'))),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          ),
+          child: Text(I18n.t('common.close')),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          style: FilledButton.styleFrom(
+            // Dialogdagi tugma butun enni egallamaydi.
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+          ),
+          child: Text(I18n.t('order.cancel.confirm_btn')),
+        ),
       ],
     );
   }

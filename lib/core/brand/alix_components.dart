@@ -634,3 +634,71 @@ class AlixUploadRow extends StatelessWidget {
     );
   }
 }
+
+/// Tasdiqlash dialogi — barcha "ishonchingiz komilmi?" savollari uchun.
+///
+/// Oldin har bir joyda alohida `AlertDialog` yig'ilar edi va tugmalar
+/// bir xil bo'lmasdi. Bu yerda ular bitta ko'rinishga keltirilgan:
+/// chapda jim bekor qilish, o'ngda amalni bajaradigan tugma.
+///
+/// `danger: true` — qaytarib bo'lmaydigan amal (chiqish, o'chirish):
+/// tasdiq tugmasi qizil bo'ladi.
+Future<bool> showAlixConfirm(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+  required String cancelLabel,
+  bool danger = false,
+  IconData? icon,
+}) async {
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (ctx) {
+      final theme = Theme.of(ctx);
+      final cs = theme.colorScheme;
+      final accent = danger ? cs.error : AppPalette.orange;
+
+      return AlertDialog(
+        icon: icon == null
+            ? null
+            : Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppPalette.radiusChip),
+                ),
+                child: Icon(icon, color: accent),
+              ),
+        iconPadding: const EdgeInsets.only(top: 24, bottom: 4),
+        title: Text(title),
+        content: Text(message),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(
+              foregroundColor: cs.onSurfaceVariant,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            ),
+            child: Text(cancelLabel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: accent,
+              foregroundColor: Colors.white,
+              // Dialogda tugma butun enni egallamaydi — shuning uchun
+              // umumiy `minimumSize` bekor qilinadi.
+              minimumSize: const Size(0, 48),
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+            ),
+            child: Text(confirmLabel),
+          ),
+        ],
+      );
+    },
+  );
+  return result ?? false;
+}

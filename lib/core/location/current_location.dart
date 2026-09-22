@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../brand/alix_components.dart';
 import '../i18n/i18n.dart';
 
 /// Joriy GPS joylashuvini olish uchun yagona yordamchi.
@@ -84,22 +85,13 @@ class CurrentLocation {
   }
 
   static Future<bool?> _askEnableService(BuildContext context) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(I18n.t('location.enable_title')),
-        content: Text(I18n.t('location.enable_body')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(I18n.t('common.cancel')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(I18n.t('location.enable_action')),
-          ),
-        ],
-      ),
+    return showAlixConfirm(
+      context,
+      icon: Icons.location_on_rounded,
+      title: I18n.t('location.enable_title'),
+      message: I18n.t('location.enable_body'),
+      confirmLabel: I18n.t('location.enable_action'),
+      cancelLabel: I18n.t('common.cancel'),
     );
   }
 
