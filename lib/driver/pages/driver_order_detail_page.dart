@@ -1108,7 +1108,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: cs.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(AppPalette.radiusField),
                                 border: Border.all(color: cs.outlineVariant),
                               ),
                               child: Column(
@@ -1163,7 +1163,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: cs.tertiaryContainer.withValues(alpha: 0.4),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppPalette.radiusChip),
                                 ),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1194,7 +1194,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
                                   color: cs.tertiaryContainer,
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(AppPalette.radiusField),
                                 ),
                                 child: Row(
                                   children: [
@@ -1234,7 +1234,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
                                     color: cs.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(AppPalette.radiusField),
                                   ),
                                   child: Row(
                                     children: [
@@ -1410,12 +1410,13 @@ class _NavHud extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final (mIcon, mLabel) = _maneuverPresentation();
+    // HUD xarita ustida turadi — yorug' plastinka kunduzi yo'qolib ketardi,
+    // shuning uchun brendning to'q plastinkasi va oq matn.
     return Material(
-      color: cs.surface.withValues(alpha: 0.92),
+      color: AppPalette.inkStrong.withValues(alpha: 0.92),
       elevation: 6,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(AppPalette.radiusCard),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
@@ -1425,15 +1426,15 @@ class _NavHud extends StatelessWidget {
               icon: Icons.speed_rounded,
               big: '${speedKmh.round()}',
               small: I18n.t('driver.detail.hud_speed_unit'),
-              color: cs.primary,
+              color: AppPalette.orange,
             ),
-            _hudDivider(cs),
+            _hudDivider(),
             // Keyingi burilish
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(mIcon, color: cs.primary, size: 28),
+                  Icon(mIcon, color: AppPalette.orange, size: 28),
                   const SizedBox(width: 8),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1446,13 +1447,14 @@ class _NavHud extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
                       ),
                       Text(
                         mLabel,
                         style: TextStyle(
                           fontSize: 11,
-                          color: cs.onSurface.withValues(alpha: 0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -1460,7 +1462,7 @@ class _NavHud extends StatelessWidget {
                 ],
               ),
             ),
-            _hudDivider(cs),
+            _hudDivider(),
             // Qolgan masofa
             _HudCell(
               icon: Icons.flag_rounded,
@@ -1474,11 +1476,11 @@ class _NavHud extends StatelessWidget {
     );
   }
 
-  Widget _hudDivider(ColorScheme cs) => Container(
+  Widget _hudDivider() => Container(
         width: 1,
         height: 32,
         margin: const EdgeInsets.symmetric(horizontal: 10),
-        color: cs.outlineVariant.withValues(alpha: 0.5),
+        color: Colors.white.withValues(alpha: 0.18),
       );
 }
 
@@ -1497,7 +1499,6 @@ class _HudCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Row(
       children: [
         Icon(icon, color: color, size: 22),
@@ -1508,13 +1509,17 @@ class _HudCell extends StatelessWidget {
           children: [
             Text(
               big,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
             ),
             Text(
               small,
               style: TextStyle(
                 fontSize: 11,
-                color: cs.onSurface.withValues(alpha: 0.7),
+                color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -1649,7 +1654,7 @@ class _WaitCountdown extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isPaid ? AppPalette.dangerLight.withValues(alpha: 0.15) : AppPalette.success.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppPalette.radiusCard),
         border: Border.all(
           color: isPaid ? AppPalette.dangerLight : AppPalette.success,
           width: 1.2,
@@ -1861,41 +1866,31 @@ class _IncomeBreakdown extends StatelessWidget {
     final netIncome = settledIncome - penalty;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant),
+        borderRadius: BorderRadius.circular(AppPalette.radiusCard),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.account_balance_wallet_outlined, color: cs.primary, size: 18),
+              const Icon(Icons.account_balance_wallet_outlined,
+                  color: AppPalette.orange, size: 18),
               const SizedBox(width: 8),
-              Text(
-                I18n.t('order.price_breakdown'),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+              Expanded(
+                child: Text(
+                  I18n.t('order.price_breakdown').toUpperCase(),
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
               ),
-              const Spacer(),
+              // Hali yakunlanmagan buyurtmada raqamlar taxminiy — buni
+              // aytib qo'yish kerak, aks holda haydovchi aniq summa deb o'ylaydi.
               if (!isSettled)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: cs.tertiaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    I18n.t('driver.detail.estimate_badge'),
-                    style: TextStyle(
-                      color: cs.onTertiaryContainer,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                AlixStatusChip(
+                  label: I18n.t('driver.detail.estimate_badge'),
+                  tone: AlixTone.warning,
                 ),
             ],
           ),

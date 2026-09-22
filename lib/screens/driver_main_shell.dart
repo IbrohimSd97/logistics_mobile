@@ -1838,7 +1838,7 @@ class _FeedTabPill extends StatelessWidget {
                     color: selected
                         ? cs.onPrimary.withValues(alpha: 0.2)
                         : cs.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppPalette.radiusChip),
                   ),
                   child: Text(
                     '$count',

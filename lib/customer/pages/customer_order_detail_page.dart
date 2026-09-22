@@ -890,7 +890,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                               padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
                                 color: cs.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(AppPalette.radiusField),
                                 border: Border.all(color: cs.outlineVariant),
                               ),
                               child: Column(
@@ -947,7 +947,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: cs.tertiaryContainer.withValues(alpha: 0.4),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(AppPalette.radiusChip),
                                 ),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -991,7 +991,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                                         padding: const EdgeInsets.all(14),
                                         decoration: BoxDecoration(
                                           color: cs.surfaceContainerHighest,
-                                          borderRadius: BorderRadius.circular(14),
+                                          borderRadius: BorderRadius.circular(AppPalette.radiusField),
                                         ),
                                         child: Row(
                                           children: [
@@ -1105,7 +1105,7 @@ class _ScheduledPickupBannerState extends State<_ScheduledPickupBanner> {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: cs.primaryContainer,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppPalette.radiusField),
         border: Border.all(color: cs.primary.withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -1210,7 +1210,7 @@ class _WaitCountdown extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isPaid ? AppPalette.dangerLight.withValues(alpha: 0.15) : AppPalette.success.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppPalette.radiusCard),
         border: Border.all(
           color: isPaid ? AppPalette.dangerLight : AppPalette.success,
           width: 1.2,
