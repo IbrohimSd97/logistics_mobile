@@ -841,13 +841,14 @@ const Map<String, String> kStringsUz = {
   'driver.reg.legal_entity_subtitle':
       'Davlat ro‘yxatidan o‘tganlik guvohnomasi PDF talab qilinadi',
   'driver.reg.legal_pdf': 'Guvohnoma (PDF) *',
+  'driver.reg.pick_pdf': 'PDF faylni tanlang',
+  'driver.reg.pdf_only': 'Faqat PDF fayl yuklash mumkin.',
+  'driver.reg.file_too_large': 'Fayl hajmi 10 MB dan oshmasligi kerak.',
   'driver.reg.avtopark_title': 'Avtopark tanlash (ixtiyoriy)',
   'driver.reg.avtopark_label': 'Avtopark',
   'driver.reg.avtopark_none': 'Avtoparksiz (custom driver)',
   'driver.reg.avtopark_offerta': 'Avtopark offertasini qabul qilaman *',
   'driver.reg.finish_short': 'Tugatish',
-  'driver.reg.pdf_not_supported_yet':
-      'PDF tanlash hozircha qo‘llab-quvvatlanmaydi. Galereyadan rasm tanlang yoki bu maydonni keyin yangilang.',
   'driver.reg.upload_ownership_doc': 'Egalik hujjatini yuklang.',
   'driver.reg.upload_legal_pdf': 'Yuridik hujjat (PDF) ni yuklang.',
   'driver.reg.accept_avtopark_offerta': 'Avtopark offertasini qabul qiling.',

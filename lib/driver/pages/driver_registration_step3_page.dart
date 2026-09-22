@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -43,6 +44,9 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   int _ownership = 1;
   XFile? _ownershipFile;
   String? _ownershipUrl; // server'dagi mavjud hujjat (prefill)
+
+  /// Backenddagi `max:10240` (kilobayt) bilan bir xil.
+  static const int _maxUploadBytes = 10 * 1024 * 1024;
 
   /// v1: faqat tadbirkorlik sub'ekti — 1=YATT, 4=Yuridik shaxs.
   /// Jismoniy shaxs (3) va o'z-o'zini band qilish (2) yopilgan.
@@ -177,12 +181,32 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
     return _picker.pickImage(source: src, imageQuality: 82);
   }
 
-  /// Note: image_picker hozircha PDF tanlashga ruxsat bermaydi (faqat rasmlar).
-  /// Step3 backend `mimes:pdf` kutadi. Hozirgi UX: foydalanuvchiga "PDF rasm sifatida yuklash"ni so'raymiz —
-  /// haqiqiy PDF picker keyingi versiyada (file_picker package).
-  Future<XFile?> _pickPdfPlaceholder() async {
-    _toast(I18n.t('driver.reg.pdf_not_supported_yet'));
-    return _pickImage();
+  /// Guvohnoma uchun PDF tanlash.
+  ///
+  /// Kamera OCHILMAYDI: backend `legal_certificate_pdf` maydonida faqat PDF
+  /// qabul qiladi (`mimes:pdf`, 10 MB), rasm yuborilsa 422 qaytaradi.
+  Future<XFile?> _pickPdf() async {
+    final picked = await FilePicker.pickFile(
+      dialogTitle: I18n.t('driver.reg.pick_pdf'),
+      type: FileType.custom,
+      allowedExtensions: const ['pdf'],
+    );
+    if (picked == null) return null;
+
+    // Ba'zi Android fayl menejerlari kengaytma filtriga bo'ysunmaydi,
+    // shuning uchun tanlovdan keyin qayta tekshiramiz.
+    if ((picked.extension ?? '').toLowerCase() != 'pdf') {
+      _toast(I18n.t('driver.reg.pdf_only'));
+      return null;
+    }
+
+    final size = await picked.length();
+    if (size != null && size > _maxUploadBytes) {
+      _toast(I18n.t('driver.reg.file_too_large'));
+      return null;
+    }
+
+    return picked.xFile;
   }
 
   Future<void> _submit() async {
@@ -361,7 +385,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
             if (_legalType == 1 || _legalType == 4)
               _fileRow(I18n.t('driver.reg.legal_pdf'), _legalPdf, _legalUrl,
                   () async {
-                final f = await _pickPdfPlaceholder();
+                final f = await _pickPdf();
                 if (f != null) setState(() => _legalPdf = f);
               }),
             _errorNote('legal_certificate_img'),
@@ -448,6 +472,17 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
           borderRadius: BorderRadius.circular(radius),
         ),
         child: Icon(Icons.attach_file_rounded, color: cs.onSurfaceVariant),
+      );
+    } else if (f.name.toLowerCase().endsWith('.pdf')) {
+      // PDF ni rasm sifatida chizib bo'lmaydi — hujjat belgisi ko'rsatiladi.
+      thumb = Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(radius),
+        ),
+        child: const Icon(Icons.picture_as_pdf_rounded, color: AppPalette.orange),
       );
     } else if (kIsWeb) {
       thumb = ClipRRect(

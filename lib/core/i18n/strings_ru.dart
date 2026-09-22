@@ -839,13 +839,14 @@ const Map<String, String> kStringsRu = {
   'driver.reg.legal_entity_subtitle':
       'Требуется PDF свидетельства о госрегистрации',
   'driver.reg.legal_pdf': 'Свидетельство (PDF) *',
+  'driver.reg.pick_pdf': 'Выберите PDF-файл',
+  'driver.reg.pdf_only': 'Можно загрузить только PDF-файл.',
+  'driver.reg.file_too_large': 'Размер файла не должен превышать 10 МБ.',
   'driver.reg.avtopark_title': 'Выбор автопарка (опционально)',
   'driver.reg.avtopark_label': 'Автопарк',
   'driver.reg.avtopark_none': 'Без автопарка (custom driver)',
   'driver.reg.avtopark_offerta': 'Я принимаю оферту автопарка *',
   'driver.reg.finish_short': 'Завершить',
-  'driver.reg.pdf_not_supported_yet':
-      'Выбор PDF пока не поддерживается. Выберите фото из галереи или обновите это поле позже.',
   'driver.reg.upload_ownership_doc': 'Загрузите документ собственности.',
   'driver.reg.upload_legal_pdf': 'Загрузите юридический документ (PDF).',
   'driver.reg.accept_avtopark_offerta': 'Согласитесь с офертой автопарка.',

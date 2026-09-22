@@ -50,6 +50,9 @@ dependencies:
   # Karta orqali hamyonni to'ldirish: Kapitalbank to'lov sahifasi WebView'da
   # ochiladi. Karta ma'lumoti ilovaga ham, bizning serverga ham tegmaydi.
   webview_flutter: ^4.10.0
+  # Haydovchi guvohnomasi FAQAT PDF bo'lishi kerak (backend `mimes:pdf`),
+  # image_picker esa faqat rasm beradi — hujjat tanlash uchun shu paket.
+  file_picker: ^13.1.0
 
 dev_dependencies:
   flutter_test:
