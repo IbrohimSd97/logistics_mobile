@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../i18n/i18n.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/app_links.dart';
@@ -14,12 +16,12 @@ Future<void> openOfferta(BuildContext context, {String? url}) async {
     );
     if (!ok) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Offertani ochib bo‘lmadi.')),
+        SnackBar(content: Text(I18n.t('offerta.open_failed'))),
       );
     }
   } catch (_) {
     messenger.showSnackBar(
-      const SnackBar(content: Text('Offertani ochib bo‘lmadi.')),
+      SnackBar(content: Text(I18n.t('offerta.open_failed'))),
     );
   }
 }

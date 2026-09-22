@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_palette.dart';
 import 'i18n.dart';
 
 /// Settings card uchun til tanlash ListTile. AnimatedBuilder bilan
@@ -37,14 +38,11 @@ class LanguagePickerTile extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                 child: Row(
                   children: [
-                    const Icon(Icons.language_rounded),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.language_rounded, color: AppPalette.orange),
+                    const SizedBox(width: 10),
                     Text(
                       I18n.t('settings.language'),
-                      style: Theme.of(ctx)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
+                      style: Theme.of(ctx).textTheme.titleLarge,
                     ),
                   ],
                 ),

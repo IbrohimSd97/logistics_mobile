@@ -1,6 +1,5 @@
 import 'package:http/http.dart' as http;
 
-import 'api_exception.dart';
 import 'http_response_codec.dart';
 import '../config/api_config.dart';
 import '../i18n/i18n.dart';

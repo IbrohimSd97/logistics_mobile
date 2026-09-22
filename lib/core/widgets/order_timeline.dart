@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/i18n.dart';
 import '../theme/app_palette.dart';
 
 class TimelineStep {
@@ -38,7 +39,7 @@ class OrderTimeline extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppPalette.radiusCard),
         border: Border.all(color: cs.outlineVariant),
       ),
       child: Column(
@@ -46,10 +47,10 @@ class OrderTimeline extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.history_rounded, color: cs.primary, size: 18),
+              const Icon(Icons.history_rounded, color: AppPalette.orange, size: 18),
               const SizedBox(width: 8),
               Text(
-                'Status tarixi',
+                I18n.t('order.timeline.title'),
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../i18n/i18n.dart';
 import '../theme/app_palette.dart';
 
 /// Yetkazish muddati banner. Status hayotchan bo'lsa qolgan vaqt countdown
@@ -104,23 +105,25 @@ class DeadlineBanner extends StatelessWidget {
     }
 
     final detailLine = isLate
-        ? (isDriver
-            ? (penaltyText != null
-                ? 'Jarima: $penaltyText so‘m (sizdan yechiladi)'
-                : 'Yetkazish muddati o‘tib ketdi')
-            : (penaltyText != null
-                ? 'Kompensatsiya: $penaltyText so‘m'
-                : 'Yetkazish muddati o‘tib ketdi'))
+        ? (penaltyText == null
+            ? I18n.t('deadline.overdue')
+            : I18n.t(
+                isDriver
+                    ? 'deadline.penalty_driver'
+                    : 'deadline.compensation_customer',
+                {'amount': penaltyText},
+              ))
         : (slaHours != null
-            ? 'SLA: $slaHours soat • muddat ${_fmtDateTime(deadline)}'
-            : 'Muddat: ${_fmtDateTime(deadline)}');
+            ? I18n.t('deadline.sla_line',
+                {'sla': slaHours, 'time': _fmtDateTime(deadline)})
+            : I18n.t('deadline.deadline_line', {'time': _fmtDateTime(deadline)}));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppPalette.radiusCard),
         border: Border.all(color: borderColor, width: 1.1),
       ),
       child: Row(
@@ -136,7 +139,9 @@ class DeadlineBanner extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        isLate ? 'Kechikkan' : 'Yetkazish muddati',
+                        isLate
+                            ? I18n.t('deadline.late_title')
+                            : I18n.t('deadline.title'),
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: fg,
@@ -145,7 +150,7 @@ class DeadlineBanner extends StatelessWidget {
                     ),
                     Text(
                       roundedHours != null
-                          ? '$roundedHours soat'
+                          ? I18n.t('deadline.hours', {'n': roundedHours})
                           : _fmtDuration(diff, isLate: isLate),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,

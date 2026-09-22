@@ -173,13 +173,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     // shunda buyurtmaga koordinata emas, haqiqiy manzil yoziladi.
     if (_resolving) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Manzil aniqlanmoqda, biroz kuting...')),
+        SnackBar(content: Text(I18n.t('picker.resolving_wait'))),
       );
       return;
     }
     if (_address.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Manzil aniqlanmadi. Kartani biroz suring va qayta urinib ko\'ring.')),
+        SnackBar(content: Text(I18n.t('picker.address_not_found'))),
       );
       return;
     }
@@ -266,7 +266,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               children: [
                 Material(
                   elevation: 4,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppPalette.radiusField),
                   color: cs.surfaceContainerHigh,
                   child: TextField(
                     controller: _searchCtrl,
@@ -294,7 +294,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       filled: true,
                       fillColor: cs.surfaceContainerHigh,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppPalette.radiusField),
                         borderSide: BorderSide.none,
                       ),
                     ),
@@ -306,7 +306,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   const SizedBox(height: 6),
                   Material(
                     elevation: 4,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppPalette.radiusField),
                     color: cs.surfaceContainerHigh,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 240),
@@ -363,7 +363,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.location_on_rounded, color: cs.primary, size: 22),
+                          const Icon(Icons.location_on_rounded, color: AppPalette.orange, size: 22),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(

@@ -576,9 +576,20 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     return Padding(
       padding: const EdgeInsets.only(top: 4, left: 6, bottom: 2),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.error_outline_rounded, size: 15, color: Colors.red),
-        const SizedBox(width: 4),
-        Expanded(child: Text('Admin: $r', style: const TextStyle(color: Colors.red, fontSize: 12, height: 1.3))),
+        const Icon(Icons.error_outline_rounded,
+            size: 15, color: AppPalette.dangerLight),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            I18n.t('driver.reg.admin_note', {'text': r}),
+            style: const TextStyle(
+              color: AppPalette.dangerLight,
+              fontSize: 12,
+              height: 1.3,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ]),
     );
   }
