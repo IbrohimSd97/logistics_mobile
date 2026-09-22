@@ -235,6 +235,33 @@ void main() {
         find.byType(AlixListSkeleton), matchesGoldenFile('preview_skeleton.png'));
   }, skip: !_enabled);
 
+  testWidgets('confirm dialog', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 560));
+    await tester.pumpWidget(_app(Builder(
+      builder: (context) => Scaffold(
+        body: Center(
+          child: ElevatedButton(
+            onPressed: () => showAlixConfirm(
+              context,
+              icon: Icons.logout_rounded,
+              title: 'Chiqish',
+              message: 'Hisobdan chiqishni xohlaysizmi?',
+              confirmLabel: 'Chiqish',
+              cancelLabel: 'Bekor qilish',
+              danger: true,
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    )));
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await expectLater(
+        find.byType(AlertDialog), matchesGoldenFile('preview_confirm_dialog.png'));
+  }, skip: !_enabled);
+
   testWidgets('components light', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 760));
     await tester.pumpWidget(_app(const _Showcase()));

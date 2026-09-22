@@ -142,6 +142,8 @@ Qayta ishlatiladigan bloklar `lib/core/brand/alix_components.dart` da:
 | `AlixTxRow` | Hamyondagi pul harakati qatori |
 | `AlixStepHeader` | Ko'p qadamli formada bosqich ko'rsatkichi |
 | `AlixUploadRow` | Hujjat / rasm yuklash qatori |
+| `AlixListSkeleton` | Ro'yxat yuklanayotgandagi skelet holati |
+| `showAlixConfirm` | Tasdiqlash dialogi (`danger` — qaytarib bo'lmaydigan amal) |
 
 Buyurtma statusining rangi `lib/core/brand/order_status_tone.dart` da —
 bitta manba, shuning uchun bir buyurtma ro'yxatda, tafsilotda va haydovchi
