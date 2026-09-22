@@ -927,7 +927,7 @@ class DriverOrdersArchiveBodyState extends State<DriverOrdersArchiveBody> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) return const AlixListSkeleton();
     if (_error != null && _list.isEmpty) {
       return ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),

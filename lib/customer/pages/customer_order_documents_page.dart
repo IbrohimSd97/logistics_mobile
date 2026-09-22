@@ -44,7 +44,7 @@ class _CustomerOrderDocumentsPageState extends State<CustomerOrderDocumentsPage>
         future: _future,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const AlixListSkeleton(itemHeight: 84);
           }
           if (snap.hasError) {
             final err = snap.error;

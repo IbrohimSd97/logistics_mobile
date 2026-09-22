@@ -814,7 +814,7 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const AlixListSkeleton()
                 : TabBarView(
                     children: [
                       _orderList(_current, widget.onOpenDetail, _error),

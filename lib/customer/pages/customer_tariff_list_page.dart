@@ -80,7 +80,7 @@ class _CustomerTariffListPageState extends State<CustomerTariffListPage>
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const AlixListSkeleton(itemHeight: 96)
             : _error != null
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),

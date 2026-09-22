@@ -702,3 +702,67 @@ Future<bool> showAlixConfirm(
   );
   return result ?? false;
 }
+
+/// Ro'yxat yuklanayotganda ko'rsatiladigan "skelet" kartalar.
+///
+/// Aylanuvchi indikator o'rniga kelayotgan kontentning shakli ko'rsatiladi:
+/// foydalanuvchi nima kutayotganini biladi va sahifa yuklangach tuzilma
+/// sakramaydi.
+class AlixListSkeleton extends StatefulWidget {
+  const AlixListSkeleton({
+    super.key,
+    this.itemCount = 3,
+    this.itemHeight = 132,
+    this.padding = const EdgeInsets.fromLTRB(20, 16, 20, 20),
+  });
+
+  final int itemCount;
+  final double itemHeight;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  State<AlixListSkeleton> createState() => _AlixListSkeletonState();
+}
+
+class _AlixListSkeletonState extends State<AlixListSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return IgnorePointer(
+      child: ListView.separated(
+        padding: widget.padding,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: widget.itemCount,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (_, _) => AnimatedBuilder(
+          animation: _controller,
+          builder: (_, child) => Opacity(
+            // Pulsatsiya sezilarli, lekin bezovta qilmaydigan oraliqda.
+            opacity: 0.45 + _controller.value * 0.35,
+            child: child,
+          ),
+          child: Container(
+            height: widget.itemHeight,
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(AppPalette.radiusCard),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

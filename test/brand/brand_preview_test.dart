@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mening_ilovam/core/brand/alix_components.dart';
 import 'package:mening_ilovam/core/brand/alix_logo.dart';
 import 'package:mening_ilovam/core/brand/alix_splash.dart';
 import 'package:mening_ilovam/core/theme/app_palette.dart';
@@ -224,6 +225,14 @@ void main() {
       await expectLater(find.byType(DriverPendingPage),
           matchesGoldenFile('preview_driver_pending.png'));
     });
+  }, skip: !_enabled);
+
+  testWidgets('list skeleton', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 520));
+    await tester.pumpWidget(_app(const Scaffold(body: AlixListSkeleton())));
+    await tester.pump(const Duration(milliseconds: 550));
+    await expectLater(
+        find.byType(AlixListSkeleton), matchesGoldenFile('preview_skeleton.png'));
   }, skip: !_enabled);
 
   testWidgets('components light', (tester) async {
