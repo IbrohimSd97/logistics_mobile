@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:smart_auth/smart_auth.dart';
 
 import '../core/api/api_exception.dart';
 import '../core/api/auth_api.dart';
@@ -61,8 +63,53 @@ class _LoginScreenState extends State<LoginScreen>
   /// Noto'g'ri kod xatosi — input tagida qizil yozuv + qizil border uchun.
   String? _otpError;
 
+  /// SMS tinglash faolmi. Sahifa yopilganda yoki raqam o'zgartirilganda
+  /// kechikib kelgan javobni e'tiborsiz qoldirish uchun kerak.
+  bool _listeningForSms = false;
+
+  /// SMS kelganda kodni avtomat to'ldiradi (Android SMS User Consent API).
+  ///
+  /// Ruxsat so'ralmaydi va shablon o'zgartirilmaydi: tizim bitta xabarni
+  /// o'qishga ruxsat so'rab dialog ko'rsatadi, foydalanuvchi "Allow" bosadi.
+  /// iOS'da bu kerak emas — u yerda klaviatura `autofillHints` orqali kodni
+  /// o'zi taklif qiladi.
+  Future<void> _listenForSmsCode() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+
+    _listeningForSms = true;
+    final result = await SmartAuth.instance.getSmsWithUserConsentApi(
+      // Kod aniq 6 xonali; SMS matnidagi "1 daqiqa" kabi sonlar ilinmaydi.
+      matcher: r'\d{6}',
+    );
+    if (!mounted || !_listeningForSms) return;
+
+    final code = result.data?.code;
+    if (code == null || code.length != 6) return;
+
+    setState(() {
+      _otpController.text = code;
+      _otpError = null;
+    });
+
+    // Qo'lda kiritilgandagi bilan bir xil yo'l: bir kod ikki marta
+    // yuborilmasligi uchun `_autoSubmittedCode` tekshiriladi.
+    if (!_loading && code != _autoSubmittedCode) {
+      _autoSubmittedCode = code;
+      _verifyOtp();
+    }
+  }
+
+  /// Tinglashni to'xtatadi — kod kiritilgach yoki sahifa yopilganda.
+  void _stopListeningForSms() {
+    if (!_listeningForSms) return;
+    _listeningForSms = false;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    SmartAuth.instance.removeUserConsentApiListener();
+  }
+
   @override
   void dispose() {
+    _stopListeningForSms();
     _otpTimer?.cancel();
     _phoneController.dispose();
     _otpController.dispose();
@@ -196,6 +243,7 @@ class _LoginScreenState extends State<LoginScreen>
       });
       _otpFocus.requestFocus();
       _startOtpCountdown(r.expiresInSec);
+      unawaited(_listenForSmsCode());
       final sec = r.expiresInSec != null ? ' (${r.expiresInSec} s)' : '';
       _toast(
         r.devCode != null
@@ -392,6 +440,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   void _resetOtpStep() {
+    _stopListeningForSms();
     _otpTimer?.cancel();
     setState(() {
       _otpSent = false;
@@ -499,6 +548,10 @@ class _LoginScreenState extends State<LoginScreen>
                           keyboardType: TextInputType.number,
                           maxLength: 6,
                           textInputAction: TextInputAction.done,
+                          // iOS klaviaturasi SMS'dagi kodni shu belgi orqali
+                          // taklif qiladi; Android autofill xizmati ham shuni
+                          // o'qiydi. Androidda asosiy yo'l — User Consent API.
+                          autofillHints: const [AutofillHints.oneTimeCode],
                           style: TextStyle(
                             color: cs.onSurface,
                             fontSize: 22,
