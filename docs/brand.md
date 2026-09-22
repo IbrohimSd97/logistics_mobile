@@ -21,6 +21,27 @@ Brend ikki rangdan iborat — orange va charcoal. Qolgani neytral yuzalar.
 Holat ranglari (brenddan tashqari, faqat ma'no uchun): `success #12A150`,
 `amber #F5A524` (kutilmoqda), `dangerLight #E5484D`.
 
+### Kontrast va matn variantlari
+
+Brend orange yorug' fonda **2.87:1** beradi — WCAG AA (4.5:1) dan past.
+Shuning uchun rang ikkiga bo'lingan:
+
+* **to'ldirish** (tugma foni, progress, nuqta, ikonka) — brend `orange`;
+* **matn** (chip yozuvi, havola, kichik yorliq) — `orangeText #B23F00`
+  (oq fonda 5.83:1, krem fonda 5.23:1).
+
+Xuddi shunday `successText #0B6B35` va matn uchun `danger #B3261E`.
+Rejimga qarab tanlash: `AppPalette.accentTextOn(brightness)`,
+`successTextOn`, `dangerTextOn` — to'q rejimda brend ranglari o'zi
+yetarli kontrast beradi.
+
+**Ongli chetlanish:** asosiy CTA (oq matn + orange fon) 2.87:1 da qoladi —
+bu brend materiallaridagi ko'rinish. Kompensatsiya: tugma balandligi
+52–56 dp, matn 16 px qalin, teginish maydoni katta. Agar qat'iy AA talab
+qilinsa, CTA foni `#C44600` ga quyultiriladi (4.97:1).
+
+Teginish maydonlari kamida 44 dp.
+
 To'q rejim yuzalari: `darkBg #141414`, `darkCard #1E1E1E`,
 `darkCardElevated #262626`, `darkBorder #333333`, matn `#F4F2EE`.
 

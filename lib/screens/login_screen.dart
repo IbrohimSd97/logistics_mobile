@@ -547,9 +547,8 @@ class _LoginScreenState extends State<LoginScreen>
                                   onPressed: _loading ? null : _sendOtp,
                                   icon: const Icon(Icons.refresh_rounded, size: 18),
                                   style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: const Size(0, 0),
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    minimumSize: const Size(0, 44),
                                   ),
                                   label: Text(I18n.t('auth.resend_otp')),
                                 ),

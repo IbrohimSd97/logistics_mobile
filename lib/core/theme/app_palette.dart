@@ -21,6 +21,16 @@ class AppPalette {
   /// Yorug' fonda orange ustidagi yumshoq to'ldirish (chip, banner).
   static const Color orangeSoft = Color(0xFFFFF0E6);
 
+  /// Yorug' fonda MATN uchun orange.
+  ///
+  /// Brend orange (#FF6A13) oq fonda 2.87:1 beradi — WCAG AA (4.5:1) dan
+  /// past, ya'ni kichik matn o'qilishi qiyin. To'ldirish (tugma foni,
+  /// progress, nuqtalar) uchun brend rangi qoladi, matn esa shu quyuq
+  /// variantda yoziladi: oq fonda 5.83:1, krem fonda 5.23:1.
+  /// To'q rejimda brend orange o'zi yetarli (6.42:1), shuning uchun
+  /// [accentTextOn] rejimga qarab tanlaydi.
+  static const Color orangeText = Color(0xFFB23F00);
+
   /// Brendning to'q rangi — matn, to'q kartalar, ikkilamchi CTA.
   static const Color ink = Color(0xFF3A3A3A);
 
@@ -39,6 +49,10 @@ class AppPalette {
   // ─── Holat ranglari (brenddan tashqari, faqat ma'no uchun) ─────────────
   static const Color success = Color(0xFF12A150);
   static const Color successSoft = Color(0xFFE7F6EE);
+
+  /// Yorug' fonda matn uchun yashil (5.9:1). `success` o'zi 3:1 atrofida —
+  /// belgi va to'ldirish uchun yetarli, matn uchun emas.
+  static const Color successText = Color(0xFF0B6B35);
 
   /// Kutilmoqda / diqqat — brend orange bilan chalkashmasligi uchun sariq.
   static const Color amber = Color(0xFFF5A524);
@@ -63,6 +77,19 @@ class AppPalette {
   static const Color darkBorder = Color(0xFF333333);
   static const Color darkOn = Color(0xFFF4F2EE);
   static const Color darkMuted = Color(0xFFA3A3A3);
+
+  // ─── Kontrastga mos variantlar ─────────────────────────────────────────
+  /// Rejimga qarab matn uchun urg'u rangi.
+  static Color accentTextOn(Brightness brightness) =>
+      brightness == Brightness.dark ? orange : orangeText;
+
+  /// Rejimga qarab matn uchun yashil.
+  static Color successTextOn(Brightness brightness) =>
+      brightness == Brightness.dark ? success : successText;
+
+  /// Rejimga qarab matn uchun qizil (`dangerLight` oq fonda 3.9:1, kam).
+  static Color dangerTextOn(Brightness brightness) =>
+      brightness == Brightness.dark ? dangerLight : danger;
 
   // ─── Gradientlar ───────────────────────────────────────────────────────
   /// Asosiy CTA. Brend tekis rangda ishlaydi, gradient faqat sezilarli

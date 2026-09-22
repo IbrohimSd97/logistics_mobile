@@ -857,9 +857,9 @@ class _ShiftCard extends StatelessWidget {
                 label: Text(I18n.t('driver.refresh_location')),
                 style: TextButton.styleFrom(
                   foregroundColor: AppPalette.orange,
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(0, 36),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  // Teginish maydoni 44 dp dan kichik bo'lmasligi kerak.
+                  minimumSize: const Size(0, 44),
                 ),
               ),
             ),

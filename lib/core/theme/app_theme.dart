@@ -150,9 +150,9 @@ class AppTheme {
           return TextStyle(
             fontFamily: fontFamily,
             color: errored
-                ? AppPalette.dangerLight
+                ? AppPalette.dangerTextOn(brightness)
                 : focused
-                    ? AppPalette.orange
+                    ? AppPalette.accentTextOn(brightness)
                     : muted,
             fontWeight: FontWeight.w600,
           );
@@ -227,7 +227,8 @@ class AppTheme {
 
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppPalette.orange,
+          // Matn — shuning uchun kontrastga mos variant.
+          foregroundColor: AppPalette.accentTextOn(brightness),
           textStyle: const TextStyle(fontFamily: fontFamily, fontWeight: FontWeight.w700),
         ),
       ),
@@ -299,6 +300,7 @@ class AppTheme {
           color: Colors.white,
           height: 1.35,
         ),
+        // Snackbar foni to'q — u yerda brend orange yetarli kontrast beradi.
         actionTextColor: AppPalette.orange,
         behavior: SnackBarBehavior.floating,
         elevation: 0,

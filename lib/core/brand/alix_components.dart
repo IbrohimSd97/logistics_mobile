@@ -249,13 +249,14 @@ class AlixStatusChip extends StatelessWidget {
 
     final (bg, fg) = switch (tone) {
       AlixTone.neutral => (cs.surfaceContainerHighest, cs.onSurfaceVariant),
+      // Chip matni kichik — rang kontrastga mos variantdan olinadi.
       AlixTone.progress => (
           isDark ? AppPalette.orange.withValues(alpha: 0.18) : AppPalette.orangeSoft,
-          AppPalette.orange,
+          AppPalette.accentTextOn(Theme.of(context).brightness),
         ),
       AlixTone.success => (
           isDark ? AppPalette.success.withValues(alpha: 0.18) : AppPalette.successSoft,
-          AppPalette.success,
+          AppPalette.successTextOn(Theme.of(context).brightness),
         ),
       AlixTone.warning => (
           isDark ? AppPalette.amber.withValues(alpha: 0.18) : AppPalette.amberSoft,
@@ -263,7 +264,7 @@ class AlixStatusChip extends StatelessWidget {
         ),
       AlixTone.danger => (
           isDark ? AppPalette.dangerLight.withValues(alpha: 0.18) : AppPalette.dangerSoft,
-          AppPalette.dangerLight,
+          AppPalette.dangerTextOn(Theme.of(context).brightness),
         ),
     };
 
@@ -363,7 +364,7 @@ class AlixBanner extends StatelessWidget {
     final (bg, fg) = switch (tone) {
       AlixTone.danger => (
           isDark ? AppPalette.danger.withValues(alpha: 0.24) : AppPalette.dangerSoft,
-          isDark ? Colors.white : AppPalette.danger,
+          isDark ? Colors.white : AppPalette.dangerTextOn(theme.brightness),
         ),
       AlixTone.warning => (
           isDark ? AppPalette.amber.withValues(alpha: 0.20) : AppPalette.amberSoft,
@@ -371,7 +372,7 @@ class AlixBanner extends StatelessWidget {
         ),
       AlixTone.success => (
           isDark ? AppPalette.success.withValues(alpha: 0.20) : AppPalette.successSoft,
-          isDark ? AppPalette.success : const Color(0xFF0B6B35),
+          AppPalette.successTextOn(theme.brightness),
         ),
       _ => (
           theme.colorScheme.surfaceContainerHighest,
@@ -443,7 +444,8 @@ class AlixTxRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final accent = negative ? cs.onSurface : AppPalette.success;
+    final accent =
+        negative ? cs.onSurface : AppPalette.successTextOn(theme.brightness);
 
     return AlixCard(
       tone: AlixSurfaceTone.cream,

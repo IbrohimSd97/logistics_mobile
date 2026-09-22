@@ -478,7 +478,7 @@ class _ScheduledPickupCard extends StatelessWidget {
                         : I18n.t('order.create.change_btn')),
                     style: OutlinedButton.styleFrom(
                       backgroundColor: cs.surface,
-                      minimumSize: const Size(0, 40),
+                      minimumSize: const Size(0, 44),
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                     ),
                   ),
@@ -592,7 +592,7 @@ class _LocationField extends StatelessWidget {
                     : I18n.t('order.create.pick_from_map_btn')),
                 style: OutlinedButton.styleFrom(
                   backgroundColor: cs.surface,
-                  minimumSize: const Size(0, 40),
+                  minimumSize: const Size(0, 44),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                 ),
               ),
