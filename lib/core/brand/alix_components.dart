@@ -660,16 +660,21 @@ Future<bool> showAlixConfirm(
       final accent = danger ? cs.error : AppPalette.orange;
 
       return AlertDialog(
+        // `Center` shart: AlertDialog ikonka slotini butun enga cho'zadi,
+        // shundan plastinka kvadrat emas, tasma bo'lib ko'rinardi.
         icon: icon == null
             ? null
-            : Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppPalette.radiusChip),
+            : Center(
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(AppPalette.radiusChip),
+                  ),
+                  child: Icon(icon, color: accent),
                 ),
-                child: Icon(icon, color: accent),
               ),
         iconPadding: const EdgeInsets.only(top: 24, bottom: 4),
         title: Text(title),

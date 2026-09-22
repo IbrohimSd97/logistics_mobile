@@ -171,8 +171,10 @@ class AppTheme {
         style: FilledButton.styleFrom(
           backgroundColor: AppPalette.orange,
           foregroundColor: Colors.white,
-          disabledBackgroundColor: AppPalette.orange.withValues(alpha: 0.35),
-          disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
+          // O'chirilgan tugma: och orange fonda oq matn o'qilmas edi —
+          // endi neytral yuza va so'nik matn.
+          disabledBackgroundColor: cardElevated,
+          disabledForegroundColor: muted,
           textStyle: const TextStyle(
             fontFamily: fontFamily,
             fontWeight: FontWeight.w700,
