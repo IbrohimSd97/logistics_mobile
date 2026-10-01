@@ -199,6 +199,19 @@ class CustomerApi {
     return _decodeResponse(res);
   }
 
+  /// GET /api/customer/orders/{id}/fiscal-receipts — order yakunida OFD'ga
+  /// yuborilgan cheklar (QR havolasi bilan). Cheklar asenkron yuboriladi,
+  /// shuning uchun ro'yxatda `pending` holatdagilar ham bo'lishi mumkin.
+  Future<List<OrderFiscalReceipt>> orderFiscalReceipts(int orderId) async {
+    final token = await _requireBearer();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/orders/$orderId/fiscal-receipts');
+    final res = await http.get(url, headers: _jsonAuth(token));
+    final map = _decodeResponse(res);
+    final data = map['data'];
+    final items = data is Map<String, dynamic> ? mapListFrom(data['items']) : const <Map<String, dynamic>>[];
+    return items.map(OrderFiscalReceipt.fromMap).whereType<OrderFiscalReceipt>().toList();
+  }
+
   /// POST /api/customer/orders/cancel
   ///
   /// `cancelReasonId` — `cancel_reasons` jadvalidan tanlangan ID (majburiy).

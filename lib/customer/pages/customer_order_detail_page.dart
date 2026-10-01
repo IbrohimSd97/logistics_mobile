@@ -22,6 +22,7 @@ import '../../core/widgets/order_timeline.dart';
 import '../../core/widgets/slide_button.dart';
 import '../customer_api.dart';
 import '../customer_models.dart';
+import '../widgets/order_fiscal_receipts_section.dart';
 import 'customer_order_create_page.dart';
 
 class CustomerOrderDetailPage extends StatefulWidget {
@@ -963,6 +964,11 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                                   ],
                                 ),
                               ),
+                            ],
+                            // Yakunlangan (pul yechilgan) buyurtma — OFD cheklari va QR.
+                            if (s == 10) ...[
+                              const SizedBox(height: 14),
+                              OrderFiscalReceiptsSection(orderId: _order.id),
                             ],
                             const SizedBox(height: 14),
                             OrderTimeline(steps: _timelineStepsCustomer(_order)),

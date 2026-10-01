@@ -9,6 +9,7 @@ import 'package:mening_ilovam/core/theme/app_theme.dart';
 import 'package:mening_ilovam/core/widgets/gradient_button.dart';
 import 'package:mening_ilovam/customer/pages/customer_order_create_page.dart';
 import 'package:mening_ilovam/customer/pages/customer_wallet_topup_page.dart';
+import 'package:mening_ilovam/customer/widgets/order_fiscal_receipts_section.dart';
 import 'package:mening_ilovam/screens/customer_main_shell.dart';
 import 'package:mening_ilovam/driver/pages/driver_pending_page.dart';
 import 'package:mening_ilovam/driver/pages/driver_registration_step1_page.dart';
@@ -105,6 +106,30 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       await expectLater(
           find.byType(CustomerOrdersBody), matchesGoldenFile('preview_customer_orders.png'));
+    });
+  }, skip: !_enabled);
+
+  testWidgets('order fiscal receipts', (tester) async {
+    await withFakeApi(() async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      // Ikonkalar (QR, chek) ko'rinishi uchun Material Icons shriftini yuklaymiz.
+      await tester.runAsync(() async {
+        final icons = FontLoader('MaterialIcons')
+          ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+        await icons.load();
+      });
+      await tester.pumpWidget(_app(const _FiscalPreview()));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 300));
+      await expectLater(
+          find.byType(_FiscalPreview), matchesGoldenFile('preview_order_fiscal.png'));
+
+      // Sotuv cheki bosilganda — QR oynasi.
+      await tester.tap(find.text('Sotuv cheki'));
+      await tester.pumpAndSettle();
+      // Bottom sheet navigator overlay'ida — butun ilovani suratga olamiz.
+      await expectLater(
+          find.byType(MaterialApp), matchesGoldenFile('preview_order_fiscal_qr.png'));
     });
   }, skip: !_enabled);
 
@@ -358,6 +383,79 @@ class _Showcase extends StatelessWidget {
           AlixInkButton(label: 'Batafsil', onPressed: () {}),
           const SizedBox(height: 10),
           OutlinedButton(onPressed: () {}, child: const Text('Bekor qilish')),
+        ],
+      ),
+    );
+  }
+}
+
+/// Buyurtma tafsilotining yakunlangan holati. Xarita (platform view) testda
+/// chizilmaydi, shuning uchun uning o'rnida kulrang joy qoldiriladi; pastki
+/// qism — haqiqiy `OrderFiscalReceiptsSection`.
+class _FiscalPreview extends StatelessWidget {
+  const _FiscalPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Scaffold(
+      backgroundColor: cs.surfaceContainerHighest,
+      body: Column(
+        children: [
+          SizedBox(
+            height: 150,
+            child: Center(child: Icon(Icons.map_outlined, size: 40, color: cs.outline)),
+          ),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('AX-20471', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 4),
+                            const AlixStatusChip(label: 'Yakunlangan', tone: AlixTone.success),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('1 450 000', style: tt.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                          Text('UZS', style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  AlixCard(
+                    tone: AlixSurfaceTone.cream,
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Toshkent, Yunusobod tumani, Amir Temur 108', style: tt.bodyMedium),
+                        const Divider(height: 18),
+                        Text('Samarqand, Registon ko\'chasi 14', style: tt.bodyMedium),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const OrderFiscalReceiptsSection(orderId: 20471),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

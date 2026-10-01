@@ -621,3 +621,57 @@ class CardTopUpStatus {
     );
   }
 }
+
+/// Order bo'yicha fiskal chek (OFD). `receiptType`: 0=Sotuv, 1=Avans, 2=Kredit.
+/// `status`: pending | accepted | error — cheklar backendda asenkron yuboriladi.
+class OrderFiscalReceipt {
+  const OrderFiscalReceipt({
+    required this.id,
+    required this.receiptType,
+    required this.isRefund,
+    required this.status,
+    this.receiptSeq,
+    this.terminalId,
+    this.fiscalSign,
+    this.qrCodeUrl,
+    this.amount,
+    this.issuedAt,
+  });
+
+  final int id;
+  final int receiptType;
+  final bool isRefund;
+  final String status;
+  final int? receiptSeq;
+  final String? terminalId;
+  final String? fiscalSign;
+  final String? qrCodeUrl;
+  final num? amount;
+  final DateTime? issuedAt;
+
+  bool get isAccepted => status == 'accepted';
+  bool get isPending => status == 'pending';
+  bool get hasQr => isAccepted && (qrCodeUrl ?? '').isNotEmpty;
+
+  static OrderFiscalReceipt? fromMap(Map<String, dynamic> m) {
+    final id = int.tryParse(m['id']?.toString() ?? '');
+    if (id == null) return null;
+    String? str(String k) {
+      final v = m[k]?.toString();
+      return (v == null || v.isEmpty) ? null : v;
+    }
+
+    return OrderFiscalReceipt(
+      id: id,
+      receiptType: int.tryParse(m['receipt_type']?.toString() ?? '') ?? 0,
+      isRefund: m['is_refund'] == true || m['is_refund'] == 1,
+      status: m['status']?.toString() ?? 'pending',
+      receiptSeq: int.tryParse(m['receipt_seq']?.toString() ?? ''),
+      terminalId: str('terminal_id'),
+      fiscalSign: str('fiscal_sign'),
+      qrCodeUrl: str('qr_code_url'),
+      amount: num.tryParse(m['amount']?.toString() ?? ''),
+      issuedAt: DateTime.tryParse(m['issued_at']?.toString() ?? '')?.toLocal(),
+    );
+  }
+}

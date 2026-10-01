@@ -27,6 +27,7 @@ Future<http.Response> _handle(http.Request request) async {
     _ when path.endsWith('/customer/wallet') => {'data': _wallet},
     _ when path.endsWith('/wallet/transactions') => {'data': _transactions},
     _ when path.endsWith('/wallet/topup/history') => {'data': <dynamic>[]},
+    _ when path.endsWith('/fiscal-receipts') => {'data': {'order_id': 20471, 'items': _fiscalReceipts}},
     _ => {'data': <dynamic>[]},
   };
   return http.Response(
@@ -35,6 +36,26 @@ Future<http.Response> _handle(http.Request request) async {
     headers: {'content-type': 'application/json'},
   );
 }
+
+const _fiscalReceipts = [
+  {
+    'id': 301, 'receipt_type': 1, 'is_refund': false, 'status': 'accepted',
+    'receipt_seq': 1841, 'terminal_id': 'UZ191211502383', 'fiscal_sign': null,
+    'qr_code_url': 'https://ofd.soliq.uz/epi?t=UZ191211502383&r=1841&c=20260930101455&s=0',
+    'amount': 1450000, 'issued_at': '2026-09-30T05:14:55Z',
+  },
+  {
+    'id': 302, 'receipt_type': 0, 'is_refund': false, 'status': 'accepted',
+    'receipt_seq': 1842, 'terminal_id': 'UZ191211502383', 'fiscal_sign': '381602947215',
+    'qr_code_url': 'https://ofd.soliq.uz/epi?t=UZ191211502383&r=1842&c=20260930101500&s=381602947215',
+    'amount': 1450000, 'issued_at': '2026-09-30T05:15:00Z',
+  },
+  {
+    'id': 303, 'receipt_type': 2, 'is_refund': false, 'status': 'pending',
+    'receipt_seq': 1843, 'terminal_id': null, 'fiscal_sign': null, 'qr_code_url': null,
+    'amount': 1450000, 'issued_at': '2026-09-30T05:15:04Z',
+  },
+];
 
 const _currentOrders = [
   {
