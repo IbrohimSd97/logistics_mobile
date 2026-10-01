@@ -293,7 +293,7 @@ class CustomerApi {
     );
     final map = _decodeResponse(res);
     final session = CardTopUpSession.fromData(map['data']);
-    if (session == null) {
+    if (session == null || (!session.credited && session.paymentLink == null)) {
       throw ApiException('To`lov havolasi olinmadi');
     }
     return session;

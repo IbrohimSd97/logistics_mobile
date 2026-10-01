@@ -102,10 +102,19 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
 
     if (!mounted) return;
 
+    // Test rejimi (bank hali ulanmagan): server pulni darhol yozgan — bank
+    // sahifasini ochmaymiz.
+    if (session.credited) {
+      setState(() => _busy = false);
+      unawaited(_loadHistory());
+      _onCredited();
+      return;
+    }
+
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => CustomerPaymentWebviewPage(
-          paymentUrl: session.paymentLink,
+          paymentUrl: session.paymentLink!,
           redirectUrl: session.redirectUrl,
         ),
       ),
@@ -144,11 +153,7 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
     unawaited(_loadHistory());
 
     if (status != null && status.credited) {
-      _amount.clear();
-      _snack(I18n.t('payment.topup_credited'), success: true);
-      // Chaqiruvchi sahifalar natijani o'qimaydi (MaterialPageRoute<void>),
-      // shuning uchun qiymatsiz yopamiz.
-      Navigator.of(context).pop();
+      _onCredited();
       return;
     }
 
@@ -160,6 +165,14 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
     // To'langan, lekin hali yozilmagan yoki noma'lum — bank tasdig'i biroz
     // kechikishi normal holat.
     _snack(I18n.t('payment.topup_pending'));
+  }
+
+  void _onCredited() {
+    _amount.clear();
+    _snack(I18n.t('payment.topup_credited'), success: true);
+    // Chaqiruvchi sahifalar natijani o'qimaydi (MaterialPageRoute<void>),
+    // shuning uchun qiymatsiz yopamiz.
+    Navigator.of(context).pop();
   }
 
   void _snack(String text, {bool success = false}) {

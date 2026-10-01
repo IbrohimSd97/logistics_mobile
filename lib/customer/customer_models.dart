@@ -540,6 +540,7 @@ class CardTopUpSession {
     required this.operationId,
     required this.paymentLink,
     required this.redirectUrl,
+    this.credited = false,
     this.amount,
     this.currency,
     this.status,
@@ -547,7 +548,13 @@ class CardTopUpSession {
   });
 
   final String operationId;
-  final String paymentLink;
+
+  /// Bank to'lov sahifasi. Test rejimida (bank ulanmagan) bo'sh — pul
+  /// darhol yoziladi va [credited] true bo'ladi.
+  final String? paymentLink;
+
+  /// Pul allaqachon hamyonga yozilganmi (test rejimi) — bank sahifasi ochilmaydi.
+  final bool credited;
 
   /// To'lovdan keyin bank shu manzilga qaytaradi — WebView shuni ko'rib yopiladi.
   final String redirectUrl;
@@ -561,11 +568,12 @@ class CardTopUpSession {
     if (data is! Map) return null;
     final link = data['payment_link']?.toString();
     final op = data['operation_id']?.toString();
-    if (link == null || link.isEmpty || op == null || op.isEmpty) return null;
+    if (op == null || op.isEmpty) return null;
 
     return CardTopUpSession(
       operationId: op,
-      paymentLink: link,
+      paymentLink: (link == null || link.isEmpty) ? null : link,
+      credited: data['credited'] == true,
       redirectUrl: data['redirect_url']?.toString() ?? '',
       amount: double.tryParse(data['amount']?.toString() ?? ''),
       currency: data['currency']?.toString(),
