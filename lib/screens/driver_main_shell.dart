@@ -420,6 +420,10 @@ class DriverHomeBodyState extends State<DriverHomeBody>
       // Joriy buyurtma bo'lsa ham — rejali kelajak buyurtmalari ko'rinishi kerak
       // (driver oldinga rejalashtirishi uchun).
       if (serverOnline) {
+        // Ilova qayta ochilganda driver serverda allaqachon online bo'lishi
+        // mumkin — joylashuv faqat "online'ga o'tish"da olinardi, shuning
+        // uchun bu holatda yorliq "aniqlanmoqda…"da, masofalar "—"da qolardi.
+        if (_pickedLocation == null) unawaited(_restoreLocation());
         unawaited(_loadActive());
       } else {
         setState(() {
@@ -434,6 +438,22 @@ class DriverHomeBodyState extends State<DriverHomeBody>
         // currentOrder yo'q bo'lsa server 404 yoki conflict qaytaradi — bu xato emas
         _current = null;
       });
+    }
+  }
+
+  /// Online holatda ochilganda joylashuvni (ANR-xavfsiz) olib, yorliq va
+  /// buyurtmalargacha masofani tiklaydi. Manzil fonda aniqlanadi.
+  Future<void> _restoreLocation() async {
+    final pos = await CurrentLocation.oneShot(timeLimit: const Duration(seconds: 8));
+    if (pos == null || !mounted || _pickedLocation != null) return;
+    final latLng = LatLng(pos.latitude, pos.longitude);
+    setState(() {
+      _pickedLocation = latLng;
+      _pickedAddress = '${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+    });
+    final addr = await _reverseGeocode(latLng);
+    if (addr != null && addr.isNotEmpty && mounted) {
+      setState(() => _pickedAddress = addr);
     }
   }
 
