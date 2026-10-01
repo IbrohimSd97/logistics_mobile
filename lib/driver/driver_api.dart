@@ -95,26 +95,6 @@ class DriverApi {
     return DriverRegistrationData.fromMap(data);
   }
 
-  /// Server'dagi mavjud rasmni (nisbiy `/storage/...` yoki to'liq URL) yuklab
-  /// olib, vaqtinchalik faylga yozadi va `XFile` sifatida qaytaradi. Prefill
-  /// oqimida foydalanuvchi rasmni qayta tanlamasa, mavjud rasm shu yo'l bilan
-  /// qayta yuboriladi (backend submit shartnomasi o'zgarmaydi).
-  Future<XFile> downloadToTempFile(String urlOrPath) async {
-    final full = urlOrPath.startsWith('http')
-        ? urlOrPath
-        : '${ApiConfig.baseUrl}$urlOrPath';
-    final res = await http.get(Uri.parse(full));
-    if (res.statusCode >= 400) {
-      throw ApiException('Mavjud rasmni yuklab bo‘lmadi ($full)');
-    }
-    final name = full.split('?').first.split('/').last;
-    final safe = name.isEmpty ? 'image.jpg' : name;
-    final dir = Directory.systemTemp.createTempSync('prefill_');
-    final f = File('${dir.path}/$safe');
-    await f.writeAsBytes(res.bodyBytes);
-    return XFile(f.path);
-  }
-
   // ────────────────────────────── lookups ──────────────────────────────
 
   /// GET /api/driver/avtoparks/lists (no auth required by routes)
@@ -153,9 +133,9 @@ class DriverApi {
     required String carLicenseSeries,
     required String carLicenseNumber,
     required String carLicenseIssuedDate, // YYYY-MM-DD
-    required XFile carLicenseFront,
-    required XFile carLicenseBack,
-    required XFile carLicenseSelfie,
+    XFile? carLicenseFront,
+    XFile? carLicenseBack,
+    XFile? carLicenseSelfie,
   }) async {
     final token = await _requireTemp();
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/driver/registration/step1');
@@ -170,9 +150,11 @@ class DriverApi {
       ..fields['car_license_number'] = carLicenseNumber
       ..fields['car_license_issued_date'] = carLicenseIssuedDate;
 
-    req.files.add(await _filePart('car_license_front_img', carLicenseFront));
-    req.files.add(await _filePart('car_license_back_img', carLicenseBack));
-    req.files.add(await _filePart('car_license_selfie_img', carLicenseSelfie));
+    // Qayta yuborishda (rad etilgandan keyin) o'zgarmagan rasm yuborilmaydi —
+    // server mavjud faylni saqlab qoladi.
+    await _addFile(req, 'car_license_front_img', carLicenseFront);
+    await _addFile(req, 'car_license_back_img', carLicenseBack);
+    await _addFile(req, 'car_license_selfie_img', carLicenseSelfie);
 
     final res = await http.Response.fromStream(await req.send());
     final map = _decode(res);
@@ -197,11 +179,11 @@ class DriverApi {
     required bool hasTrailer,
     String? trailerPlateNumber,
     required bool projectOffertaAccepted,
-    required XFile regCertFront,
-    required XFile regCertBack,
-    required XFile vehicleFront,
-    required XFile vehicleSide,
-    required XFile vehicleBack,
+    XFile? regCertFront,
+    XFile? regCertBack,
+    XFile? vehicleFront,
+    XFile? vehicleSide,
+    XFile? vehicleBack,
     XFile? trailerRegFront,
     XFile? trailerRegBack,
   }) async {
@@ -226,11 +208,11 @@ class DriverApi {
       req.fields['trailer_plate_number'] = trailerPlateNumber;
     }
 
-    req.files.add(await _filePart('reg_certificate_front_img', regCertFront));
-    req.files.add(await _filePart('reg_certificate_back_img', regCertBack));
-    req.files.add(await _filePart('vehicle_front_img', vehicleFront));
-    req.files.add(await _filePart('vehicle_side_img', vehicleSide));
-    req.files.add(await _filePart('vehicle_back_img', vehicleBack));
+    await _addFile(req, 'reg_certificate_front_img', regCertFront);
+    await _addFile(req, 'reg_certificate_back_img', regCertBack);
+    await _addFile(req, 'vehicle_front_img', vehicleFront);
+    await _addFile(req, 'vehicle_side_img', vehicleSide);
+    await _addFile(req, 'vehicle_back_img', vehicleBack);
     if (hasTrailer && trailerRegFront != null) {
       req.files.add(await _filePart('trailer_reg_certificate_front_img', trailerRegFront));
     }
@@ -515,6 +497,11 @@ class DriverApi {
     if (lower.endsWith('.heif')) return MediaType('image', 'heif');
     if (lower.endsWith('.pdf')) return MediaType('application', 'pdf');
     return MediaType('image', 'jpeg');
+  }
+
+  /// Fayl tanlangan bo'lsagina multipart'ga qo'shadi.
+  Future<void> _addFile(http.MultipartRequest req, String field, XFile? f) async {
+    if (f != null) req.files.add(await _filePart(field, f));
   }
 
   Future<http.MultipartFile> _filePart(

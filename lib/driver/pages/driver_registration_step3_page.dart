@@ -120,11 +120,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
     final errs = widget.rejects?.step3Errors;
     if (errs == null) return null;
     for (final e in errs) {
-      if (e is Map && e['field'] == field) {
-        final rt = e['reason_text']?.toString();
-        if (rt != null && rt.trim().isNotEmpty) return rt.trim();
-        return e['reason_code']?.toString();
-      }
+      if (e is Map && e['field'] == field) return driverRejectNote(e);
     }
     return null;
   }
@@ -223,6 +219,16 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
       _toast(I18n.t('driver.reg.upload_legal_pdf'));
       return;
     }
+    // Admin rad etgan hujjat qayta yuklanishi shart — mavjudi qabul qilinmaydi.
+    if ((_ownership == 2 &&
+            _ownershipFile == null &&
+            _fieldError('ownership_contract_img') != null) ||
+        ((_legalType == 1 || _legalType == 4) &&
+            _legalPdf == null &&
+            _fieldError('legal_certificate_img') != null)) {
+      _toast(I18n.t('driver.reg.retake_rejected_msg'));
+      return;
+    }
     if (_avtopark == null) {
       _toast(I18n.t('driver.reg.select_avtopark'));
       return;
@@ -234,26 +240,13 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
 
     setState(() => _submitting = true);
     try {
-      // Foydalanuvchi qayta tanlamagan hujjatlarni mavjud URL'dan yuklab olamiz.
-      XFile? ownershipFile = _ownershipFile;
-      if (_ownership == 2 &&
-          ownershipFile == null &&
-          (_ownershipUrl ?? '').isNotEmpty) {
-        ownershipFile =
-            await DriverApi.instance.downloadToTempFile(_ownershipUrl!);
-      }
-      XFile? legalPdf = _legalPdf;
-      if ((_legalType == 1 || _legalType == 4) &&
-          legalPdf == null &&
-          (_legalUrl ?? '').isNotEmpty) {
-        legalPdf = await DriverApi.instance.downloadToTempFile(_legalUrl!);
-      }
+      // Qayta tanlanmagan hujjat yuborilmaydi — server mavjudini saqlab qoladi.
       final r = await DriverApi.instance.registrationStep3(
         sessionId: widget.sessionId,
         vehicleOwnership: _ownership,
-        ownershipFile: ownershipFile,
+        ownershipFile: _ownershipFile,
         legalEntityType: _legalType,
-        legalCertificatePdf: legalPdf,
+        legalCertificatePdf: _legalPdf,
         companyId: _avtopark?.id,
         companyOffertaAccepted: _companyOfferta,
       );

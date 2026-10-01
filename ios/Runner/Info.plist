@@ -12,6 +12,10 @@
 	<string>$(YANDEX_MAPKIT_API_KEY)</string>
 	<!-- Buyurtma manzilini xaritada belgilash va haydovchi joylashuvini
 	     kuzatish uchun. Bu matnlarsiz iOS ruxsat so'ramaydi. -->
+	<key>NSCameraUsageDescription</key>
+	<string>ALIX haydovchi guvohnomasi, selfi va mashina rasmlarini olish uchun kameradan foydalanadi.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ALIX hujjat rasmlarini galereyadan tanlash uchun ruxsat so'raydi.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Manzilni xaritada belgilash va yetkazib berishni kuzatish uchun joylashuvingiz kerak.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

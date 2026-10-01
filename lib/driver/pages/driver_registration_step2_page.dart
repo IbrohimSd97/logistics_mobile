@@ -3,11 +3,13 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:camera/camera.dart' show CameraLensDirection;
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/config/api_config.dart';
 import '../../core/brand/alix_components.dart';
+import '../../core/camera/camera_capture_page.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/widgets/gradient_button.dart';
@@ -59,8 +61,8 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
 
   XFile? _regFront, _regBack, _vFront, _vSide, _vBack, _tFront, _tBack;
 
-  // Server'da mavjud rasmlar (prefill). Foydalanuvchi qayta tanlamasa, submit
-  // paytida shu URL'dan yuklab qayta yuboriladi.
+  // Server'da mavjud rasmlar (prefill). Foydalanuvchi qayta tanlamasa, rasm
+  // yuborilmaydi — server mavjud faylni saqlab qoladi.
   String? _regFrontUrl,
       _regBackUrl,
       _vFrontUrl,
@@ -113,15 +115,6 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
             int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
       }
     } catch (_) {}
-    return null;
-  }
-
-  /// Yangi tanlangan rasm bo'lsa — o'sha; aks holda mavjud URL'dan yuklab oladi.
-  Future<XFile?> _resolveImage(XFile? picked, String? url) async {
-    if (picked != null) return picked;
-    if (url != null && url.isNotEmpty) {
-      return DriverApi.instance.downloadToTempFile(url);
-    }
     return null;
   }
 
@@ -224,6 +217,16 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     return _picker.pickImage(source: src, imageQuality: 82);
   }
 
+  /// Mashina rasmlari — faqat kamera orqali (galereya yo'q), orqa kamera.
+  Future<XFile?> _shootVehicle(String hintKey) async {
+    if (kIsWeb) return _pick();
+    return captureWithCamera(context, lens: CameraLensDirection.back, hint: I18n.t(hintKey));
+  }
+
+  /// Admin rad etgan rasm qayta olinishi shart — mavjudi qabul qilinmaydi.
+  bool _needsNew(String field, XFile? picked) =>
+      picked == null && _fieldError(field) != null;
+
   void _toast(String m) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
@@ -235,14 +238,25 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       _toast(I18n.t('driver.reg.select_tariff'));
       return;
     }
-    // Har bir majburiy rasm: yangi tanlangan bo'lsa — o'sha; aks holda mavjud
-    // URL bo'lsa qabul qilinadi (submit paytida yuklab olinadi).
+    // Har bir majburiy rasm: yangi tanlangan bo'lsa — o'sha yuboriladi; aks
+    // holda serverdagi mavjud rasm saqlanib qoladi.
     if ((_regFront == null && (_regFrontUrl ?? '').isEmpty) ||
         (_regBack == null && (_regBackUrl ?? '').isEmpty) ||
         (_vFront == null && (_vFrontUrl ?? '').isEmpty) ||
         (_vSide == null && (_vSideUrl ?? '').isEmpty) ||
         (_vBack == null && (_vBackUrl ?? '').isEmpty)) {
       _toast(I18n.t('driver.reg.upload_5_required'));
+      return;
+    }
+    if (_needsNew('reg_certificate_front_img', _regFront) ||
+        _needsNew('reg_certificate_back_img', _regBack) ||
+        _needsNew('vehicle_front_img', _vFront) ||
+        _needsNew('vehicle_side_img', _vSide) ||
+        _needsNew('vehicle_back_img', _vBack) ||
+        (_hasTrailer &&
+            (_needsNew('trailer_reg_certificate_front_img', _tFront) ||
+                _needsNew('trailer_reg_certificate_back_img', _tBack)))) {
+      _toast(I18n.t('driver.reg.retake_rejected_msg'));
       return;
     }
     if (_hasTrailer &&
@@ -258,24 +272,6 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     }
     setState(() => _submitting = true);
     try {
-      final regFront = await _resolveImage(_regFront, _regFrontUrl);
-      final regBack = await _resolveImage(_regBack, _regBackUrl);
-      final vFront = await _resolveImage(_vFront, _vFrontUrl);
-      final vSide = await _resolveImage(_vSide, _vSideUrl);
-      final vBack = await _resolveImage(_vBack, _vBackUrl);
-      final tFront = _hasTrailer ? await _resolveImage(_tFront, _tFrontUrl) : null;
-      final tBack = _hasTrailer ? await _resolveImage(_tBack, _tBackUrl) : null;
-      if (regFront == null ||
-          regBack == null ||
-          vFront == null ||
-          vSide == null ||
-          vBack == null ||
-          (_hasTrailer && (tFront == null || tBack == null))) {
-        if (!mounted) return;
-        setState(() => _submitting = false);
-        _toast(I18n.t('driver.reg.upload_5_required'));
-        return;
-      }
       final r = await DriverApi.instance.registrationStep2(
         sessionId: widget.sessionId,
         tariffId: _tariff!.id,
@@ -289,13 +285,13 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
         hasTrailer: _hasTrailer,
         trailerPlateNumber: _hasTrailer ? _trailerPlate.text.trim() : null,
         projectOffertaAccepted: _offerta,
-        regCertFront: regFront,
-        regCertBack: regBack,
-        vehicleFront: vFront,
-        vehicleSide: vSide,
-        vehicleBack: vBack,
-        trailerRegFront: tFront,
-        trailerRegBack: tBack,
+        regCertFront: _regFront,
+        regCertBack: _regBack,
+        vehicleFront: _vFront,
+        vehicleSide: _vSide,
+        vehicleBack: _vBack,
+        trailerRegFront: _hasTrailer ? _tFront : null,
+        trailerRegBack: _hasTrailer ? _tBack : null,
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -495,12 +491,12 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                   decoration: InputDecoration(labelText: I18n.t('driver.reg.trailer_plate_required')),
                 ),
                 _errorNote('trailer_plate_number'),
-                _imgRow(I18n.t('driver.reg.img_trailer_front'), _tFront, _tFrontUrl, () async {
+                _imgRow(I18n.t('driver.reg.img_trailer_front'), _tFront, _tFrontUrl, field: 'trailer_reg_certificate_front_img', () async {
                   final f = await _pick();
                   if (f != null) setState(() => _tFront = f);
                 }),
                 _errorNote('trailer_reg_certificate_front_img'),
-                _imgRow(I18n.t('driver.reg.img_trailer_back'), _tBack, _tBackUrl, () async {
+                _imgRow(I18n.t('driver.reg.img_trailer_back'), _tBack, _tBackUrl, field: 'trailer_reg_certificate_back_img', () async {
                   final f = await _pick();
                   if (f != null) setState(() => _tBack = f);
                 }),
@@ -509,28 +505,28 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.images_section'), style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 14),
-              _imgRow(I18n.t('driver.reg.img_techpass_front'), _regFront, _regFrontUrl, () async {
+              _imgRow(I18n.t('driver.reg.img_techpass_front'), _regFront, _regFrontUrl, field: 'reg_certificate_front_img', () async {
                 final f = await _pick();
                 if (f != null) setState(() => _regFront = f);
               }),
               _errorNote('reg_certificate_front_img'),
-              _imgRow(I18n.t('driver.reg.img_techpass_back'), _regBack, _regBackUrl, () async {
+              _imgRow(I18n.t('driver.reg.img_techpass_back'), _regBack, _regBackUrl, field: 'reg_certificate_back_img', () async {
                 final f = await _pick();
                 if (f != null) setState(() => _regBack = f);
               }),
               _errorNote('reg_certificate_back_img'),
-              _imgRow(I18n.t('driver.reg.img_vehicle_front'), _vFront, _vFrontUrl, () async {
-                final f = await _pick();
+              _imgRow(I18n.t('driver.reg.img_vehicle_front'), _vFront, _vFrontUrl, field: 'vehicle_front_img', () async {
+                final f = await _shootVehicle('camera.hint_vehicle_front');
                 if (f != null) setState(() => _vFront = f);
               }),
               _errorNote('vehicle_front_img'),
-              _imgRow(I18n.t('driver.reg.img_vehicle_side'), _vSide, _vSideUrl, () async {
-                final f = await _pick();
+              _imgRow(I18n.t('driver.reg.img_vehicle_side'), _vSide, _vSideUrl, field: 'vehicle_side_img', () async {
+                final f = await _shootVehicle('camera.hint_vehicle_side');
                 if (f != null) setState(() => _vSide = f);
               }),
               _errorNote('vehicle_side_img'),
-              _imgRow(I18n.t('driver.reg.img_vehicle_back'), _vBack, _vBackUrl, () async {
-                final f = await _pick();
+              _imgRow(I18n.t('driver.reg.img_vehicle_back'), _vBack, _vBackUrl, field: 'vehicle_back_img', () async {
+                final f = await _shootVehicle('camera.hint_vehicle_back');
                 if (f != null) setState(() => _vBack = f);
               }),
               _errorNote('vehicle_back_img'),
@@ -561,11 +557,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     final errs = widget.rejects?.step2Errors;
     if (errs == null) return null;
     for (final e in errs) {
-      if (e is Map && e['field'] == field) {
-        final rt = e['reason_text']?.toString();
-        if (rt != null && rt.trim().isNotEmpty) return rt.trim();
-        return e['reason_code']?.toString();
-      }
+      if (e is Map && e['field'] == field) return driverRejectNote(e);
     }
     return null;
   }
@@ -594,9 +586,12 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     );
   }
 
-  Widget _imgRow(String label, XFile? f, String? existingUrl, VoidCallback onPick) {
+  Widget _imgRow(String label, XFile? f, String? existingUrl, VoidCallback onPick,
+      {required String field}) {
     final cs = Theme.of(context).colorScheme;
     final hasExisting = f == null && (existingUrl ?? '').isNotEmpty;
+    // Admin rad etgan mavjud rasm "tayyor" (✓) ko'rinmasin — qayta olish kerak.
+    final needsRetake = f == null && _fieldError(field) != null;
     const size = 52.0;
     const radius = AppPalette.radiusChip;
 
@@ -645,10 +640,12 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       child: AlixUploadRow(
         label: label,
         status: f?.name ??
-            (hasExisting
-                ? I18n.t('driver.reg.existing_image')
-                : I18n.t('driver.reg.not_picked')),
-        filled: f != null || hasExisting,
+            (needsRetake
+                ? I18n.t('driver.reg.needs_retake')
+                : hasExisting
+                    ? I18n.t('driver.reg.existing_image')
+                    : I18n.t('driver.reg.not_picked')),
+        filled: f != null || (hasExisting && !needsRetake),
         thumbnail: thumb,
         onPick: onPick,
       ),

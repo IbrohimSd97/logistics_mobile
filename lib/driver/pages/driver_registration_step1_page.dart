@@ -3,11 +3,13 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:camera/camera.dart' show CameraLensDirection;
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/config/api_config.dart';
 import '../../core/brand/alix_components.dart';
+import '../../core/camera/camera_capture_page.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/widgets/gradient_button.dart';
@@ -55,8 +57,8 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
   DateTime? _licIssuedDate;
   bool _prefilled = false;
 
-  // Server'da mavjud rasmlar (prefill). Foydalanuvchi qayta tanlamasa, submit
-  // paytida shu URL'dan yuklab qayta yuboriladi.
+  // Server'da mavjud rasmlar (prefill). Foydalanuvchi qayta tanlamasa, rasm
+  // yuborilmaydi — server mavjud faylni saqlab qoladi.
   String? _frontUrl;
   String? _backUrl;
   String? _selfieUrl;
@@ -169,13 +171,13 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     if (kIsWeb) {
       return _picker.pickImage(source: ImageSource.gallery, imageQuality: 82);
     }
-    // Selfi (guvohnoma bilan) — galereya tanlash mumkin emas, to'g'ridan old
-    // kamera ochiladi.
+    // Selfi (guvohnoma bilan) — galereya yo'q, faqat OLD kamera. Tizim
+    // kamerasi old kamerani kafolatlamaydi, shuning uchun ilova ichidagi kamera.
     if (selfie) {
-      return _picker.pickImage(
-        source: ImageSource.camera,
-        imageQuality: 82,
-        preferredCameraDevice: CameraDevice.front,
+      return captureWithCamera(
+        context,
+        lens: CameraLensDirection.front,
+        hint: I18n.t('camera.hint_selfie'),
       );
     }
     final src = await showModalBottomSheet<ImageSource>(
@@ -199,21 +201,12 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       ),
     );
     if (src == null) return null;
-    return _picker.pickImage(
-      source: src,
-      imageQuality: 82,
-      preferredCameraDevice: selfie ? CameraDevice.front : CameraDevice.rear,
-    );
+    return _picker.pickImage(source: src, imageQuality: 82);
   }
 
-  /// Yangi tanlangan rasm bo'lsa — o'sha; aks holda mavjud URL'dan yuklab oladi.
-  Future<XFile?> _resolveImage(XFile? picked, String? url) async {
-    if (picked != null) return picked;
-    if (url != null && url.isNotEmpty) {
-      return DriverApi.instance.downloadToTempFile(url);
-    }
-    return null;
-  }
+  /// Admin rad etgan rasm qayta olinishi shart — mavjudi qabul qilinmaydi.
+  bool _needsNew(String field, XFile? picked) =>
+      picked == null && _fieldError(field) != null;
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -225,26 +218,22 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       _toast(I18n.t('driver.reg.license_issued_required_msg'));
       return;
     }
-    // Har bir rasm: yangi tanlangan bo'lsa — o'sha; aks holda mavjud URL bo'lsa
-    // qabul qilinadi (submit paytida yuklab olinadi). Ikkalasi ham yo'q bo'lsa —
-    // xatolik.
+    // Har bir rasm: yangi tanlangan bo'lsa — o'sha yuboriladi; aks holda
+    // serverdagi mavjud rasm saqlanib qoladi. Ikkalasi ham yo'q bo'lsa — xato.
     if ((_front == null && (_frontUrl ?? '').isEmpty) ||
         (_back == null && (_backUrl ?? '').isEmpty) ||
         (_selfie == null && (_selfieUrl ?? '').isEmpty)) {
       _toast(I18n.t('driver.reg.upload_3_msg'));
       return;
     }
+    if (_needsNew('car_license_front_img', _front) ||
+        _needsNew('car_license_back_img', _back) ||
+        _needsNew('car_license_selfie_img', _selfie)) {
+      _toast(I18n.t('driver.reg.retake_rejected_msg'));
+      return;
+    }
     setState(() => _submitting = true);
     try {
-      final front = await _resolveImage(_front, _frontUrl);
-      final back = await _resolveImage(_back, _backUrl);
-      final selfie = await _resolveImage(_selfie, _selfieUrl);
-      if (front == null || back == null || selfie == null) {
-        if (!mounted) return;
-        setState(() => _submitting = false);
-        _toast(I18n.t('driver.reg.upload_3_msg'));
-        return;
-      }
       final r = await DriverApi.instance.registrationStep1(
         lastName: _last.text.trim(),
         firstName: _first.text.trim(),
@@ -254,9 +243,9 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
         carLicenseSeries: _licSeries.text.trim(),
         carLicenseNumber: _licNumber.text.trim(),
         carLicenseIssuedDate: _fmtDate(_licIssuedDate!),
-        carLicenseFront: front,
-        carLicenseBack: back,
-        carLicenseSelfie: selfie,
+        carLicenseFront: _front,
+        carLicenseBack: _back,
+        carLicenseSelfie: _selfie,
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -290,11 +279,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     final errs = widget.rejects?.step1Errors;
     if (errs == null) return null;
     for (final e in errs) {
-      if (e is Map && e['field'] == field) {
-        final rt = e['reason_text']?.toString();
-        if (rt != null && rt.trim().isNotEmpty) return rt.trim();
-        return e['reason_code']?.toString();
-      }
+      if (e is Map && e['field'] == field) return driverRejectNote(e);
     }
     return null;
   }
@@ -488,20 +473,17 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
               Text(I18n.t('driver.reg.images_section'),
                   style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
-              _imgRow(I18n.t('driver.reg.img_license_front'), _front, _frontUrl,
-                  () async {
+              _imgRow(I18n.t('driver.reg.img_license_front'), _front, _frontUrl, field: 'car_license_front_img', () async {
                 final f = await _pickImage(selfie: false);
                 if (f != null) setState(() => _front = f);
               }),
               _errorNote('car_license_front_img'),
-              _imgRow(I18n.t('driver.reg.img_license_back'), _back, _backUrl,
-                  () async {
+              _imgRow(I18n.t('driver.reg.img_license_back'), _back, _backUrl, field: 'car_license_back_img', () async {
                 final f = await _pickImage(selfie: false);
                 if (f != null) setState(() => _back = f);
               }),
               _errorNote('car_license_back_img'),
-              _imgRow(I18n.t('driver.reg.img_license_selfie'), _selfie, _selfieUrl,
-                  () async {
+              _imgRow(I18n.t('driver.reg.img_license_selfie'), _selfie, _selfieUrl, field: 'car_license_selfie_img', () async {
                 final f = await _pickImage(selfie: true);
                 if (f != null) setState(() => _selfie = f);
               }),
@@ -520,9 +502,12 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     );
   }
 
-  Widget _imgRow(String label, XFile? f, String? existingUrl, VoidCallback onPick) {
+  Widget _imgRow(String label, XFile? f, String? existingUrl, VoidCallback onPick,
+      {required String field}) {
     final cs = Theme.of(context).colorScheme;
     final hasExisting = f == null && (existingUrl ?? '').isNotEmpty;
+    // Admin rad etgan mavjud rasm "tayyor" (✓) ko'rinmasin — qayta olish kerak.
+    final needsRetake = f == null && _fieldError(field) != null;
     const size = 52.0;
     const radius = AppPalette.radiusChip;
 
@@ -570,10 +555,12 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       child: AlixUploadRow(
         label: label,
         status: f?.name ??
-            (hasExisting
-                ? I18n.t('driver.reg.existing_image')
-                : I18n.t('driver.reg.not_picked')),
-        filled: f != null || hasExisting,
+            (needsRetake
+                ? I18n.t('driver.reg.needs_retake')
+                : hasExisting
+                    ? I18n.t('driver.reg.existing_image')
+                    : I18n.t('driver.reg.not_picked')),
+        filled: f != null || (hasExisting && !needsRetake),
         thumbnail: thumb,
         onPick: onPick,
       ),

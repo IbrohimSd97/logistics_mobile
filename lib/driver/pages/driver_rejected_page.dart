@@ -214,21 +214,9 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
 
   String _fieldLabel(String field) => _fieldLabels[field] ?? _humanize(field);
 
-  /// reason_code'ni (masalan `blurry_image`) o'qiladigan sababga o'giradi.
-  static const Map<String, String> _reasonLabels = {
-    'blurry_image': 'Rasm noaniq',
-    'wrong_document': 'Noto‘g‘ri hujjat',
-    'unreadable': 'O‘qib bo‘lmaydi',
-    'mismatch': 'Ma’lumotlar mos kelmaydi',
-    'expired': 'Muddati o‘tgan',
-    'invalid': 'Noto‘g‘ri',
-    'missing': 'Yetishmaydi',
-    'other': 'Boshqa sabab',
-  };
-
   String _reasonLabel(String? code) {
     if (code == null || code.trim().isEmpty) return I18n.t('driver.rejected.reason_generic');
-    return _reasonLabels[code] ?? _humanize(code);
+    return driverRejectReasonLabel(code);
   }
 
   @override

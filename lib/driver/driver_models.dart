@@ -1,3 +1,5 @@
+import '../core/i18n/i18n.dart';
+
 int? _int(Object? v) {
   if (v == null) return null;
   if (v is int) return v;
@@ -108,9 +110,26 @@ class DriverRegistrationRejects {
   }
 }
 
+/// Admin rad etish sababi kodini (`blurry_image`, ...) joriy tilda
+/// o'qiladigan matnga o'giradi; noma'lum kod — kodning o'zi (bo'shliq bilan).
+String driverRejectReasonLabel(String code) {
+  final key = 'driver.reject_reason.$code';
+  final label = I18n.t(key);
+  return label == key ? code.replaceAll('_', ' ') : label;
+}
+
+/// Admin belgilagan xatolik matni: izoh yozilgan bo'lsa — o'sha, aks holda
+/// sabab kodi tarjimasi.
+String? driverRejectNote(Map<dynamic, dynamic> e) {
+  final text = e['reason_text']?.toString().trim();
+  if (text != null && text.isNotEmpty) return text;
+  final code = e['reason_code']?.toString().trim();
+  return (code == null || code.isEmpty) ? null : driverRejectReasonLabel(code);
+}
+
 /// Rad etilgan haydovchining oldin yuborgan registratsiya qiymatlari (Driver +
 /// Vehicle). "Xatolarni tuzatish" oqimida step maydonlarini oldindan to'ldirish
-/// uchun. Rasm maydonlari `*_img_url` — nisbiy `/storage/...` yo'l.
+/// uchun. Rasm maydonlari `*_img_url` — to'liq, muddatli imzolangan `/media/...` URL.
 class DriverRegistrationData {
   const DriverRegistrationData({this.step1, this.step2, this.step3});
 
