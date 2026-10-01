@@ -25,13 +25,24 @@ val yandexMapkitKey: String = run {
         ?: "").trim()
 }
 
+/**
+ * Play upload kaliti — `android/key.properties` (git'ga kirmaydi):
+ *   storeFile=/abs/path/alix-upload.jks, storePassword, keyAlias, keyPassword
+ * Fayl bo'lmasa release debug kaliti bilan imzolanadi (lokal `flutter run
+ * --release` uchun) — bunday build Play'ga yuklanmaydi.
+ */
+val keystoreProperties = Properties().apply {
+    rootProject.file("key.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+val hasUploadKey = keystoreProperties.getProperty("storeFile") != null
+
 android {
     buildFeatures {
         buildConfig = true
     }
 
     ndkVersion = "27.0.12077973"
-    namespace = "com.example.mening_ilovam"
+    namespace = "uz.alix.app"
     compileSdk = flutter.compileSdkVersion
 
     compileOptions {
@@ -44,10 +55,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.mening_ilovam"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "uz.alix.app"
         // Yandex MapKit minSdk 26 (Android 8.0+) talab qiladi.
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
@@ -57,11 +65,24 @@ android {
         buildConfigField("String", "YANDEX_MAPKIT_KEY", "\"$yandexMapkitKey\"")
     }
 
+    signingConfigs {
+        if (hasUploadKey) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasUploadKey) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

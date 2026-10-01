@@ -1,4 +1,4 @@
-package com.example.mening_ilovam
+package uz.alix.app
 
 import android.app.Application
 import com.yandex.mapkit.MapKitFactory

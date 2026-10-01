@@ -1,4 +1,4 @@
-package com.example.mening_ilovam
+package uz.alix.app
 
 import io.flutter.embedding.android.FlutterActivity
 
