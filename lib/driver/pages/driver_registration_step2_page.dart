@@ -50,14 +50,9 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   final _trailerPlate = TextEditingController();
 
   DateTime? _regIssuedDate;
-  DriverTariffItem? _tariff;
-  List<DriverTariffItem> _tariffs = [];
-  bool _loadingTariffs = true;
-  String? _tariffsError;
 
   bool _hasTrailer = false;
   bool _offerta = false;
-  bool _tariffPrefilled = false;
 
   XFile? _regFront, _regBack, _vFront, _vSide, _vBack, _tFront, _tBack;
 
@@ -77,8 +72,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   @override
   void initState() {
     super.initState();
-    // Prefill: server (data.step2) qiymatlaridan. Tarif tariflar yuklangach
-    // (_loadTariffs ichida) tanlanadi.
+    // Prefill: server (data.step2) qiymatlaridan.
     final d = widget.data?.step2;
     if (d != null) {
       _setText(_vehicleName, widget.data!.s2('vehicle_name'));
@@ -99,7 +93,6 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       _tFrontUrl = widget.data!.s2('trailer_reg_certificate_front_img_url');
       _tBackUrl = widget.data!.s2('trailer_reg_certificate_back_img_url');
     }
-    _loadTariffs();
   }
 
   static void _setText(TextEditingController c, String? v) {
@@ -132,47 +125,6 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
 
   static String _fmtDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-  Future<void> _loadTariffs() async {
-    setState(() {
-      _loadingTariffs = true;
-      _tariffsError = null;
-    });
-    try {
-      final list = await DriverApi.instance.tariffsList();
-      if (!mounted) return;
-      setState(() {
-        _tariffs = list;
-        _loadingTariffs = false;
-        _tariff = list.isNotEmpty ? list.first : null;
-        // Prefill: oldin tanlangan tarifni ID bo'yicha topamiz (bir marta).
-        if (!_tariffPrefilled && widget.data?.step2 != null) {
-          final id = widget.data!.i2('tariff_id');
-          if (id != null) {
-            for (final t in list) {
-              if (t.id == id) {
-                _tariff = t;
-                break;
-              }
-            }
-          }
-          _tariffPrefilled = true;
-        }
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loadingTariffs = false;
-        _tariffsError = e.firstFieldMessage;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loadingTariffs = false;
-        _tariffsError = I18n.t('driver.reg.network_error_label', {'msg': '$e'});
-      });
-    }
-  }
 
   Future<void> _pickIssued() async {
     // Sana tanlashdan oldin klaviaturani yopamiz.
@@ -234,10 +186,6 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_tariff == null) {
-      _toast(I18n.t('driver.reg.select_tariff'));
-      return;
-    }
     // Har bir majburiy rasm: yangi tanlangan bo'lsa — o'sha yuboriladi; aks
     // holda serverdagi mavjud rasm saqlanib qoladi.
     if ((_regFront == null && (_regFrontUrl ?? '').isEmpty) ||
@@ -274,7 +222,6 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     try {
       final r = await DriverApi.instance.registrationStep2(
         sessionId: widget.sessionId,
-        tariffId: _tariff!.id,
         vehicleName: _vehicleName.text.trim(),
         plateNumber: _plate.text.trim(),
         color: _color.text.trim().isEmpty ? null : _color.text.trim(),
@@ -322,20 +269,6 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     return Scaffold(
       appBar: AppBar(
         title: Text(I18n.t('driver.reg.step2_appbar')),
-        actions: [
-          IconButton(
-            tooltip: I18n.t('common.refresh'),
-            icon: _loadingTariffs
-                ? const SizedBox(
-                    width: 18, height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh_rounded),
-            // Tariflar ro'yxatini qaytadan tortib olamiz (tanlangan tarif saqlanadi
-            // agar yangi ro'yxatda ham mavjud bo'lsa). Form maydonlari tegmaydi.
-            onPressed: (_submitting || _loadingTariffs) ? null : _loadTariffs,
-          ),
-        ],
       ),
       body: AbsorbPointer(
         absorbing: _submitting,
@@ -351,28 +284,6 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                 label: I18n.t('driver.reg.step_of', {'n': 2, 'total': 3}),
               ),
               const SizedBox(height: 20),
-              if (_loadingTariffs)
-                const LinearProgressIndicator(minHeight: 3)
-              else if (_tariffsError != null)
-                AlixBanner(
-                  message: _tariffsError!,
-                  icon: Icons.error_outline_rounded,
-                  action: TextButton(
-                    onPressed: _loadTariffs,
-                    child: Text(I18n.t('common.retry_short')),
-                  ),
-                )
-              else
-                DropdownMenu<DriverTariffItem>(
-                  initialSelection: _tariff,
-                  expandedInsets: EdgeInsets.zero,
-                  label: Text(I18n.t('driver.reg.tariff_required')),
-                  dropdownMenuEntries: _tariffs
-                      .map((t) => DropdownMenuEntry(value: t, label: t.name))
-                      .toList(),
-                  onSelected: (v) => setState(() => _tariff = v),
-                ),
-              const SizedBox(height: 12),
               TextFormField(
                 controller: _vehicleName,
                 decoration: InputDecoration(labelText: I18n.t('driver.reg.vehicle_name_required'), hintText: I18n.t('driver.reg.vehicle_name_hint')),

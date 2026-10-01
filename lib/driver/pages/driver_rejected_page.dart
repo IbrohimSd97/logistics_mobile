@@ -184,35 +184,13 @@ class _DriverRejectedPageState extends State<DriverRejectedPage>
   String _humanize(String key) =>
       key.replaceAll('_', ' ').replaceFirstMapped(RegExp(r'^[a-z]'), (m) => m[0]!.toUpperCase());
 
-  /// Backend maydon nomini (masalan `car_license_selfie_img`) o'qiladigan
-  /// nomga o'giradi. Noma'lum maydon — umumiy humanize.
-  static const Map<String, String> _fieldLabels = {
-    'last_name': 'Familiya',
-    'first_name': 'Ism',
-    'middle_name': 'Otasining ismi',
-    'birth_date': 'Tug‘ilgan sana',
-    'national_id': 'JSHSHIR (INN)',
-    'car_license_series': 'Guvohnoma seriyasi',
-    'car_license_number': 'Guvohnoma raqami',
-    'car_license_issued_date': 'Guvohnoma berilgan sana',
-    'car_license_front_img': 'Guvohnoma — old tomon',
-    'car_license_back_img': 'Guvohnoma — orqa tomon',
-    'car_license_selfie_img': 'Guvohnoma bilan selfi',
-    'vehicle_name': 'Avtomobil nomi',
-    'plate_number': 'Davlat raqami',
-    'reg_certificate_series': 'Texpasport seriyasi',
-    'reg_certificate_number': 'Texpasport raqami',
-    'reg_certificate_issued_date': 'Texpasport sanasi',
-    'reg_certificate_front_img': 'Texpasport — old',
-    'reg_certificate_back_img': 'Texpasport — orqa',
-    'vehicle_front_img': 'Avtomobil — old',
-    'vehicle_side_img': 'Avtomobil — yon',
-    'vehicle_back_img': 'Avtomobil — orqa',
-    'ownership_contract_img': 'Mulkchilik hujjati',
-    'legal_certificate_img': 'Yuridik hujjat',
-  };
-
-  String _fieldLabel(String field) => _fieldLabels[field] ?? _humanize(field);
+  /// Backend maydon nomini (masalan `car_license_selfie_img`) joriy tilda
+  /// o'qiladigan nomga o'giradi. Noma'lum maydon — umumiy humanize.
+  String _fieldLabel(String field) {
+    final key = 'driver.field.$field';
+    final label = I18n.t(key);
+    return label == key ? _humanize(field) : label;
+  }
 
   String _reasonLabel(String? code) {
     if (code == null || code.trim().isEmpty) return I18n.t('driver.rejected.reason_generic');

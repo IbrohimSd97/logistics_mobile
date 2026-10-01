@@ -109,18 +109,6 @@ class DriverApi {
     return list.map(AvtoparkItem.fromMap).whereType<AvtoparkItem>().toList();
   }
 
-  /// GET /api/driver/tariff/lists (no auth required by routes)
-  Future<List<DriverTariffItem>> tariffsList() async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/api/driver/tariff/lists');
-    final res = await http.get(url, headers: {
-      'Accept': 'application/json',
-      'Accept-Language': I18n.instance.code,
-    });
-    final map = _decode(res);
-    final list = mapListFrom(map['data']);
-    return list.map(DriverTariffItem.fromMap).whereType<DriverTariffItem>().toList();
-  }
-
   // ────────────────────────────── registration steps ──────────────────────────────
 
   /// POST /api/driver/registration/step1 (auth.temp, multipart)
@@ -168,7 +156,6 @@ class DriverApi {
   /// POST /api/driver/registration/step2 (auth.temp, multipart)
   Future<DriverStepResult> registrationStep2({
     required String sessionId,
-    required int tariffId,
     required String vehicleName,
     required String plateNumber,
     String? color,
@@ -192,7 +179,6 @@ class DriverApi {
     final req = http.MultipartRequest('POST', uri)
       ..headers.addAll(_multiAuth(token))
       ..fields['session_id'] = sessionId
-      ..fields['tariff_id'] = '$tariffId'
       ..fields['vehicle_name'] = vehicleName
       ..fields['plate_number'] = plateNumber
       ..fields['capacity_kg'] = capacityKg

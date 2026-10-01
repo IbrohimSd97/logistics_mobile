@@ -67,7 +67,6 @@ void main() {
   test('step2: unchanged vehicle photos are omitted', () async {
     await withClient(() => DriverApi.instance.registrationStep2(
           sessionId: 's-1',
-          tariffId: 1,
           vehicleName: 'Isuzu',
           plateNumber: '01A123BC',
           capacityKg: '5000',

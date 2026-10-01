@@ -203,29 +203,6 @@ class AvtoparkItem {
     );
   }
 }
-
-class DriverTariffItem {
-  const DriverTariffItem({
-    required this.id,
-    required this.name,
-    this.pricePerKm,
-  });
-
-  final int id;
-  final String name;
-  final String? pricePerKm;
-
-  static DriverTariffItem? fromMap(Map<String, dynamic> m) {
-    final id = _int(m['id']);
-    if (id == null) return null;
-    return DriverTariffItem(
-      id: id,
-      name: m['name']?.toString() ?? '',
-      pricePerKm: m['price_per_km']?.toString(),
-    );
-  }
-}
-
 class CargoTypeMini {
   const CargoTypeMini({
     required this.id,
