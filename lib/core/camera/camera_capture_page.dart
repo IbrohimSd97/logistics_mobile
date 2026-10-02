@@ -47,6 +47,10 @@ class _CameraCapturePageState extends State<CameraCapturePage>
   String? _error;
   bool _busy = false;
 
+  /// Kamera ochilmoqda — ruxsat oynasi ilovani "nofaol" holatga o'tkazadi va
+  /// qaytganda ikkinchi `_init` boshlanib, ikkita kontroller ochilmasin.
+  bool _initializing = false;
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +70,7 @@ class _CameraCapturePageState extends State<CameraCapturePage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final c = _controller;
+    if (_initializing) return;
     if (state == AppLifecycleState.inactive) {
       _controller = null;
       c?.dispose();
@@ -77,6 +82,8 @@ class _CameraCapturePageState extends State<CameraCapturePage>
   }
 
   Future<void> _init() async {
+    if (_initializing) return;
+    _initializing = true;
     try {
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
@@ -110,6 +117,8 @@ class _CameraCapturePageState extends State<CameraCapturePage>
       );
     } catch (_) {
       _fail(I18n.t('camera.open_failed'));
+    } finally {
+      _initializing = false;
     }
   }
 
