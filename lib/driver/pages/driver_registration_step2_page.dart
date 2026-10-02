@@ -16,6 +16,7 @@ import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/offerta_link.dart';
 import '../driver_api.dart';
 import '../driver_models.dart';
+import '../plate_number.dart';
 import 'driver_registration_step3_page.dart';
 
 class DriverRegistrationStep2Page extends StatefulWidget {
@@ -43,6 +44,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   final _formKey = GlobalKey<FormState>();
   final _vehicleName = TextEditingController();
   final _plate = TextEditingController();
+  PlateKind _plateKind = PlateKind.uzIndividual;
   final _color = TextEditingController();
   final _capacityKg = TextEditingController();
   final _regSeries = TextEditingController();
@@ -77,6 +79,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     if (d != null) {
       _setText(_vehicleName, widget.data!.s2('vehicle_name'));
       _setText(_plate, widget.data!.s2('plate_number'));
+      _plateKind = PlateKind.detect(_plate.text);
       _setText(_color, widget.data!.s2('color'));
       _setText(_capacityKg, widget.data!.s2('capacity_kg'));
       _setText(_regSeries, widget.data!.s2('reg_certificate_series'));
@@ -179,6 +182,20 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   bool _needsNew(String field, XFile? picked) =>
       picked == null && _fieldError(field) != null;
 
+  /// Raqam turi o'zgarganda mavjud matnni yangi niqobga moslaymiz (mos
+  /// kelmagan belgilar tushib qoladi).
+  void _setPlateKind(PlateKind k) {
+    if (k == _plateKind) return;
+    final formatted = k.formatter.formatEditUpdate(
+      TextEditingValue.empty,
+      TextEditingValue(text: _plate.text),
+    );
+    setState(() {
+      _plateKind = k;
+      _plate.value = formatted;
+    });
+  }
+
   void _toast(String m) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
@@ -223,7 +240,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       final r = await DriverApi.instance.registrationStep2(
         sessionId: widget.sessionId,
         vehicleName: _vehicleName.text.trim(),
-        plateNumber: _plate.text.trim(),
+        plateNumber: PlateKind.normalize(_plate.text, _plateKind),
         color: _color.text.trim().isEmpty ? null : _color.text.trim(),
         capacityKg: _capacityKg.text.trim(),
         regCertSeries: _regSeries.text.trim(),
@@ -291,13 +308,40 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
               ),
               _errorNote('vehicle_name'),
               const SizedBox(height: 14),
+              Text(I18n.t('driver.reg.plate_kind_label'),
+                  style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final k in PlateKind.values)
+                    ChoiceChip(
+                      label: Text(I18n.t('driver.reg.plate_kind_${k.name}')),
+                      selected: _plateKind == k,
+                      onSelected: (_) => _setPlateKind(k),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
               TextFormField(
+                // Tur o'zgarsa niqob ham o'zgaradi — maydon qayta quriladi.
+                key: ValueKey(_plateKind),
                 controller: _plate,
                 textCapitalization: TextCapitalization.characters,
-                // Davlat raqami maskasi: 01 A 123 BC (2 raqam · 1 harf · 3 raqam · 2 harf).
-                inputFormatters: [_UzPlateFormatter()],
-                decoration: InputDecoration(labelText: I18n.t('driver.reg.plate_required'), hintText: I18n.t('driver.reg.plate_hint')),
-                validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
+                inputFormatters: [_plateKind.formatter],
+                decoration: InputDecoration(
+                  labelText: I18n.t('driver.reg.plate_required'),
+                  hintText: I18n.t('driver.reg.plate_hint_${_plateKind.name}'),
+                  helperText: _plateKind == PlateKind.other
+                      ? I18n.t('driver.reg.plate_other_help')
+                      : null,
+                  helperMaxLines: 3,
+                ),
+                validator: (v) {
+                  final key = _plateKind.validate(v ?? '');
+                  return key == null ? null : I18n.t(key);
+                },
               ),
               _errorNote('plate_number'),
               const SizedBox(height: 14),
@@ -565,31 +609,4 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
 
   static String _fullUrl(String urlOrPath) =>
       urlOrPath.startsWith('http') ? urlOrPath : '${ApiConfig.baseUrl}$urlOrPath';
-}
-
-class _UzPlateFormatter extends TextInputFormatter {
-  bool _isDigitPos(int i) => i <= 1 || (i >= 3 && i <= 5);
-
-  @override
-  TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-    final raw =
-        newValue.text.toUpperCase().replaceAll(RegExp('[^A-Z0-9]'), '');
-    final buf = StringBuffer();
-    for (var i = 0; i < raw.length && buf.length < 8; i++) {
-      final c = raw[i];
-      final isDigit = RegExp('[0-9]').hasMatch(c);
-      final pos = buf.length;
-      if (_isDigitPos(pos)) {
-        if (isDigit) buf.write(c);
-      } else {
-        if (!isDigit) buf.write(c);
-      }
-    }
-    final text = buf.toString();
-    return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-  }
 }
