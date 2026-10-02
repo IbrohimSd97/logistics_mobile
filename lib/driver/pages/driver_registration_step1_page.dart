@@ -12,6 +12,7 @@ import '../../core/brand/alix_components.dart';
 import '../../core/camera/camera_capture_page.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/util/keyboard.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../driver_api.dart';
 import '../driver_models.dart';
@@ -137,10 +138,10 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
   static String _fmtDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  Future<void> _pickBirth() async {
-    // Sana tanlashdan oldin klaviaturani yopamiz — aks holda oldingi input
-    // (otasining ismi) fokusda qolib, klaviatura ochilib turadi.
-    FocusScope.of(context).unfocus();
+  Future<void> _pickBirth() =>
+      withoutKeyboard(() => _pickBirthRaw());
+
+  Future<void> _pickBirthRaw() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -153,8 +154,10 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     setState(() => _birthDate = picked);
   }
 
-  Future<void> _pickLicIssued() async {
-    FocusScope.of(context).unfocus();
+  Future<void> _pickLicIssued() =>
+      withoutKeyboard(() => _pickLicIssuedRaw());
+
+  Future<void> _pickLicIssuedRaw() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -167,7 +170,10 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     setState(() => _licIssuedDate = picked);
   }
 
-  Future<XFile?> _pickImage({required bool selfie}) async {
+  Future<XFile?> _pickImage({required bool selfie}) =>
+      withoutKeyboard(() => _pickImageRaw(selfie: selfie));
+
+  Future<XFile?> _pickImageRaw({required bool selfie}) async {
     if (kIsWeb) {
       return _picker.pickImage(source: ImageSource.gallery, imageQuality: 82);
     }

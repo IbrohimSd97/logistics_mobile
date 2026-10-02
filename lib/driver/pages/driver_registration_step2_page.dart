@@ -12,6 +12,7 @@ import '../../core/brand/alix_components.dart';
 import '../../core/camera/camera_capture_page.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/util/keyboard.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/offerta_link.dart';
 import '../driver_api.dart';
@@ -129,9 +130,10 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   static String _fmtDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  Future<void> _pickIssued() async {
-    // Sana tanlashdan oldin klaviaturani yopamiz.
-    FocusScope.of(context).unfocus();
+  Future<void> _pickIssued() =>
+      withoutKeyboard(() => _pickIssuedRaw());
+
+  Future<void> _pickIssuedRaw() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -144,7 +146,10 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     setState(() => _regIssuedDate = picked);
   }
 
-  Future<XFile?> _pick() async {
+  Future<XFile?> _pick() =>
+      withoutKeyboard(() => _pickRaw());
+
+  Future<XFile?> _pickRaw() async {
     if (kIsWeb) {
       return _picker.pickImage(source: ImageSource.gallery, imageQuality: 82);
     }
@@ -175,7 +180,9 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   /// Mashina rasmlari — faqat kamera orqali (galereya yo'q), orqa kamera.
   Future<XFile?> _shootVehicle(String hintKey) async {
     if (kIsWeb) return _pick();
-    return captureWithCamera(context, lens: CameraLensDirection.back, hint: I18n.t(hintKey));
+    return withoutKeyboard(
+      () => captureWithCamera(context, lens: CameraLensDirection.back, hint: I18n.t(hintKey)),
+    );
   }
 
   /// Admin rad etgan rasm qayta olinishi shart — mavjudi qabul qilinmaydi.
