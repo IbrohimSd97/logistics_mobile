@@ -7,8 +7,8 @@ class AppLinks {
   AppLinks._();
 
   /// Ilova (buyurtmachi/haydovchi) ommaviy offertasi.
-  static const String offertaUrl = 'https://alix.uz/offerta';
+  static const String offertaUrl = 'https://admin.alix.uz/offerta';
 
   /// Avtopark (fleet) offertasi — haydovchi avtoparkka biriktirilganda.
-  static const String avtoparkOffertaUrl = 'https://alix.uz/offerta/avtopark';
+  static const String avtoparkOffertaUrl = 'https://admin.alix.uz/offerta/avtopark';
 }
