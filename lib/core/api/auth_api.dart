@@ -73,12 +73,17 @@ class AuthApi {
         'Accept-Language': I18n.instance.code,
       };
 
-  Future<OtpSendResult> otpSend(String phoneNumber) async {
+  /// [countryIso] — raqam davlati (`UZ`, `KZ`, …); backend xorijiy raqamga
+  /// SMS yuborishda ishlatadi.
+  Future<OtpSendResult> otpSend(String phoneNumber, {String? countryIso}) async {
     final url = Uri.parse('${ApiConfig.baseUrl}/api/auth/otp-send');
     final res = await http.post(
       url,
       headers: _headers,
-      body: jsonEncode({'phone_number': phoneNumber}),
+      body: jsonEncode({
+        'phone_number': phoneNumber,
+        if (countryIso != null) 'country_code': countryIso,
+      }),
     );
     final map = decodeJsonEnvelopeOrThrow(res);
 

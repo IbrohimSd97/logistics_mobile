@@ -14,7 +14,7 @@ import '../core/brand/alix_logo.dart';
 import '../core/theme/app_palette.dart';
 import '../core/widgets/gradient_button.dart';
 import '../core/util/network_error_message.dart';
-import '../core/util/phone_util.dart';
+import '../core/phone/phone_country.dart';
 import '../driver/driver_api.dart';
 import '../driver/driver_models.dart';
 import '../driver/pages/driver_failed_page.dart';
@@ -51,6 +51,9 @@ class _LoginScreenState extends State<LoginScreen>
   String? _autoSubmittedCode;
 
   String? _phoneApi;
+
+  /// Telefon raqami davlati — kodni (+998, +7, …) shu belgilaydi.
+  PhoneCountry _country = PhoneCountry.uz;
   String? _devCodeHint;
   int? _otpExpiresSec;
   String? _tempToken;
@@ -105,6 +108,30 @@ class _LoginScreenState extends State<LoginScreen>
     _listeningForSms = false;
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     SmartAuth.instance.removeUserConsentApiListener();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    PhoneCountry.loadLast().then((c) {
+      if (mounted && c.iso != _country.iso) setState(() => _country = c);
+    });
+  }
+
+  Future<void> _chooseCountry() async {
+    final c = await showPhoneCountryPicker(context, _country);
+    if (c == null || !mounted || c.iso == _country.iso) return;
+    // Yangi davlat uzunligiga moslaymiz (ortiqcha raqamlar tushib qoladi).
+    final formatted = c.formatter.formatEditUpdate(
+      TextEditingValue.empty,
+      TextEditingValue(text: _phoneController.text),
+    );
+    setState(() {
+      _country = c;
+      _phoneController.value = formatted;
+    });
+    unawaited(PhoneCountry.saveLast(c));
+    _phoneFocus.requestFocus();
   }
 
   @override
@@ -205,9 +232,12 @@ class _LoginScreenState extends State<LoginScreen>
   String? _validatePhoneInput() {
     final raw = _phoneController.text.trim();
     if (raw.isEmpty) return I18n.t('auth.enter_phone_number');
-    final api = normalizeUzbekPhoneForApi(raw);
-    if (api.length < 12) {
-      return I18n.t('auth.full_uz_phone_required');
+    if (!_country.isComplete(raw)) {
+      final c = _country;
+      return I18n.t('auth.phone_incomplete', {
+        'country': c.name,
+        'n': c.minLen == c.maxLen ? '${c.minLen}' : '${c.minLen}–${c.maxLen}',
+      });
     }
     return null;
   }
@@ -218,7 +248,7 @@ class _LoginScreenState extends State<LoginScreen>
       _toast(err, error: true);
       return;
     }
-    final apiPhone = normalizeUzbekPhoneForApi(_phoneController.text);
+    final apiPhone = _country.toApi(_phoneController.text);
 
     setState(() {
       _loading = true;
@@ -231,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen>
       _autoSubmittedCode = null;
     });
     try {
-      final r = await _auth.otpSend(apiPhone);
+      final r = await _auth.otpSend(apiPhone, countryIso: _country.iso);
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -528,14 +558,14 @@ class _LoginScreenState extends State<LoginScreen>
                           fontWeight: FontWeight.w600,
                         ),
                         cursorColor: AppPalette.orange,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[\d+\s\-]')),
-                          _MaxDigitsFormatter(12),
-                        ],
+                        inputFormatters: [_country.formatter],
                         decoration: _fieldDecoration(
                           I18n.t('auth.phone_number'),
-                          I18n.t('auth.phone_hint'),
-                          prefix: const Icon(Icons.phone_iphone_rounded),
+                          _country.hint,
+                          prefix: _CountryCodeButton(
+                            country: _country,
+                            onTap: _otpSent ? null : _chooseCountry,
+                          ),
                         ),
                         onFieldSubmitted: (_) =>
                             _otpSent ? _otpFocus.requestFocus() : _sendOtp(),
@@ -718,17 +748,37 @@ class _BrandBackdropPainter extends CustomPainter {
 }
 
 /// Max N ta **raqam** kiritishga ruxsat beradi (+/spaces/dashes hisobga olinmaydi).
-class _MaxDigitsFormatter extends TextInputFormatter {
-  _MaxDigitsFormatter(this.maxDigits);
+/// Telefon maydonidagi davlat tugmasi: bayroq + kod, bosilsa ro'yxat.
+class _CountryCodeButton extends StatelessWidget {
+  const _CountryCodeButton({required this.country, required this.onTap});
 
-  final int maxDigits;
+  final PhoneCountry country;
+  final VoidCallback? onTap;
 
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length > maxDigits) {
-      return oldValue;
-    }
-    return newValue;
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: I18n.t('auth.choose_country'),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(country.flag, style: const TextStyle(fontSize: 20)),
+              const SizedBox(width: 6),
+              Text('+${country.dial}',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: cs.onSurface)),
+              if (onTap != null) Icon(Icons.arrow_drop_down_rounded, color: cs.onSurfaceVariant),
+              const SizedBox(width: 4),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
