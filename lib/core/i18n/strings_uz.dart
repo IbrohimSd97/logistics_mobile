@@ -72,7 +72,6 @@ const Map<String, String> kStringsUz = {
   // ── login / auth ───────────────────────────────────────────────────────
   'auth.login_title': 'Kirish',
   'auth.phone_number': 'Telefon raqami',
-  'auth.phone_hint': '+998 90 123 45 67',
   'auth.password': 'Parol',
   'auth.send_otp': 'SMS-kod yuborish',
   'auth.otp_code': 'SMS-kod',
@@ -237,7 +236,6 @@ const Map<String, String> kStringsUz = {
 
   // ── auth (extended) ────────────────────────────────────────────────────
   'auth.enter_phone_number': 'Telefon raqamini kiriting',
-  'auth.full_uz_phone_required': 'To‘liq O‘zbekiston raqami kerak (+998 …)',
   'auth.enter_6_digit_otp': '6 xonali OTP kiriting',
   'auth.login_with_phone': 'Telefon raqamingiz bilan kiring',
   'auth.sms_code_label': 'SMS kodi',
@@ -841,9 +839,9 @@ const Map<String, String> kStringsUz = {
   'driver.reg.pick_pdf': 'PDF faylni tanlang',
   'driver.reg.pdf_only': 'Faqat PDF fayl yuklash mumkin.',
   'driver.reg.file_too_large': 'Fayl hajmi 10 MB dan oshmasligi kerak.',
-  'driver.reg.avtopark_title': 'Avtopark tanlash (ixtiyoriy)',
+  'driver.reg.avtopark_title': 'Avtopark *',
+  'driver.reg.avtopark_help': 'Har bir haydovchi avtoparkka biriktirilishi shart — to‘lovlar avtopark hisobiga o‘tkaziladi.',
   'driver.reg.avtopark_label': 'Avtopark',
-  'driver.reg.avtopark_none': 'Avtoparksiz (custom driver)',
   'driver.reg.avtopark_offerta': 'Avtopark offertasini qabul qilaman *',
   'driver.reg.finish_short': 'Tugatish',
   'driver.reg.upload_ownership_doc': 'Egalik hujjatini yuklang.',
@@ -950,4 +948,7 @@ const Map<String, String> kStringsUz = {
   'driver.reg.plate_hint_other': 'Masalan: 01 D 123456, KZ 123 ABC 02',
   'driver.reg.plate_other_help': 'Davlat, diplomatik, chet el fuqarosi yoki xorijda ro‘yxatdan o‘tgan mashina raqamini texpasportdagidek kiriting.',
   'driver.reg.plate_invalid': 'Davlat raqami to‘liq yoki to‘g‘ri kiritilmagan.',
+  'auth.choose_country': 'Davlatni tanlang',
+  'auth.country_search': 'Davlat nomi yoki kodi',
+  'auth.phone_incomplete': '{country} raqami {n} ta raqamdan iborat bo‘lishi kerak',
 };

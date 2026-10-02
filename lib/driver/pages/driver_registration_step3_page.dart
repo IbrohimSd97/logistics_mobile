@@ -11,6 +11,7 @@ import '../../core/config/app_links.dart';
 import '../../core/brand/alix_components.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/util/keyboard.dart';
 import '../../core/session/session_store.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/offerta_link.dart';
@@ -154,7 +155,10 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
-  Future<XFile?> _pickImage() async {
+  Future<XFile?> _pickImage() =>
+      withoutKeyboard(() => _pickImageRaw());
+
+  Future<XFile?> _pickImageRaw() async {
     if (kIsWeb) return _picker.pickImage(source: ImageSource.gallery, imageQuality: 82);
     final src = await showModalBottomSheet<ImageSource>(
       context: context,
@@ -181,7 +185,10 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   ///
   /// Kamera OCHILMAYDI: backend `legal_certificate_pdf` maydonida faqat PDF
   /// qabul qiladi (`mimes:pdf`, 10 MB), rasm yuborilsa 422 qaytaradi.
-  Future<XFile?> _pickPdf() async {
+  Future<XFile?> _pickPdf() =>
+      withoutKeyboard(() => _pickPdfRaw());
+
+  Future<XFile?> _pickPdfRaw() async {
     final picked = await FilePicker.pickFile(
       dialogTitle: I18n.t('driver.reg.pick_pdf'),
       type: FileType.custom,
@@ -385,6 +392,13 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
             const Divider(height: 32),
             Text(I18n.t('driver.reg.avtopark_title'),
                 style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              I18n.t('driver.reg.avtopark_help'),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
             const SizedBox(height: 8),
             if (_loadingAvtoparks)
               const LinearProgressIndicator(minHeight: 3)

@@ -71,7 +71,6 @@ const Map<String, String> kStringsRu = {
   // ── login / auth ───────────────────────────────────────────────────────
   'auth.login_title': 'Вход',
   'auth.phone_number': 'Номер телефона',
-  'auth.phone_hint': '+998 90 123 45 67',
   'auth.password': 'Пароль',
   'auth.send_otp': 'Отправить SMS-код',
   'auth.otp_code': 'SMS-код',
@@ -235,7 +234,6 @@ const Map<String, String> kStringsRu = {
 
   // ── auth (extended) ────────────────────────────────────────────────────
   'auth.enter_phone_number': 'Введите номер телефона',
-  'auth.full_uz_phone_required': 'Нужен полный узбекский номер (+998 …)',
   'auth.enter_6_digit_otp': 'Введите 6-значный код',
   'auth.login_with_phone': 'Войдите по номеру телефона',
   'auth.sms_code_label': 'SMS-код',
@@ -839,9 +837,9 @@ const Map<String, String> kStringsRu = {
   'driver.reg.pick_pdf': 'Выберите PDF-файл',
   'driver.reg.pdf_only': 'Можно загрузить только PDF-файл.',
   'driver.reg.file_too_large': 'Размер файла не должен превышать 10 МБ.',
-  'driver.reg.avtopark_title': 'Выбор автопарка (опционально)',
+  'driver.reg.avtopark_title': 'Автопарк *',
+  'driver.reg.avtopark_help': 'Каждый водитель должен быть прикреплён к автопарку — выплаты идут на счёт автопарка.',
   'driver.reg.avtopark_label': 'Автопарк',
-  'driver.reg.avtopark_none': 'Без автопарка (custom driver)',
   'driver.reg.avtopark_offerta': 'Я принимаю оферту автопарка *',
   'driver.reg.finish_short': 'Завершить',
   'driver.reg.upload_ownership_doc': 'Загрузите документ собственности.',
@@ -948,4 +946,7 @@ const Map<String, String> kStringsRu = {
   'driver.reg.plate_hint_other': 'Например: 01 D 123456, KZ 123 ABC 02',
   'driver.reg.plate_other_help': 'Госномер государственной, дипломатической, иностранной или зарегистрированной за рубежом машины — как в техпаспорте.',
   'driver.reg.plate_invalid': 'Госномер введён не полностью или неверно.',
+  'auth.choose_country': 'Выберите страну',
+  'auth.country_search': 'Название страны или код',
+  'auth.phone_incomplete': 'Номер ({country}) должен содержать {n} цифр',
 };
