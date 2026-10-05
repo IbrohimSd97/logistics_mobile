@@ -1,14 +1,14 @@
 /// Ilovadagi tashqi havolalar.
 ///
-/// **Eslatma:** [offertaUrl] hozircha placeholder. Haqiqiy ommaviy offerta
-/// manzili bilan almashtiring — link ilovaning barcha "offerta" joylarida
-/// (customer va driver ro'yxatdan o'tish) shu yagona konstantadan olinadi.
+/// Offertalar `alix.uz` landing saytida (`alix-landing` repo, `legal/`).
+/// Link ilovaning barcha "offerta" joylarida (customer va driver ro'yxatdan
+/// o'tish) shu konstantalardan olinadi.
 class AppLinks {
   AppLinks._();
 
   /// Ilova (buyurtmachi/haydovchi) ommaviy offertasi.
-  static const String offertaUrl = 'https://admin.alix.uz/offerta';
+  static const String offertaUrl = 'https://alix.uz/legal/public-offer.html';
 
   /// Avtopark (fleet) offertasi — haydovchi avtoparkka biriktirilganda.
-  static const String avtoparkOffertaUrl = 'https://admin.alix.uz/offerta/avtopark';
+  static const String avtoparkOffertaUrl = 'https://alix.uz/legal/fleet-offer.html';
 }
