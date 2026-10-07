@@ -36,6 +36,12 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
   List<CardTopUpStatus> _history = const [];
   bool _historyLoading = true;
 
+  /// Bank НПС (Uzcard/Humo) va МПС (Visa/Mastercard) uchun alohida terminal
+  /// ishlatadi: НПС buyurtmasini Visa bilan to'lab bo'lmaydi. Shuning uchun
+  /// karta turi bank sahifasi ochilishidan OLDIN tanlanadi.
+  List<String> _schemes = const ['nps'];
+  String _scheme = 'nps';
+
   /// Tez tanlash uchun tayyor summalar.
   static const _presets = <int>[50000, 100000, 200000, 500000];
 
@@ -48,6 +54,7 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
   void initState() {
     super.initState();
     _loadHistory();
+    _loadSchemes();
   }
 
   @override
@@ -71,6 +78,20 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
     });
   }
 
+  Future<void> _loadSchemes() async {
+    List<String> schemes = const ['nps'];
+    try {
+      schemes = await CustomerApi.instance.topUpCardSchemes();
+    } catch (_) {
+      // Tanlov ikkinchi darajali — xato bo'lsa faqat Uzcard/Humo qoladi.
+    }
+    if (!mounted) return;
+    setState(() {
+      _schemes = schemes;
+      if (!_schemes.contains(_scheme)) _scheme = _schemes.first;
+    });
+  }
+
   Future<void> _start() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
@@ -83,7 +104,7 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
 
     CardTopUpSession session;
     try {
-      session = await CustomerApi.instance.topUpInit(amount);
+      session = await CustomerApi.instance.topUpInit(amount, cardScheme: _scheme);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -241,6 +262,22 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
                   )
                   .toList(),
             ),
+            if (_schemes.length > 1) ...[
+              const SizedBox(height: 22),
+              AlixSectionTitle(I18n.t('payment.card_scheme_title')),
+              SegmentedButton<String>(
+                showSelectedIcon: false,
+                segments: [
+                  for (final code in _schemes)
+                    ButtonSegment<String>(
+                      value: code,
+                      label: Text(I18n.t('payment.card_scheme_$code')),
+                    ),
+                ],
+                selected: {_scheme},
+                onSelectionChanged: (v) => setState(() => _scheme = v.first),
+              ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 16),
               AlixBanner(message: _error!, icon: Icons.error_outline_rounded),

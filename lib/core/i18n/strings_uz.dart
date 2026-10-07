@@ -593,6 +593,9 @@ const Map<String, String> kStringsUz = {
       'Summani kiriting — keyin Kapitalbank to‘lov sahifasi ochiladi. Karta ma’lumotlari faqat o‘sha yerda kiritiladi.',
   'payment.topup_secure_note':
       'Karta raqami va CVV ilovaga saqlanmaydi — ular to‘g‘ridan-to‘g‘ri bankka yuboriladi.',
+  'payment.card_scheme_title': 'Karta turi',
+  'payment.card_scheme_nps': 'Uzcard / Humo',
+  'payment.card_scheme_mps': 'Visa / Mastercard',
   'payment.topup_credited': 'To‘lov qabul qilindi, hamyon to‘ldirildi.',
   'payment.topup_pending':
       'To‘lov tekshirilmoqda. Hamyon balansi bir necha soniyada yangilanadi.',

@@ -591,6 +591,9 @@ const Map<String, String> kStringsRu = {
       'Введите сумму — откроется платёжная страница Капиталбанка. Данные карты вводятся только там.',
   'payment.topup_secure_note':
       'Номер карты и CVV не сохраняются в приложении — они передаются напрямую банку.',
+  'payment.card_scheme_title': 'Тип карты',
+  'payment.card_scheme_nps': 'Uzcard / Humo',
+  'payment.card_scheme_mps': 'Visa / Mastercard',
   'payment.topup_credited': 'Платёж принят, кошелёк пополнен.',
   'payment.topup_pending':
       'Платёж проверяется. Баланс кошелька обновится через несколько секунд.',

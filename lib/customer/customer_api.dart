@@ -280,7 +280,11 @@ class CustomerApi {
   ///
   /// Karta ma'lumoti BU SO'ROVGA KIRMAYDI — javobdagi `payment_link`
   /// Kapitalbank sahifasi, mijoz kartani o'sha yerda kiritadi.
-  Future<CardTopUpSession> topUpInit(double amount, {String? description}) async {
+  Future<CardTopUpSession> topUpInit(
+    double amount, {
+    String? description,
+    String? cardScheme,
+  }) async {
     final token = await _requireBearer();
     final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/wallet/topup/init');
     final res = await http.post(
@@ -289,6 +293,9 @@ class CustomerApi {
       body: jsonEncode({
         'amount': amount,
         if (description != null && description.isNotEmpty) 'description': description,
+        // Bank НПС va МПС uchun alohida terminal ishlatadi — buyurtma to'lovdan
+        // oldin to'g'ri terminalda ochilishi kerak.
+        if (cardScheme != null) 'card_scheme': cardScheme,
       }),
     );
     final map = _decodeResponse(res);
@@ -315,6 +322,29 @@ class CustomerApi {
       throw ApiException('To`ldirish holati olinmadi');
     }
     return status;
+  }
+
+  /// GET /api/customer/wallet/topup/options
+  ///
+  /// Qaysi karta turlari (`nps`, `mps`) bilan to'ldirish mumkinligi.
+  /// Eski backend bu endpointni bilmaydi — unda faqat `nps` qaytariladi.
+  Future<List<String>> topUpCardSchemes() async {
+    final token = await _requireBearer();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/wallet/topup/options');
+    try {
+      final res = await http.get(url, headers: _jsonAuth(token));
+      final map = _decodeResponse(res);
+      final data = map['data'];
+      final codes = data is Map
+          ? mapListFrom(data['card_schemes'])
+              .map((e) => e['code']?.toString() ?? '')
+              .where((c) => c.isNotEmpty)
+              .toList()
+          : <String>[];
+      return codes.isEmpty ? const ['nps'] : codes;
+    } on ApiException {
+      return const ['nps'];
+    }
   }
 
   /// GET /api/customer/wallet/topup/history
