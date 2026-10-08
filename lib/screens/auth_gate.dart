@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/api/api_exception.dart';
 import '../core/brand/alix_splash.dart';
+import '../core/push/push_service.dart';
 import '../core/session/session_store.dart';
 import '../driver/driver_api.dart';
 import '../driver/driver_models.dart';
@@ -123,6 +124,12 @@ class _AuthGateState extends State<AuthGate> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(builder: (_) => page),
     );
+    // Sessiya bo'lsa push tokenini yangilaymiz; ilova yopiq paytda bosilgan
+    // bildirishnoma bo'lsa, asosiy sahifa ochilgach o'shani ochamiz.
+    if (page is! LoginScreen) {
+      PushService.instance.syncToken();
+      PushService.instance.markAppReady();
+    }
   }
 
   @override

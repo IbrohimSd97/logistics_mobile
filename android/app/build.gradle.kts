@@ -3,6 +3,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("kotlin-android")
+    id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -48,6 +49,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications java.time API'sini ishlatadi.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -99,4 +102,6 @@ dependencies {
     // yandex_mapkit 4.3.0 → 4.39.1, variant `android/gradle.properties`dagi
     // `yandexMapkit.variant` (full — geocoding va routing uchun kerak).
     implementation("com.yandex.android:maps.mobile:4.39.1-full")
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

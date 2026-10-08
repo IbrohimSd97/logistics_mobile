@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Mobil API: `exchange-token` dan keyin JWT refresh token saqlanadi (TZ 3.0).
@@ -8,6 +10,13 @@ class SessionStore {
   static const _kUserType = 'alix_user_type';
   static const _kPhone = 'alix_phone_display';
   static const _kTempReg = 'alix_customer_temp_registration_token';
+
+  /// Push servisi ulanadi: kirgandan keyin qurilma tokenini serverga yuboradi.
+  static Future<void> Function()? onSessionSaved;
+
+  /// Push servisi ulanadi: chiqishdan OLDIN (refresh token hali bor paytda)
+  /// qurilma tokenini serverdan o'chiradi.
+  static Future<void> Function()? beforeClear;
 
   Future<void> saveSession({
     required String refreshToken,
@@ -21,6 +30,8 @@ class SessionStore {
     await p.setString(_kUserType, userType);
     await p.setString(_kPhone, phoneDisplay);
     await p.remove(_kTempReg);
+    // Kutmaymiz: push ikkilamchi, login oqimini sekinlashtirmasin.
+    unawaited(onSessionSaved?.call());
   }
 
   /// Refresh token bo‘lmasa ham telefon (jismoniy ro‘yxatdan o‘tish / UI uchun).
@@ -45,6 +56,7 @@ class SessionStore {
   }
 
   Future<void> clear() async {
+    await beforeClear?.call();
     final p = await SharedPreferences.getInstance();
     await p.remove(_kRefresh);
     await p.remove(_kUserId);

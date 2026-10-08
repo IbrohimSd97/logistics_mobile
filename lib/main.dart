@@ -6,9 +6,11 @@ import 'core/api/logging_http_client.dart';
 import 'core/api/net_log.dart';
 import 'core/api/net_log_overlay.dart';
 import 'core/i18n/i18n.dart';
+import 'core/push/push_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'screens/auth_gate.dart';
+import 'screens/push_tap_router.dart';
 
 void main() {
   // Tarmoq logi yoniq bo'lsa, BUTUN ishga tushirishni (binding init + runApp)
@@ -33,6 +35,10 @@ Future<void> _bootstrap() async {
     ThemeController.instance.load(),
     I18n.instance.load(),
   ]);
+  // Push — tilni bilishi kerak (I18n.load'dan keyin). Xato bo'lsa ilova
+  // pushsiz ishlayveradi.
+  PushService.instance.onTap = PushTapRouter.open;
+  await PushService.instance.init();
   runApp(const MyApp());
 }
 
@@ -53,6 +59,8 @@ class MyApp extends StatelessWidget {
       builder: (_, __) {
         return MaterialApp(
           title: 'ALIX Logistics',
+          // Push bosilganda sahifa ochish uchun (context'siz navigatsiya).
+          navigatorKey: PushTapRouter.navigatorKey,
           debugShowCheckedModeBanner: false,
           themeMode: ThemeController.instance.mode,
           theme: AppTheme.light(),

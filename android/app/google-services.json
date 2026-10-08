@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1030849501248",
+    "project_id": "alix-uz",
+    "storage_bucket": "alix-uz.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1030849501248:android:e63247e2b4e3d82ac0a7a5",
+        "android_client_info": {
+          "package_name": "uz.alix.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUtn8aRIX0QxSqbvTkwcYlwNIKVYAM5v8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
