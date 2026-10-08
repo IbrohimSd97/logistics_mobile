@@ -40,16 +40,18 @@ class PushTapRouter {
 
   static Future<Widget?> _customerPage(int orderId) async {
     final api = CustomerApi.instance;
-    CustomerOrder? order = (await api.currentOrders()).where((o) => o.id == orderId).firstOrNull;
-    order ??= (await api.archiveOrders()).where((o) => o.id == orderId).firstOrNull;
+    // Buyurtma joriy yoki arxivda — ikkalasini parallel so'raymiz (sekin tarmoqda kutish ikki baravar kam).
+    final lists = await Future.wait([api.currentOrders(), api.archiveOrders()]);
+    final CustomerOrder? order = lists.expand((l) => l).where((o) => o.id == orderId).firstOrNull;
     return order == null ? null : CustomerOrderDetailPage(order: order);
   }
 
   static Future<Widget?> _driverPage(int orderId) async {
     final api = DriverApi.instance;
-    final current = await api.currentOrder();
-    DriverOrder? order = current?.id == orderId ? current : null;
-    order ??= (await api.archiveOrders()).where((o) => o.id == orderId).firstOrNull;
+    final results = await Future.wait<Object?>([api.currentOrder(), api.archiveOrders()]);
+    final current = results[0] as DriverOrder?;
+    final archive = results[1] as List<DriverOrder>;
+    final DriverOrder? order = current?.id == orderId ? current : archive.where((o) => o.id == orderId).firstOrNull;
     return order == null ? null : DriverOrderDetailPage(order: order);
   }
 }
