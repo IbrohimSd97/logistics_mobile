@@ -36,7 +36,7 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
   List<CardTopUpStatus> _history = const [];
   bool _historyLoading = true;
 
-  /// Bank НПС (Uzcard/Humo) va МПС (Visa/Mastercard) uchun alohida terminal
+  /// Bank НПС (Uzcard; Humo hozircha yopiq) va МПС (Visa/Mastercard) uchun alohida terminal
   /// ishlatadi: НПС buyurtmasini Visa bilan to'lab bo'lmaydi. Shuning uchun
   /// karta turi bank sahifasi ochilishidan OLDIN tanlanadi.
   List<String> _schemes = const ['nps'];
@@ -83,7 +83,7 @@ class _CustomerWalletTopupPageState extends State<CustomerWalletTopupPage>
     try {
       schemes = await CustomerApi.instance.topUpCardSchemes();
     } catch (_) {
-      // Tanlov ikkinchi darajali — xato bo'lsa faqat Uzcard/Humo qoladi.
+      // Tanlov ikkinchi darajali — xato bo'lsa faqat Uzcard qoladi.
     }
     if (!mounted) return;
     setState(() {
