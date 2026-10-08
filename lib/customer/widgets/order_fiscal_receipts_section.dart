@@ -11,9 +11,16 @@ import '../../core/theme/app_palette.dart';
 import '../customer_api.dart';
 import '../customer_models.dart';
 
-/// Yakunlangan buyurtmaning fiskal cheklari (OFD). Har bir chek bosilganda
-/// QR kod ochiladi — mijoz uni soliq ilovasi bilan skanerlashi yoki soliq
-/// saytida ko'rishi mumkin.
+/// Mijozga ko'rsatiladigan chek — faqat Sotuv cheki (qaytarish emas).
+///
+/// Buyurtma yakunlanganda backend uchta chek chiqaradi (Avans → Sotuv →
+/// Kredit), lekin Avans va Kredit buxgalteriya uchun. Backend ham faqat
+/// Sotuvni qaytaradi; bu filtr eski backend bilan ham to'g'ri ishlashi uchun.
+bool _isCustomerReceipt(OrderFiscalReceipt r) => r.receiptType == 0 && !r.isRefund;
+
+/// Yakunlangan buyurtmaning sotuv cheki (OFD). Chek bosilganda QR kod
+/// ochiladi — mijoz uni soliq ilovasi bilan skanerlashi yoki soliq saytida
+/// ko'rishi mumkin.
 ///
 /// Cheklar backendda buyurtma yakunlangach navbat orqali yuboriladi, shuning
 /// uchun ro'yxat bo'sh yoki `pending` bo'lsa bir necha marta qayta so'raladi.
@@ -63,7 +70,7 @@ class _OrderFiscalReceiptsSectionState extends State<OrderFiscalReceiptsSection>
       final items = await CustomerApi.instance.orderFiscalReceipts(widget.orderId);
       if (!mounted) return;
       setState(() {
-        _items = items;
+        _items = items.where(_isCustomerReceipt).toList();
         _error = null;
       });
     } catch (e) {
@@ -179,6 +186,123 @@ class _OrderFiscalReceiptsSectionState extends State<OrderFiscalReceiptsSection>
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) => _FiscalQrSheet(receipt: r, title: _typeLabel(r)),
+    );
+  }
+}
+
+/// Buyurtma yakunlangach sotuv chekini ekranga chiqaradi.
+///
+/// Chek OFD'ga navbat orqali yuboriladi, shuning uchun oyna chek tayyor
+/// bo'lguncha kutadi va keyin QR kodni ko'rsatadi. Chek vaqtida chiqmasa,
+/// mijozga buyurtma sahifasida ko'rinishini aytamiz — oynani yopsa bo'ladi.
+Future<void> showOrderSaleReceiptSheet(BuildContext context, int orderId) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _SaleReceiptSheet(orderId: orderId),
+  );
+}
+
+class _SaleReceiptSheet extends StatefulWidget {
+  const _SaleReceiptSheet({required this.orderId});
+
+  final int orderId;
+
+  @override
+  State<_SaleReceiptSheet> createState() => _SaleReceiptSheetState();
+}
+
+class _SaleReceiptSheetState extends State<_SaleReceiptSheet> {
+  static const _pollInterval = Duration(seconds: 3);
+  static const _maxPolls = 20; // ~1 daqiqa
+
+  OrderFiscalReceipt? _receipt;
+  bool _gaveUp = false;
+  int _polls = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    OrderFiscalReceipt? sale;
+    try {
+      final items = await CustomerApi.instance.orderFiscalReceipts(widget.orderId);
+      for (final r in items) {
+        if (_isCustomerReceipt(r)) sale = r;
+      }
+    } catch (_) {
+      // Tarmoq xatosi — keyingi urinishda yana so'raymiz.
+    }
+    if (!mounted) return;
+    final ready = sale != null && sale.hasQr;
+    final failed = sale != null && !sale.isPending && !sale.hasQr;
+    setState(() {
+      _receipt = ready ? sale : null;
+      _gaveUp = !ready && (failed || _polls >= _maxPolls);
+    });
+    if (!ready && !_gaveUp) {
+      _polls++;
+      _timer = Timer(_pollInterval, _load);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _receipt;
+    if (r != null) {
+      return _FiscalQrSheet(receipt: r, title: I18n.t('fiscal.type.sale'));
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_rounded, size: 56, color: cs.primary),
+            const SizedBox(height: 12),
+            Text(
+              I18n.t('order.detail.order_finished_msg'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 20),
+            if (_gaveUp)
+              Text(
+                I18n.t('fiscal.sale_later'),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurfaceVariant, height: 1.4),
+              )
+            else ...[
+              const SizedBox(width: 28, height: 28, child: CircularProgressIndicator(strokeWidth: 2.6)),
+              const SizedBox(height: 14),
+              Text(
+                I18n.t('fiscal.sale_preparing'),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.onSurfaceVariant, height: 1.4),
+              ),
+            ],
+            const SizedBox(height: 20),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              child: Text(I18n.t('common.close')),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

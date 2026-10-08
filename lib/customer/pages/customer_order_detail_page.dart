@@ -446,9 +446,9 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
     try {
       await CustomerApi.instance.finishOrder(_order.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(I18n.t('order.detail.order_finished_msg'))),
-      );
+      // Yakunlanganda sotuv cheki avtomat shakllanadi — uni darhol ko'rsatamiz.
+      await showOrderSaleReceiptSheet(context, _order.id);
+      if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
