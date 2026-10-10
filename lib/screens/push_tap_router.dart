@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/api/api_exception.dart';
 import '../customer/customer_api.dart';
 import '../customer/customer_models.dart';
 import '../customer/pages/customer_order_detail_page.dart';
@@ -48,7 +49,11 @@ class PushTapRouter {
 
   static Future<Widget?> _driverPage(int orderId) async {
     final api = DriverApi.instance;
-    final results = await Future.wait<Object?>([api.currentOrder(), api.archiveOrders()]);
+    // Faol buyurtma bo'lmasa server 404 qaytaradi — bu xato emas, arxivdan qidiramiz.
+    final results = await Future.wait<Object?>([
+      api.currentOrder().catchError((Object e) => null, test: (e) => e is ApiException && e.statusCode == 404),
+      api.archiveOrders(),
+    ]);
     final current = results[0] as DriverOrder?;
     final archive = results[1] as List<DriverOrder>;
     final DriverOrder? order = current?.id == orderId ? current : archive.where((o) => o.id == orderId).firstOrNull;
