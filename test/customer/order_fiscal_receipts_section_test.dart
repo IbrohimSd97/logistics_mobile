@@ -82,7 +82,7 @@ void main() {
     });
   });
 
-  testWidgets('sends bearer token to the right endpoint and lists receipts', (tester) async {
+  testWidgets('sends bearer token to the right endpoint and shows only the sale receipt', (tester) async {
     late http.Request seen;
     await http.runWithClient(() async {
       await tester.pumpWidget(_host());
@@ -99,11 +99,12 @@ void main() {
     expect(seen.method, 'GET');
     expect(seen.url.path, '/api/customer/orders/7/fiscal-receipts');
     expect(seen.headers['Authorization'], 'Bearer test-token');
-    expect(find.text('Avans cheki'), findsOneWidget);
+    // Mijozga faqat sotuv cheki ko'rsatiladi — avans va kredit yashiriladi.
+    expect(find.text('Avans cheki'), findsNothing);
     expect(find.text('Sotuv cheki'), findsOneWidget);
-    expect(find.text('Kredit cheki'), findsOneWidget);
-    expect(find.text('Qabul qilindi'), findsNWidgets(3));
-    expect(find.textContaining('1 450 000'), findsNWidgets(3));
+    expect(find.text('Kredit cheki'), findsNothing);
+    expect(find.text('Qabul qilindi'), findsOneWidget);
+    expect(find.textContaining('1 450 000'), findsOneWidget);
   });
 
   testWidgets('tapping accepted receipt opens QR sheet with fiscal data', (tester) async {
@@ -158,7 +159,7 @@ void main() {
     await http.runWithClient(() async {
       await tester.pumpWidget(_host());
       await tester.pumpAndSettle();
-      expect(find.text('Cheklar tayyorlanmoqda…'), findsOneWidget);
+      expect(find.text('Chek tayyorlanmoqda…'), findsOneWidget);
 
       for (var i = 0; i < 30; i++) {
         await tester.pump(const Duration(seconds: 5));
