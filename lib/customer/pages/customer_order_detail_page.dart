@@ -409,10 +409,19 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
         label: I18n.t('order.detail.cancelled'),
         iconData: Icons.cancel_rounded,
         timeIso: o.cancelledAt,
-        note: _renderCancelReason(o),
+        note: _cancelNote(o),
       ));
     }
     return steps;
+  }
+
+  /// Sabab + (bo'lsa) haydovchiga ushlab qolingan kompensatsiya.
+  String? _cancelNote(CustomerOrder o) {
+    final reason = _renderCancelReason(o);
+    final fee = num.tryParse(o.cancelCompensationAmount ?? '') ?? 0;
+    if (fee <= 0) return reason;
+    final line = I18n.t('order.cancel.fee_note', {'fee': _formatMoney(o.cancelCompensationAmount)});
+    return reason == null ? line : '$reason\n$line';
   }
 
   /// Bekor qilingan buyurtmaning sababini ko'rinadigan satrga aylantiradi:
@@ -458,6 +467,10 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
   }
 
   Future<void> _cancel() async {
+    // Haydovchi yo'lga chiqqan bo'lsa — kompensatsiya ushlab qolinadi.
+    // Mijoz buni sabab tanlashdan OLDIN bilishi kerak.
+    final fee = await _confirmCancelFee();
+    if (fee == null || !mounted) return;
     final picked = await _askCancelReason();
     if (picked == null || !mounted) return;
     setState(() => _busy = true);
@@ -468,13 +481,62 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
         customText: picked.customText,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(I18n.t('order.detail.cancelled_msg'))));
+      final msg = fee.applies
+          ? I18n.t('order.cancel.fee_done', {'fee': _formatMoney('${fee.fee}')})
+          : I18n.t('order.detail.cancelled_msg');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
       _showError(e);
     }
+  }
+
+  /// Kompensatsiya bo'lsa ogohlantiradi. `null` — mijoz voz kechdi yoki
+  /// summani bilib bo'lmadi (pul bilan bog'liq qaror taxminga qoldirilmaydi).
+  Future<CancelFeePreview?> _confirmCancelFee() async {
+    const none = CancelFeePreview(applies: false, fee: 0, distanceKm: 0, refundAmount: 0);
+    // Haydovchi hali qabul qilmagan (3 — qabul, 4 — yetib keldi, 5 — yuklash) —
+    // kompensatsiya yo'q, so'rovsiz davom.
+    if (!const {3, 4, 5}.contains(_order.status)) return none;
+
+    setState(() => _busy = true);
+    CancelFeePreview preview;
+    try {
+      preview = await CustomerApi.instance.cancelFeePreview(_order.id);
+    } catch (e) {
+      if (!mounted) return null;
+      setState(() => _busy = false);
+      _showError(e);
+      return null;
+    }
+    if (!mounted) return null;
+    setState(() => _busy = false);
+    if (!preview.applies) return preview;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(I18n.t('order.cancel.fee_title')),
+        content: Text(I18n.t('order.cancel.fee_body', {
+          'km': preview.distanceKm.toStringAsFixed(preview.distanceKm % 1 == 0 ? 0 : 1),
+          'fee': _formatMoney('${preview.fee}'),
+          'refund': _formatMoney('${preview.refundAmount}'),
+        })),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(I18n.t('order.cancel.fee_back')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(I18n.t('order.cancel.fee_continue')),
+          ),
+        ],
+      ),
+    );
+    return ok == true ? preview : null;
   }
 
   Future<_CancelReasonChoice?> _askCancelReason() async {

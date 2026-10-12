@@ -212,6 +212,16 @@ class CustomerApi {
     return items.map(OrderFiscalReceipt.fromMap).whereType<OrderFiscalReceipt>().toList();
   }
 
+  /// GET /api/customer/orders/{id}/cancel-fee — bekor qilish kompensatsiyasi (oldindan).
+  Future<CancelFeePreview> cancelFeePreview(int orderId) async {
+    final token = await _requireBearer();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/orders/$orderId/cancel-fee');
+    final res = await http.get(url, headers: _jsonAuth(token));
+    final map = _decodeResponse(res);
+    final data = map['data'];
+    return CancelFeePreview.fromMap(data is Map<String, dynamic> ? data : const {});
+  }
+
   /// POST /api/customer/orders/cancel
   ///
   /// `cancelReasonId` — `cancel_reasons` jadvalidan tanlangan ID (majburiy).

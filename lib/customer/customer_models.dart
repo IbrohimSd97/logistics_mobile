@@ -148,6 +148,8 @@ class CustomerOrder {
     this.deliveryDeadlineAt,
     this.slaHoursSnapshot,
     this.latePenaltyAmount,
+    this.cancelCompensationAmount,
+    this.cancellationDistanceKm,
     this.completedAt,
     this.cancelledAt,
     this.cancelReason,
@@ -190,6 +192,11 @@ class CustomerOrder {
   final String? deliveryDeadlineAt;
   final int? slaHoursSnapshot;
   final String? latePenaltyAmount;
+
+  /// Mijoz haydovchi yo'lga chiqqandan keyin bekor qilganda haydovchiga
+  /// ushlab qolingan kompensatsiya (0 yoki null — ushlanmagan).
+  final String? cancelCompensationAmount;
+  final String? cancellationDistanceKm;
   final String? completedAt;
   final String? cancelledAt;
   final String? cancelReason;
@@ -251,6 +258,8 @@ class CustomerOrder {
       deliveryDeadlineAt: m['delivery_deadline_at']?.toString(),
       slaHoursSnapshot: _int(m['sla_hours_snapshot']),
       latePenaltyAmount: m['late_penalty_amount']?.toString(),
+      cancelCompensationAmount: m['cancel_compensation_amount']?.toString(),
+      cancellationDistanceKm: m['cancellation_distance_km']?.toString(),
       completedAt: m['completed_at']?.toString(),
       cancelledAt: m['cancelled_at']?.toString(),
       cancelReason: m['cancel_reason']?.toString(),
@@ -430,6 +439,32 @@ class CustomerBillingInfo {
           .whereType<Map<String, dynamic>>()
           .map(WalletTransaction.fromMap)
           .toList(),
+    );
+  }
+}
+
+/// GET /api/customer/orders/{id}/cancel-fee — bekor qilishdan oldin:
+/// haydovchiga qancha kompensatsiya ushlab qolinadi va qancha qaytadi.
+class CancelFeePreview {
+  const CancelFeePreview({
+    required this.applies,
+    required this.fee,
+    required this.distanceKm,
+    required this.refundAmount,
+  });
+
+  final bool applies;
+  final num fee;
+  final num distanceKm;
+  final num refundAmount;
+
+  factory CancelFeePreview.fromMap(Map<String, dynamic> m) {
+    num n(Object? v) => v is num ? v : num.tryParse('${v ?? ''}') ?? 0;
+    return CancelFeePreview(
+      applies: m['applies'] == true,
+      fee: n(m['fee']),
+      distanceKm: n(m['distance_km']),
+      refundAmount: n(m['refund_amount']),
     );
   }
 }
