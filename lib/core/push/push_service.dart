@@ -14,6 +14,7 @@ import '../api/request_headers.dart';
 import '../config/api_config.dart';
 import '../i18n/i18n.dart';
 import '../session/session_store.dart';
+import '../theme/app_palette.dart';
 
 /// Ilova yopiq/fonda bo'lganda kelgan xabar — bildirishnomani tizim o'zi
 /// ko'rsatadi, bu yerda qiladigan ish yo'q. Handler top-level bo'lishi shart.
@@ -66,7 +67,7 @@ class PushService {
 
       await _local.initialize(
         settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@drawable/ic_launcher_monochrome'),
+          android: AndroidInitializationSettings('@drawable/ic_stat_alix'),
           iOS: DarwinInitializationSettings(
             requestAlertPermission: false,
             requestBadgePermission: false,
@@ -210,7 +211,11 @@ class PushService {
           channelDescription: _channel.description,
           importance: Importance.high,
           priority: Priority.high,
-          icon: '@drawable/ic_launcher_monochrome',
+          // Kichik ikonka tizimda doim bir rangli siluet bo'ladi; rangli
+          // logotip katta ikonka sifatida o'ng tomonda ko'rinadi.
+          icon: '@drawable/ic_stat_alix',
+          color: AppPalette.orange,
+          largeIcon: const DrawableResourceAndroidBitmap('ic_notification_large'),
           styleInformation: BigTextStyleInformation(n.body ?? ''),
         ),
       ),

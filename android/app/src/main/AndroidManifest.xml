@@ -45,9 +45,15 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="alix_orders" />
+        <!-- Android kichik ikonkani doim bir rangli siluet qilib chizadi;
+             ic_stat_alix — atrofida bo'sh joysiz, 24dp ga to'liq sig'adigan belgi.
+             Rang (to'q sariq) ikonka va ilova nomini bo'yaydi. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_launcher_monochrome" />
+            android:resource="@drawable/ic_stat_alix" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/alix_orange" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

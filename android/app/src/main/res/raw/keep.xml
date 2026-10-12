@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Push bildirishnoma ikonkalari Dart koddan nomi bilan chaqiriladi —
+     release'dagi resource shrinking ularni "ishlatilmagan" deb o'chirmasin. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_alix,@drawable/ic_notification_large" />
