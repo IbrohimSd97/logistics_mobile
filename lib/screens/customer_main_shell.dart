@@ -26,6 +26,7 @@ import '../driver/pages/driver_registration_step1_page.dart';
 import '../driver/pages/driver_rejected_page.dart';
 import 'driver_main_shell.dart';
 import 'login_screen.dart';
+import 'account_deletion.dart';
 
 /// ISO sanani mahalliy vaqtda "DD.MM.YYYY HH:mm" ko'rinishida beradi.
 /// Backend UTC yuboradi, foydalanuvchi esa o'z vaqtini kutadi.
@@ -1569,6 +1570,8 @@ class CustomerProfileBody extends StatelessWidget {
             side: BorderSide(color: cs.error.withValues(alpha: 0.5)),
           ),
         ),
+        const SizedBox(height: 8),
+        const DeleteAccountButton(),
       ],
     );
   }

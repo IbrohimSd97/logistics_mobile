@@ -29,6 +29,7 @@ import '../driver/pages/driver_pending_page.dart';
 import '../driver/pages/driver_rejected_page.dart';
 import 'customer_main_shell.dart';
 import 'login_screen.dart';
+import 'account_deletion.dart';
 
 /// Faollashtirilgan haydovchi asosiy oqimi.
 class DriverMainShell extends StatefulWidget {
@@ -1454,6 +1455,8 @@ class DriverProfileBody extends StatelessWidget {
             side: BorderSide(color: cs.error.withValues(alpha: 0.5)),
           ),
         ),
+        const SizedBox(height: 8),
+        const DeleteAccountButton(),
       ],
     );
   }
