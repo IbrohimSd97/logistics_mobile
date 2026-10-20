@@ -12,6 +12,7 @@ import '../../core/brand/alix_components.dart';
 import '../../core/camera/camera_capture_page.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/registration/pinfl_lookup.dart';
 import '../../core/util/keyboard.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../driver_api.dart';
@@ -50,7 +51,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
   final _last = TextEditingController();
   final _first = TextEditingController();
   final _middle = TextEditingController();
-  final _pinfl = TextEditingController();
+  final _pinfl = PinflLookupController();
   final _licSeries = TextEditingController();
   final _licNumber = TextEditingController();
 
@@ -73,7 +74,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       _setText(_last, widget.data!.s1('last_name'));
       _setText(_first, widget.data!.s1('first_name'));
       _setText(_middle, widget.data!.s1('middle_name'));
-      _setText(_pinfl, widget.data!.s1('national_id'));
+      _setText(_pinfl.pinfl, widget.data!.s1('national_id'));
       _setText(_licSeries, widget.data!.s1('car_license_series'));
       _setText(_licNumber, widget.data!.s1('car_license_number'));
       _birthDate = _parseDate(widget.data!.s1('birth_date')) ?? _birthDate;
@@ -100,6 +101,14 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       _birthDate = _parseDate(widget.prefillBirthDate);
       if (_birthDate != null) _prefilled = true;
     }
+    // Qayta yuborishda: saqlangan PINFL'ni soliq bazasidan qayta tekshiramiz —
+    // topilsa haydovchi yana tasdiqlaydi, topilmasa eski qo'lda kiritilgan qiymatlar qoladi.
+    _pinfl.addListener(_onPinflChanged);
+    if (_pinfl.isValid) _pinfl.lookup();
+  }
+
+  void _onPinflChanged() {
+    if (mounted) setState(() {});
   }
 
   static void _setText(TextEditingController c, String? v) {
@@ -129,6 +138,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     _last.dispose();
     _first.dispose();
     _middle.dispose();
+    _pinfl.removeListener(_onPinflChanged);
     _pinfl.dispose();
     _licSeries.dispose();
     _licNumber.dispose();
@@ -216,7 +226,11 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_birthDate == null) {
+    if (!_pinfl.confirmed && !_pinfl.manual) {
+      _toast(I18n.t('pinfl.confirm_first'));
+      return;
+    }
+    if (_pinfl.manual && _birthDate == null) {
       _toast(I18n.t('driver.reg.birth_required_msg'));
       return;
     }
@@ -240,12 +254,15 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     }
     setState(() => _submitting = true);
     try {
+      final manual = _pinfl.manual;
       final r = await DriverApi.instance.registrationStep1(
-        lastName: _last.text.trim(),
-        firstName: _first.text.trim(),
-        middleName: _middle.text.trim(),
-        birthDate: _fmtDate(_birthDate!),
-        nationalId: _pinfl.text.trim(),
+        // Tasdiqlangan bo'lsa F.I.Sh./sana server tomonda soliq bazasidan olinadi.
+        didoxConfirmed: _pinfl.confirmed,
+        lastName: manual ? _last.text.trim() : null,
+        firstName: manual ? _first.text.trim() : null,
+        middleName: manual ? _middle.text.trim() : null,
+        birthDate: manual ? _fmtDate(_birthDate!) : null,
+        nationalId: _pinfl.value,
         carLicenseSeries: _licSeries.text.trim(),
         carLicenseNumber: _licNumber.text.trim(),
         carLicenseIssuedDate: _fmtDate(_licIssuedDate!),
@@ -334,7 +351,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                     _last.clear();
                     _first.clear();
                     _middle.clear();
-                    _pinfl.clear();
+                    _pinfl.reset();
                     _licSeries.clear();
                     _licNumber.clear();
                     setState(() {
@@ -374,57 +391,48 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                 style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _last,
-                decoration: InputDecoration(labelText: I18n.t('driver.reg.field_last_required')),
-                validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_last') : null,
-              ),
-              _errorNote('last_name'),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _first,
-                decoration: InputDecoration(labelText: I18n.t('driver.reg.field_first_required')),
-                validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_first') : null,
-              ),
-              _errorNote('first_name'),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _middle,
-                // Otasining ismi — majburiy emas.
-                decoration: InputDecoration(labelText: I18n.t('driver.reg.field_middle')),
-              ),
-              _errorNote('middle_name'),
-              const SizedBox(height: 14),
-              InkWell(
-                onTap: _pickBirth,
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: I18n.t('driver.reg.field_birth_required'),
-                    suffixIcon: const Icon(Icons.calendar_today_rounded),
-                  ),
-                  child: Text(_birthDate == null ? I18n.t('driver.reg.not_picked') : _fmtDate(_birthDate!)),
-                ),
-              ),
-              _errorNote('birth_date'),
-              const SizedBox(height: 14),
-              TextFormField(
+              PinflLookupField(
                 controller: _pinfl,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(14),
-                ],
-                decoration: InputDecoration(
-                  labelText: I18n.t('driver.reg.pinfl_required'),
-                  hintText: '00000000000000',
-                ),
-                validator: (v) {
-                  final s = (v ?? '').trim();
-                  if (s.length != 14) return I18n.t('driver.reg.pinfl_14_digits');
-                  return null;
-                },
+                label: I18n.t('driver.reg.pinfl_required'),
+                errorNote: _errorNote('national_id'),
               ),
-              _errorNote('national_id'),
+              const SizedBox(height: 14),
+              // Soliq bazasi topmasa/ishlamasa — F.I.Sh. va sana qo'lda.
+              if (_pinfl.manual) ...[
+                TextFormField(
+                  controller: _last,
+                  decoration: InputDecoration(labelText: I18n.t('driver.reg.field_last_required')),
+                  validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_last') : null,
+                ),
+                _errorNote('last_name'),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _first,
+                  decoration: InputDecoration(labelText: I18n.t('driver.reg.field_first_required')),
+                  validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_first') : null,
+                ),
+                _errorNote('first_name'),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _middle,
+                  // Otasining ismi — majburiy emas.
+                  decoration: InputDecoration(labelText: I18n.t('driver.reg.field_middle')),
+                ),
+                _errorNote('middle_name'),
+                const SizedBox(height: 14),
+                InkWell(
+                  onTap: _pickBirth,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: I18n.t('driver.reg.field_birth_required'),
+                      suffixIcon: const Icon(Icons.calendar_today_rounded),
+                    ),
+                    child: Text(_birthDate == null ? I18n.t('driver.reg.not_picked') : _fmtDate(_birthDate!)),
+                  ),
+                ),
+                _errorNote('birth_date'),
+                const SizedBox(height: 14),
+              ],
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.driver_license_section'),
                   style: Theme.of(context).textTheme.titleSmall),

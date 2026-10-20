@@ -112,11 +112,15 @@ class DriverApi {
   // ────────────────────────────── registration steps ──────────────────────────────
 
   /// POST /api/driver/registration/step1 (auth.temp, multipart)
+  ///
+  /// [didoxConfirmed] — haydovchi PINFL bo'yicha soliq bazasi ma'lumotini
+  /// tasdiqlagan: F.I.Sh./sana yuborilmaydi, server ularni Didox'dan oladi.
   Future<DriverStepResult> registrationStep1({
-    required String lastName,
-    required String firstName,
-    required String middleName,
-    required String birthDate, // YYYY-MM-DD
+    bool didoxConfirmed = false,
+    String? lastName,
+    String? firstName,
+    String? middleName,
+    String? birthDate, // YYYY-MM-DD
     required String nationalId, // 14 raqamli PINFL
     required String carLicenseSeries,
     required String carLicenseNumber,
@@ -129,14 +133,19 @@ class DriverApi {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/driver/registration/step1');
     final req = http.MultipartRequest('POST', uri)
       ..headers.addAll(_multiAuth(token))
-      ..fields['last_name'] = lastName
-      ..fields['first_name'] = firstName
-      ..fields['middle_name'] = middleName
-      ..fields['birth_date'] = birthDate
       ..fields['national_id'] = nationalId
       ..fields['car_license_series'] = carLicenseSeries
       ..fields['car_license_number'] = carLicenseNumber
       ..fields['car_license_issued_date'] = carLicenseIssuedDate;
+    if (didoxConfirmed) {
+      req.fields['didox_confirmed'] = '1';
+    } else {
+      req.fields
+        ..['last_name'] = lastName ?? ''
+        ..['first_name'] = firstName ?? ''
+        ..['middle_name'] = middleName ?? ''
+        ..['birth_date'] = birthDate ?? '';
+    }
 
     // Qayta yuborishda (rad etilgandan keyin) o'zgarmagan rasm yuborilmaydi —
     // server mavjud faylni saqlab qoladi.

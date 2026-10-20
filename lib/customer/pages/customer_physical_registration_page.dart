@@ -12,12 +12,16 @@ import '../../core/api/http_response_codec.dart';
 import '../../core/config/api_config.dart';
 import '../../core/brand/alix_components.dart';
 import '../../core/i18n/i18n.dart';
+import '../../core/registration/pinfl_lookup.dart';
 import '../../core/session/session_store.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/offerta_link.dart';
 
 /// `POST /api/customer/registration/physical` (multipart, **temp** token).
+///
+/// Avval JShShIR (PINFL) kiritiladi: F.I.Sh. va tug'ilgan sana soliq bazasidan
+/// (Didox) olinadi va mijoz tasdiqlaydi. Topilmasa — qo'lda kiritadi.
 class CustomerPhysicalRegistrationPage extends StatefulWidget {
   const CustomerPhysicalRegistrationPage({
     super.key,
@@ -36,6 +40,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
   final _last = TextEditingController();
   final _first = TextEditingController();
   final _middle = TextEditingController();
+  final _pinfl = PinflLookupController();
   DateTime? _birthDate;
   int _docType = 1;
   bool _offerta = false;
@@ -54,6 +59,11 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
   void initState() {
     super.initState();
     _phoneCtrl = TextEditingController(text: widget.phoneDisplay);
+    _pinfl.addListener(_onPinflChanged);
+  }
+
+  void _onPinflChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -62,6 +72,8 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
     _last.dispose();
     _first.dispose();
     _middle.dispose();
+    _pinfl.removeListener(_onPinflChanged);
+    _pinfl.dispose();
     super.dispose();
   }
 
@@ -111,10 +123,23 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
       );
       return;
     }
-    if (_last.text.trim().isEmpty ||
-        _first.text.trim().isEmpty ||
-        _middle.text.trim().isEmpty ||
-        _birthDate == null) {
+    if (!_pinfl.isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(I18n.t('pinfl.must_be_14'))),
+      );
+      return;
+    }
+    if (!_pinfl.confirmed && !_pinfl.manual) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(I18n.t('pinfl.confirm_first'))),
+      );
+      return;
+    }
+    if (_pinfl.manual &&
+        (_last.text.trim().isEmpty ||
+            _first.text.trim().isEmpty ||
+            _middle.text.trim().isEmpty ||
+            _birthDate == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(I18n.t('customer.reg.fill_all_fields'))),
       );
@@ -142,13 +167,21 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
       final req = http.MultipartRequest('POST', uri)
         ..headers['Accept'] = 'application/json'
         ..headers['Authorization'] = 'Bearer $temp'
-        ..fields['last_name'] = _last.text.trim()
-        ..fields['first_name'] = _first.text.trim()
-        ..fields['middle_name'] = _middle.text.trim()
-        ..fields['birth_date'] = _fmtDate(_birthDate!)
+        ..fields['pinfl'] = _pinfl.value
         ..fields['phone_number'] = _phoneCtrl.text.replaceAll(RegExp(r'\s'), '')
         ..fields['id_document_type'] = '$_docType'
         ..fields['offerta_accepted'] = '1';
+
+      if (_pinfl.confirmed) {
+        // F.I.Sh./sana server tomonda soliq bazasidan olinadi.
+        req.fields['didox_confirmed'] = '1';
+      } else {
+        req.fields
+          ..['last_name'] = _last.text.trim()
+          ..['first_name'] = _first.text.trim()
+          ..['middle_name'] = _middle.text.trim()
+          ..['birth_date'] = _fmtDate(_birthDate!);
+      }
 
       req.files.add(await _part('id_doc_front_img', _front!));
       req.files.add(await _part('id_doc_back_img', _back!));
@@ -276,6 +309,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
               _last.clear();
               _first.clear();
               _middle.clear();
+              _pinfl.reset();
               setState(() {
                 _birthDate = null;
                 _docType = 1;
@@ -301,23 +335,28 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
             ),
             const SizedBox(height: 22),
             AlixSectionTitle(I18n.t('customer.reg.personal_section')),
-            TextField(controller: _last, decoration: InputDecoration(labelText: I18n.t('customer.reg.last_name_required'))),
+            PinflLookupField(controller: _pinfl, label: I18n.t('pinfl.label_required')),
             const SizedBox(height: 14),
-            TextField(controller: _first, decoration: InputDecoration(labelText: I18n.t('customer.reg.first_name_required'))),
-            const SizedBox(height: 14),
-            TextField(controller: _middle, decoration: InputDecoration(labelText: I18n.t('customer.reg.middle_name_required'))),
-            const SizedBox(height: 14),
-            InkWell(
-              onTap: _pickBirthDate,
-              child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: I18n.t('customer.reg.birth_date_required'),
-                  suffixIcon: const Icon(Icons.calendar_today_rounded),
+            // Soliq bazasi topmasa/ishlamasa — F.I.Sh. va sana qo'lda.
+            if (_pinfl.manual) ...[
+              TextField(controller: _last, decoration: InputDecoration(labelText: I18n.t('customer.reg.last_name_required'))),
+              const SizedBox(height: 14),
+              TextField(controller: _first, decoration: InputDecoration(labelText: I18n.t('customer.reg.first_name_required'))),
+              const SizedBox(height: 14),
+              TextField(controller: _middle, decoration: InputDecoration(labelText: I18n.t('customer.reg.middle_name_required'))),
+              const SizedBox(height: 14),
+              InkWell(
+                onTap: _pickBirthDate,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: I18n.t('customer.reg.birth_date_required'),
+                    suffixIcon: const Icon(Icons.calendar_today_rounded),
+                  ),
+                  child: Text(_birthDate == null ? I18n.t('customer.reg.not_picked') : _fmtDate(_birthDate!)),
                 ),
-                child: Text(_birthDate == null ? I18n.t('customer.reg.not_picked') : _fmtDate(_birthDate!)),
               ),
-            ),
-            const SizedBox(height: 14),
+              const SizedBox(height: 14),
+            ],
             TextField(
               controller: _phoneCtrl,
               readOnly: true,
