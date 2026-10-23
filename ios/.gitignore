@@ -33,3 +33,6 @@ Runner/GeneratedPluginRegistrant.*
 !default.pbxuser
 !default.perspectivev3
 Flutter/Secrets.xcconfig
+
+# Simulyator uchun xcodebuild -derivedDataPath build/sim
+build/
