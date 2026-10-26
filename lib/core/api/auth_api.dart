@@ -26,12 +26,17 @@ class OtpVerifyResult {
     required this.tempToken,
     required this.userType,
     required this.userId,
+    this.incomingOrders = 0,
   });
 
   final bool isVerified;
   final String tempToken;
   final String userType;
   final int userId;
+
+  /// Shu raqamga yuborilgan yuklar soni. Ro'yxatdan o'tmagan, lekin
+  /// `incomingOrders > 0` — "qabul qiluvchi" rejimida kiradi.
+  final int incomingOrders;
 }
 
 class ExchangeTokenResult {
@@ -129,6 +134,7 @@ class AuthApi {
       tempToken: token,
       userType: data['user_type']?.toString() ?? 'customer',
       userId: _asInt(data['user_id']),
+      incomingOrders: _asInt(data['incoming_orders']),
     );
   }
 

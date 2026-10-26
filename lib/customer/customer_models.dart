@@ -161,10 +161,18 @@ class CustomerOrder {
     this.companyCommissionPct,
     this.companyCommissionAmount,
     this.driverIncomeAmount,
+    this.recipientPhone,
+    this.recipientName,
   });
 
   final int id;
   final String? orderNumber;
+
+  /// Yuk qabul qiluvchisi (mijozning o'zi bo'lmasa). Bo'lsa buyurtmani
+  /// mijoz emas, qabul qiluvchi yakunlaydi.
+  final String? recipientPhone;
+  final String? recipientName;
+  bool get hasRecipient => (recipientPhone ?? '').isNotEmpty;
   final int? status;
   final String? totalPrice;
   final String? basePrice;
@@ -246,6 +254,8 @@ class CustomerOrder {
       acceptLng: _double(m['accept_lng']),
       cargoWeightKg: _intFromAny(m['cargo_weight_kg']),
       comment: m['comment']?.toString(),
+      recipientPhone: m['recipient'] is Map ? (m['recipient'] as Map)['phone']?.toString() : null,
+      recipientName: m['recipient'] is Map ? (m['recipient'] as Map)['name']?.toString() : null,
       createdAt: m['created_at']?.toString(),
       cargoType: CargoTypeMini.fromMap(m['cargo_type'] as Map<String, dynamic>?),
       acceptedAt: m['accepted_at']?.toString(),

@@ -86,6 +86,11 @@ class CustomerApi {
     /// Server OSRM'dan tirbandliksiz vaqt oladi, shuning uchun bu aniqroq.
     /// Server qiymatni o'z hisobiga nisbatan chegaralab qabul qiladi.
     int? durationMin,
+    /// Yuk qabul qiluvchisi (mijozning o'zi bo'lmasa): `+998XXXXXXXXX`,
+    /// STIR/PINFL va Didox topmagan bo'lsa nomi.
+    String? recipientPhone,
+    String? recipientTin,
+    String? recipientName,
   }) async {
     final token = await _requireBearer();
     final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/orders/create');
@@ -103,6 +108,9 @@ class CustomerApi {
       if (scheduledPickupAt != null)
         'scheduled_pickup_at': scheduledPickupAt.toUtc().toIso8601String(),
       if (durationMin != null && durationMin > 0) 'duration_min': durationMin,
+      'recipient_phone': ?recipientPhone,
+      'recipient_tin': ?recipientTin,
+      if (recipientName != null && recipientName.isNotEmpty) 'recipient_name': recipientName,
     };
     final res = await http.post(
       url,

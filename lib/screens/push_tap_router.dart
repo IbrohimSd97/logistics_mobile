@@ -7,11 +7,13 @@ import '../customer/pages/customer_order_detail_page.dart';
 import '../driver/driver_api.dart';
 import '../driver/driver_models.dart';
 import '../driver/pages/driver_order_detail_page.dart';
+import '../recipient/pages/recipient_order_page.dart';
+import '../recipient/recipient_api.dart';
 
 /// Push bildirishnomasi bosilganda tegishli sahifani ochadi.
 ///
 /// Backend `data` kontrakti (`OrderStatusPush`, `DriverModerationService`):
-///   - `type=order_status`, `order_id`, `role` (customer | driver) — buyurtma sahifasi;
+///   - `type=order_status`, `order_id`, `role` (customer | driver | recipient) — buyurtma sahifasi;
 ///   - `type=driver_moderation` — ilova ochiladi, yo'naltirishni mavjud
 ///     moderatsiya poller'i (`notifications/unread`) o'zi qiladi.
 ///
@@ -28,9 +30,11 @@ class PushTapRouter {
     if (orderId == null) return;
 
     try {
-      final page = data['role']?.toString() == 'driver'
-          ? await _driverPage(orderId)
-          : await _customerPage(orderId);
+      final page = switch (data['role']?.toString()) {
+        'driver' => await _driverPage(orderId),
+        'recipient' => RecipientOrderPage(order: await RecipientApi.instance.order(orderId)),
+        _ => await _customerPage(orderId),
+      };
       if (page == null) return;
       await navigatorKey.currentState?.push(MaterialPageRoute<void>(builder: (_) => page));
     } catch (e) {

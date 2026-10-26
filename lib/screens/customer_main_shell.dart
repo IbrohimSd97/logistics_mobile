@@ -17,6 +17,7 @@ import '../customer/customer_models.dart';
 import '../customer/pages/customer_order_create_page.dart';
 import '../customer/pages/customer_order_detail_page.dart';
 import '../customer/pages/customer_physical_registration_page.dart';
+import '../recipient/pages/recipient_home_page.dart';
 import '../customer/pages/customer_wallet_topup_page.dart' as wallet_page;
 import '../driver/driver_api.dart';
 import '../driver/driver_models.dart';
@@ -628,6 +629,10 @@ class CustomerHomeBodyState extends State<CustomerHomeBody> {
           ),
           const SizedBox(height: 2),
           Text(I18n.t('customer.home_title'), style: theme.textTheme.headlineMedium),
+          if (widget.hasRefreshSession) ...[
+            const SizedBox(height: 14),
+            IncomingCargoBanner(refreshTick: widget.refreshTick),
+          ],
           if (_loading)
             const Padding(
               padding: EdgeInsets.only(top: 14),

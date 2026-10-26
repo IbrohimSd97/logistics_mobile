@@ -11,6 +11,7 @@ import '../../core/theme/app_palette.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/location_picker_page.dart';
 import '../../core/widgets/refresh_icon_button.dart';
+import '../../recipient/widgets/recipient_form.dart';
 import '../customer_api.dart';
 import 'customer_payment_select_page.dart';
 
@@ -53,6 +54,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
   final _deliveryAddr = TextEditingController();
   final _weight = TextEditingController(text: '1');
   final _comment = TextEditingController();
+  final _recipient = RecipientFormController();
   LatLng? _pickup;
   LatLng? _delivery;
 
@@ -101,6 +103,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
     _deliveryAddr.dispose();
     _weight.dispose();
     _comment.dispose();
+    _recipient.dispose();
     super.dispose();
   }
 
@@ -244,6 +247,11 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(I18n.t('order.create.weight_too_big'))));
       return;
     }
+    final recipientError = _recipient.validate();
+    if (recipientError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(recipientError)));
+      return;
+    }
     // Rejali rejim: vaqt tanlangan bo'lishi kerak va kelajakda (min +5 daq).
     if (_scheduledMode) {
       if (_scheduledAt == null) {
@@ -279,6 +287,9 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
         comment: _comment.text.trim().isEmpty ? null : _comment.text.trim(),
         scheduledPickupAt: _scheduledMode ? _scheduledAt : null,
         durationMin: route?.durationMin,
+        recipientPhone: _recipient.self ? null : _recipient.phoneE164,
+        recipientTin: _recipient.self ? null : _recipient.tinValue,
+        recipientName: _recipient.self || _recipient.foundName != null ? null : _recipient.name.text.trim(),
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -395,6 +406,8 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
               ),
               maxLines: 2,
             ),
+            const SizedBox(height: 24),
+            RecipientFormSection(controller: _recipient),
             const SizedBox(height: 24),
             AlixSectionTitle(I18n.t('order.create.schedule_section')),
             _ScheduledPickupCard(

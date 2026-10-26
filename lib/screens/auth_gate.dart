@@ -11,6 +11,7 @@ import '../driver/pages/driver_pending_page.dart';
 import '../driver/pages/driver_rejected_page.dart';
 import 'login_screen.dart';
 import 'main_shell.dart';
+import 'recipient_shell.dart';
 
 /// Ilova ochilishidagi sessiya darvozasi.
 ///
@@ -55,6 +56,11 @@ class _AuthGateState extends State<AuthGate> {
 
     if (userType == 'driver') {
       await _routeDriver(phone: phone, userId: userId ?? 0);
+      return;
+    }
+
+    if (userType == 'recipient') {
+      _go(RecipientShell(phoneDisplay: phone));
       return;
     }
 

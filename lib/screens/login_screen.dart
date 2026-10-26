@@ -21,6 +21,7 @@ import '../driver/pages/driver_failed_page.dart';
 import '../driver/pages/driver_pending_page.dart';
 import '../driver/pages/driver_rejected_page.dart';
 import 'main_shell.dart';
+import 'recipient_shell.dart';
 
 // Palitra `core/theme/app_palette.dart` ga ko'chirildi (AppPalette).
 
@@ -364,6 +365,12 @@ class _LoginScreenState extends State<LoginScreen>
   }) {
     // Login ekranidagi eski (masalan, tarmoq) SnackBar yangi ekranga "yopishib" qolmasin.
     ScaffoldMessenger.of(context).clearSnackBars();
+    if (userType == 'recipient') {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => RecipientShell(phoneDisplay: phone)),
+      );
+      return;
+    }
     // Har doim driver moderatsiya holatini tekshiramiz: foydalanuvchi driver
     // bo'lib ro'yxatdan o'tган va hali tasdiqlanmagan (pending/rejected/failed)
     // bo'lsa — user_type 'customer' bo'lsa ham driver holat sahifasiga chiqaramiz.
@@ -449,7 +456,9 @@ class _LoginScreenState extends State<LoginScreen>
         _isVerifiedUser = v.isVerified;
       });
 
-      if (v.isVerified) {
+      // Ro'yxatdan o'tmagan, lekin unga yuk yuborilgan — qabul qiluvchi
+      // rejimida kiradi (server `user_type=recipient` qaytaradi).
+      if (v.isVerified || v.incomingOrders > 0) {
         await _exchangeAndRouteRegistered(phone);
       } else {
         await _openCustomerForNewNumber(phone, otpUserId: v.userId);
