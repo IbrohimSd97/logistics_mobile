@@ -16,6 +16,7 @@ class StoreFrame extends StatelessWidget {
     required this.subtitle,
     required this.screen,
     this.dark = false,
+    this.ios = false,
   });
 
   final String title;
@@ -24,6 +25,9 @@ class StoreFrame extends StatelessWidget {
 
   /// To'q fon varianti (ketma-ketlikda ritm berish uchun).
   final bool dark;
+
+  /// App Store uchun: iPhone status bar (Dynamic Island). Aks holda Android.
+  final bool ios;
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +113,7 @@ class StoreFrame extends StatelessWidget {
               left: (w - phoneW) / 2,
               width: phoneW,
               top: h * (aspect > 2.0 ? 0.335 : 0.36),
-              child: _Phone(width: phoneW, bezel: bezel, dark: dark, screen: screen),
+              child: _Phone(width: phoneW, bezel: bezel, dark: dark, ios: ios, screen: screen),
             ),
           ],
         ),
@@ -119,11 +123,18 @@ class StoreFrame extends StatelessWidget {
 }
 
 class _Phone extends StatelessWidget {
-  const _Phone({required this.width, required this.bezel, required this.dark, required this.screen});
+  const _Phone({
+    required this.width,
+    required this.bezel,
+    required this.dark,
+    required this.screen,
+    this.ios = false,
+  });
 
   final double width;
   final double bezel;
   final bool dark;
+  final bool ios;
   final Widget screen;
 
   @override
@@ -156,7 +167,7 @@ class _Phone extends StatelessWidget {
           child: FittedBox(
             fit: BoxFit.fitWidth,
             alignment: Alignment.topCenter,
-            child: SizedBox.fromSize(size: kPhoneScreen, child: PhoneScreen(child: screen)),
+            child: SizedBox.fromSize(size: kPhoneScreen, child: PhoneScreen(ios: ios, child: screen)),
           ),
         ),
       ),
@@ -168,19 +179,22 @@ class _Phone extends StatelessWidget {
 /// o'z Navigator'i (bottom sheet'lar ekran ichida ochiladi) va soxta
 /// status bar.
 class PhoneScreen extends StatelessWidget {
-  const PhoneScreen({super.key, required this.child});
+  const PhoneScreen({super.key, required this.child, this.ios = false});
 
   final Widget child;
+  final bool ios;
 
   static const double statusBar = 47;
+  static const double iosStatusBar = 54;
 
   @override
   Widget build(BuildContext context) {
+    final top = ios ? iosStatusBar : statusBar;
     final mq = MediaQuery.of(context).copyWith(
       size: kPhoneScreen,
       devicePixelRatio: 3,
-      padding: const EdgeInsets.only(top: statusBar, bottom: 20),
-      viewPadding: const EdgeInsets.only(top: statusBar, bottom: 20),
+      padding: EdgeInsets.only(top: top, bottom: 20),
+      viewPadding: EdgeInsets.only(top: top, bottom: 20),
       textScaler: TextScaler.noScaling,
     );
     return MediaQuery(
@@ -197,7 +211,7 @@ class PhoneScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const Positioned(left: 0, right: 0, top: 0, height: statusBar, child: _StatusBar()),
+            Positioned(left: 0, right: 0, top: 0, height: top, child: _StatusBar(ios: ios)),
           ],
         ),
       ),
@@ -206,11 +220,16 @@ class PhoneScreen extends StatelessWidget {
 }
 
 class _StatusBar extends StatelessWidget {
-  const _StatusBar();
+  const _StatusBar({required this.ios});
+
+  final bool ios;
 
   @override
   Widget build(BuildContext context) {
     const c = AppPalette.inkStrong;
+    if (ios) {
+      return const IgnorePointer(child: CustomPaint(painter: _IosStatusBarPainter(c)));
+    }
     return const IgnorePointer(
       child: Padding(
         padding: EdgeInsets.fromLTRB(34, 14, 26, 0),
@@ -230,6 +249,119 @@ class _StatusBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// iPhone (Dynamic Island) status bar: chapda vaqt, o'rtada "orol", o'ngda
+/// iOS uslubidagi signal, Wi-Fi va batareya. App Store Android status bar'li
+/// screenshotlarni rad etadi (Guideline 2.3.10).
+class _IosStatusBarPainter extends CustomPainter {
+  const _IosStatusBarPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    const cy = 29.5; // ikonkalar va vaqtning vertikal markazi (orol markazi)
+    final fill = Paint()..color = color;
+
+    // Dynamic Island.
+    const islandW = 125.0, islandH = 37.0;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(w / 2, cy), width: islandW, height: islandH),
+        const Radius.circular(islandH / 2),
+      ),
+      Paint()..color = Colors.black,
+    );
+
+    // Vaqt — orolning chap tomonidagi bo'shliq markazida.
+    final time = TextPainter(
+      text: TextSpan(
+        text: '9:41',
+        style: TextStyle(
+          fontFamily: 'Manrope',
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+          color: color,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final leftCenter = (w / 2 - islandW / 2) / 2 + 4;
+    time.paint(canvas, Offset(leftCenter - time.width / 2, cy - time.height / 2));
+
+    // O'ng guruh: signal (17×11), Wi-Fi (15×11), batareya (27×13).
+    const signalW = 17.0, wifiW = 15.5, batteryW = 27.5, gap = 6.0;
+    const groupW = signalW + gap + wifiW + gap + batteryW;
+    final rightCenter = w - (w / 2 - islandW / 2) / 2 - 4;
+    var x = rightCenter - groupW / 2;
+
+    // Signal: 4 ta pog'onali ustun.
+    const barW = 3.2, barGap = 1.4;
+    for (var i = 0; i < 4; i++) {
+      final h = 4.0 + i * 2.4;
+      final left = x + i * (barW + barGap);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(left, cy + 5.5 - h, barW, h),
+          const Radius.circular(1),
+        ),
+        fill,
+      );
+    }
+    x += signalW + gap;
+
+    // Wi-Fi: pastdagi nuqtadan tarqaladigan 3 ta yoy (sektor).
+    final origin = Offset(x + wifiW / 2, cy + 5.6);
+    const sweep = 1.55; // ~89°
+    const startAngle = -1.5708 - sweep / 2;
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.1
+      ..strokeCap = StrokeCap.round;
+    for (final r in [4.0, 7.6, 11.2]) {
+      if (r == 4.0) {
+        final path = Path()
+          ..moveTo(origin.dx, origin.dy)
+          ..arcTo(Rect.fromCircle(center: origin, radius: r + 1), startAngle, sweep, false)
+          ..close();
+        canvas.drawPath(path, fill);
+      } else {
+        canvas.drawArc(Rect.fromCircle(center: origin, radius: r), startAngle + 0.08, sweep - 0.16,
+            false, stroke);
+      }
+    }
+    x += wifiW + gap;
+
+    // Batareya: ochiq kontur, ichida to'liq zaryad va o'ngda "tugmacha".
+    const bodyW = 25.0, bodyH = 12.5;
+    final body = Rect.fromLTWH(x, cy - bodyH / 2, bodyW, bodyH);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(body, const Radius.circular(4)),
+      Paint()
+        ..color = color.withValues(alpha: 0.38)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(body.deflate(2), const Radius.circular(2.5)),
+      fill,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(
+        Rect.fromLTWH(x + bodyW + 1.2, cy - 2.2, 1.6, 4.4),
+        topRight: const Radius.circular(1),
+        bottomRight: const Radius.circular(1),
+      ),
+      Paint()..color = color.withValues(alpha: 0.4),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _IosStatusBarPainter old) => old.color != color;
 }
 
 /// Google Play "Feature graphic" (1024×500): chapda logotip va shior, o'ngda

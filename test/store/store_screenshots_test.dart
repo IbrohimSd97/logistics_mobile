@@ -277,6 +277,7 @@ void main() {
                       title: ru ? shot.titleRu : shot.titleUz,
                       subtitle: ru ? shot.subRu : shot.subUz,
                       dark: shot.dark,
+                      ios: size.key.startsWith('ios'),
                       screen: shot.screen(),
                     ),
                   ),
