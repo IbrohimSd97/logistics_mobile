@@ -38,6 +38,10 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Eksport muvofiqligi: faqat iOS'ning standart shifrlashi (HTTPS), o'zimizning
+	     algoritm yo'q — App Store Connect'da "Missing Compliance" so'ralmaydi. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
