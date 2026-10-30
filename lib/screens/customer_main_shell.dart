@@ -319,6 +319,8 @@ class _CustomerMainShellState extends State<CustomerMainShell>
           prefillFirstName: profile?.firstName,
           prefillMiddleName: profile?.middleName,
           prefillBirthDate: profile?.birthDate,
+          prefillPinfl: profile?.pinfl,
+          prefillPinflVerified: profile?.didoxVerified ?? false,
         ),
       ),
     );

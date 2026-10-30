@@ -74,6 +74,9 @@ class PinflLookupController extends ChangeNotifier {
   String? message;
   String _checked = '';
 
+  /// PINFL avval (mijoz profilida) tasdiqlangan — maydon ko'rsatilmaydi.
+  bool fromProfile = false;
+
   bool get confirmed => status == PinflLookupStatus.confirmed;
   bool get manual => status == PinflLookupStatus.manual;
   String get value => pinfl.text.trim();
@@ -123,9 +126,20 @@ class PinflLookupController extends ChangeNotifier {
 
   void confirm() => _set(PinflLookupStatus.confirmed);
 
+  /// Avval tasdiqlangan PINFL: Didox'ga qayta so'rov yubormasdan `confirmed`.
+  void preconfirm(String pinflValue, PinflPerson p) {
+    _checked = pinflValue;
+    person = p;
+    status = PinflLookupStatus.confirmed;
+    fromProfile = true;
+    pinfl.text = pinflValue;
+    notifyListeners();
+  }
+
   /// "Yo'q, bu men emas" — raqamni tozalab qayta kiritishga qaytaramiz.
   void reject() {
     _checked = '';
+    fromProfile = false;
     pinfl.clear();
     _set(PinflLookupStatus.idle);
   }
@@ -169,6 +183,9 @@ class PinflLookupField extends StatelessWidget {
       builder: (context, _) {
         final c = controller;
         final locked = c.status == PinflLookupStatus.confirmed || c.status == PinflLookupStatus.found;
+        if (c.fromProfile && c.confirmed && c.person != null) {
+          return _ConfirmedCard(person: c.person!, pinfl: c.value);
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -212,7 +229,7 @@ class PinflLookupField extends StatelessWidget {
             ],
             if (c.status == PinflLookupStatus.confirmed && c.person != null) ...[
               const SizedBox(height: 12),
-              _ConfirmedCard(person: c.person!, onChange: c.reset),
+              _ConfirmedCard(person: c.person!, pinfl: c.value, onChange: c.reset),
             ],
             if (c.status == PinflLookupStatus.manual && c.message != null) ...[
               const SizedBox(height: 12),
@@ -285,10 +302,13 @@ class _ConfirmCard extends StatelessWidget {
 }
 
 class _ConfirmedCard extends StatelessWidget {
-  const _ConfirmedCard({required this.person, required this.onChange});
+  const _ConfirmedCard({required this.person, required this.pinfl, this.onChange});
 
   final PinflPerson person;
-  final VoidCallback onChange;
+  final String pinfl;
+
+  /// null — o'zgartirib bo'lmaydi (PINFL mijoz profilida tasdiqlangan).
+  final VoidCallback? onChange;
 
   @override
   Widget build(BuildContext context) {
@@ -299,8 +319,17 @@ class _ConfirmedCard extends StatelessWidget {
         children: [
           const Icon(Icons.verified_rounded, color: AppPalette.success),
           const SizedBox(width: 12),
-          Expanded(child: _PersonLines(person: person)),
-          TextButton(onPressed: onChange, child: Text(I18n.t('pinfl.change'))),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PersonLines(person: person),
+                const SizedBox(height: 4),
+                Text(I18n.t('pinfl.number', {'pinfl': pinfl}), style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          if (onChange != null) TextButton(onPressed: onChange, child: Text(I18n.t('pinfl.change'))),
         ],
       ),
     );

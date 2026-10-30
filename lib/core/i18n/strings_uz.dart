@@ -93,6 +93,7 @@ const Map<String, String> kStringsUz = {
   'pinfl.yes': 'Ha, bu men',
   'pinfl.no': 'Yo‘q',
   'pinfl.change': 'O‘zgartirish',
+  'pinfl.number': 'JShShIR: {pinfl}',
   'pinfl.retry': 'Qayta tekshirish',
   'pinfl.not_found': 'Bu JShShIR bo‘yicha ma’lumot topilmadi. Raqamni tekshiring yoki ma’lumotlarni qo‘lda kiriting.',
   'pinfl.unavailable': 'Soliq bazasidan ma’lumot olib bo‘lmadi. Ma’lumotlarni qo‘lda kiriting.',

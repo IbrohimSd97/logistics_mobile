@@ -11,6 +11,8 @@ class CustomerProfile {
     this.idDocFrontImg,
     this.idDocBackImg,
     this.idDocSelfieImg,
+    this.pinfl,
+    this.didoxVerified = false,
   });
 
   final int userId;
@@ -24,6 +26,12 @@ class CustomerProfile {
   final String? idDocFrontImg;
   final String? idDocBackImg;
   final String? idDocSelfieImg;
+
+  /// JShShIR (PINFL).
+  final String? pinfl;
+
+  /// PINFL soliq bazasi (Didox) orqali tasdiqlangan — haydovchi ro'yxatida qayta so'ralmaydi.
+  final bool didoxVerified;
 
   static CustomerProfile? fromMap(Map<String, dynamic>? m) {
     if (m == null) return null;
@@ -41,6 +49,8 @@ class CustomerProfile {
       idDocFrontImg: m['id_doc_front_img']?.toString(),
       idDocBackImg: m['id_doc_back_img']?.toString(),
       idDocSelfieImg: m['id_doc_selfie_img']?.toString(),
+      pinfl: m['pinfl']?.toString(),
+      didoxVerified: m['didox_verified'] == true,
     );
   }
 }

@@ -276,6 +276,8 @@ class _MainShellState extends State<MainShell>
           prefillFirstName: profile?.firstName,
           prefillMiddleName: profile?.middleName,
           prefillBirthDate: profile?.birthDate,
+          prefillPinfl: profile?.pinfl,
+          prefillPinflVerified: profile?.didoxVerified ?? false,
         ),
       ),
     );

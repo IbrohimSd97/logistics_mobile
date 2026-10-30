@@ -92,6 +92,7 @@ const Map<String, String> kStringsRu = {
   'pinfl.yes': 'Да, это я',
   'pinfl.no': 'Нет',
   'pinfl.change': 'Изменить',
+  'pinfl.number': 'ПИНФЛ: {pinfl}',
   'pinfl.retry': 'Проверить ещё раз',
   'pinfl.not_found': 'По этому ПИНФЛ данные не найдены. Проверьте номер или введите данные вручную.',
   'pinfl.unavailable': 'Не удалось получить данные из налоговой базы. Введите данные вручную.',

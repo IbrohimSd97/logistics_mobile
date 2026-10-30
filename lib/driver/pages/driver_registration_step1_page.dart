@@ -27,6 +27,8 @@ class DriverRegistrationStep1Page extends StatefulWidget {
     this.prefillFirstName,
     this.prefillMiddleName,
     this.prefillBirthDate,
+    this.prefillPinfl,
+    this.prefillPinflVerified = false,
     this.rejects,
     this.data,
   });
@@ -36,6 +38,10 @@ class DriverRegistrationStep1Page extends StatefulWidget {
   final String? prefillFirstName;
   final String? prefillMiddleName;
   final String? prefillBirthDate;
+
+  /// Mijoz sifatida soliq bazasi orqali tasdiqlangan PINFL — qayta so'ralmaydi.
+  final String? prefillPinfl;
+  final bool prefillPinflVerified;
   final DriverRegistrationRejects? rejects;
 
   /// Xatolarni tuzatish oqimida oldin yuborilgan qiymatlar (prefill).
@@ -103,8 +109,22 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     }
     // Qayta yuborishda: saqlangan PINFL'ni soliq bazasidan qayta tekshiramiz —
     // topilsa haydovchi yana tasdiqlaydi, topilmasa eski qo'lda kiritilgan qiymatlar qoladi.
+    // Mijoz sifatida tasdiqlangan PINFL — qayta tekshirmaymiz va so'ramaymiz.
+    final verifiedPinfl = widget.prefillPinfl ?? '';
+    if (_pinfl.value.isEmpty && widget.prefillPinflVerified && verifiedPinfl.isNotEmpty) {
+      _pinfl.preconfirm(
+        verifiedPinfl,
+        PinflPerson(
+          lastName: _last.text,
+          firstName: _first.text,
+          middleName: _middle.text,
+          fullName: [_last.text, _first.text, _middle.text].where((s) => s.isNotEmpty).join(' '),
+          birthDate: widget.prefillBirthDate,
+        ),
+      );
+    }
     _pinfl.addListener(_onPinflChanged);
-    if (_pinfl.isValid) _pinfl.lookup();
+    if (_pinfl.isValid && !_pinfl.confirmed) _pinfl.lookup();
   }
 
   void _onPinflChanged() {
