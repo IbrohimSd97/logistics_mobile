@@ -329,13 +329,16 @@ class CustomerOrderCancelReasonInfo {
 }
 
 class WalletSnapshot {
-  const WalletSnapshot({this.balance, this.currency = 'UZS', this.ownerType});
+  const WalletSnapshot({this.balance, this.currency = 'UZS', this.ownerType, this.walletNumber});
 
   final String? balance;
   final String? currency;
   /// 1=driver, 2=customer, 3=app, 4=avtopark, 5=customer_company.
   /// Korporativ (5) bo'lsa UI top-up tugmalarini yashiradi (faqat admin to'ldiradi).
   final int? ownerType;
+
+  /// Ochiq hamyon raqami (`AX-123456`) — bank o'tkazmasining to'lov maqsadiga yoziladi.
+  final String? walletNumber;
 
   bool get isCorporate => ownerType == 5;
 
@@ -346,6 +349,7 @@ class WalletSnapshot {
       balance: data['balance']?.toString() ?? data['available_balance']?.toString(),
       currency: data['currency']?.toString() ?? 'UZS',
       ownerType: ot is int ? ot : (ot != null ? int.tryParse(ot.toString()) : null),
+      walletNumber: data['wallet_number']?.toString(),
     );
   }
 }
@@ -423,6 +427,9 @@ class CustomerBillingInfo {
     this.companyBalance,
     this.companyCurrency,
     this.recentCompanyTx = const [],
+    this.personalWalletNumber,
+    this.companyWalletNumber,
+    this.bankTransfer,
   });
 
   final bool isCompanyStaff;
@@ -436,6 +443,11 @@ class CustomerBillingInfo {
   final String? companyBalance;
   final String? companyCurrency;
   final List<WalletTransaction> recentCompanyTx;
+  final String? personalWalletNumber;
+  final String? companyWalletNumber;
+
+  /// ALIX rekvizitlari — hamyonni bank o'tkazmasi bilan to'ldirish uchun.
+  final BankTransferRequisites? bankTransfer;
 
   bool get isCorporateBilling => billingSource == 'company';
 
@@ -459,6 +471,36 @@ class CustomerBillingInfo {
           .whereType<Map<String, dynamic>>()
           .map(WalletTransaction.fromMap)
           .toList(),
+      personalWalletNumber: personal?['wallet_number']?.toString(),
+      companyWalletNumber: companyWallet?['wallet_number']?.toString(),
+      bankTransfer: BankTransferRequisites.fromMap(m['bank_transfer'] as Map<String, dynamic>?),
+    );
+  }
+}
+
+/// `billing-info.bank_transfer` — pul o'tkaziladigan ALIX hisobi.
+class BankTransferRequisites {
+  const BankTransferRequisites({
+    required this.receiver,
+    required this.inn,
+    required this.account,
+    required this.mfo,
+  });
+
+  final String receiver;
+  final String inn;
+  final String account;
+  final String mfo;
+
+  static BankTransferRequisites? fromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
+    final account = m['account']?.toString() ?? '';
+    if (account.isEmpty) return null;
+    return BankTransferRequisites(
+      receiver: m['receiver']?.toString() ?? '',
+      inn: m['inn']?.toString() ?? '',
+      account: account,
+      mfo: m['mfo']?.toString() ?? '',
     );
   }
 }
