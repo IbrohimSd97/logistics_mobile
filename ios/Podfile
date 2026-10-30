@@ -4,6 +4,11 @@ platform :ios, '15.0'
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# Yandex MapKit varianti. `lite` faqat xarita — manzil qidiruv va reverse
+# geocoding (YandexSearch) faqat `full`da ishlaydi. Android bilan bir xil
+# bo'lishi shart (android/gradle.properties → yandexMapkit.variant=full).
+ENV['YANDEX_MAPKIT_VARIANT'] = 'full'
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,

@@ -91,8 +91,8 @@ PODS:
     - FlutterMacOS
   - yandex_mapkit (0.0.1):
     - Flutter
-    - YandexMapsMobile (= 4.39.1-lite)
-  - YandexMapsMobile (4.39.1-lite)
+    - YandexMapsMobile (= 4.39.1-full)
+  - YandexMapsMobile (4.39.1-full)
 
 DEPENDENCIES:
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/darwin`)
@@ -176,9 +176,9 @@ SPEC CHECKSUMS:
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
   wakelock_plus: e29112ab3ef0b318e58cfa5c32326458be66b556
   webview_flutter_wkwebview: 8ebf4fded22593026f7dbff1fbff31ea98573c8d
-  yandex_mapkit: eb927c07a3f9e0ff87959bd2666f9b5223b2d625
-  YandexMapsMobile: bdc1434f582830494ef8d5f10144a06e838b468d
+  yandex_mapkit: 2182626685a07ecb6dc75d0c558c882cc498c48b
+  YandexMapsMobile: fe47790cc83669d9cadc5e2258836745dffa9d07
 
-PODFILE CHECKSUM: b716751bf2e363bdb7e47059b7b53349f6d7ba53
+PODFILE CHECKSUM: e68fb8ba58266757c4eaa7806583f9b672d2d099
 
 COCOAPODS: 1.17.0
