@@ -1259,7 +1259,7 @@ class CustomerWalletBodyState extends State<CustomerWalletBody> {
             const SizedBox(height: 14),
           ],
           if (_walletNumber(corporate) case final number?)
-            _WalletNumberCard(number: number, requisites: _billing?.bankTransfer)
+            WalletNumberCard(number: number)
           else if (corporate)
             AlixBanner(
               message: I18n.t('customer.wallet.admin_only_hint'),
@@ -1289,83 +1289,50 @@ class CustomerWalletBodyState extends State<CustomerWalletBody> {
   }
 }
 
-/// Hamyon raqami va bank o'tkazmasi rekvizitlari — mijoz o'z bankidan ALIX
-/// hisobiga pul o'tkazib, to'lov maqsadiga shu raqamni yozadi; server bank
-/// ko'chirmasidan raqamni topib, pulni hamyonga bog'laydi.
-class _WalletNumberCard extends StatelessWidget {
-  const _WalletNumberCard({required this.number, this.requisites});
+/// Hamyon raqami (`AX-123456`) — nusxa olish tugmasi bilan. Mijoz va
+/// haydovchi hamyon sahifalarida bir xil ko'rinadi.
+class WalletNumberCard extends StatelessWidget {
+  const WalletNumberCard({super.key, required this.number});
 
   final String number;
-  final BankTransferRequisites? requisites;
-
-  void _copy(BuildContext context, String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(I18n.t('customer.wallet.copied', {'text': text}))));
-  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
-    final r = requisites;
-    final purpose = I18n.t('customer.wallet.transfer_purpose', {'number': number});
-
-    Widget line(String label, String value) => Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: InkWell(
-            onTap: () => _copy(context, value),
-            child: Row(
-              children: [
-                Expanded(child: Text(label, style: theme.textTheme.bodySmall?.copyWith(color: muted))),
-                Flexible(
-                  flex: 2,
-                  child: Text(value, textAlign: TextAlign.end, style: theme.textTheme.bodyMedium),
-                ),
-                const SizedBox(width: 6),
-                Icon(Icons.copy_rounded, size: 14, color: muted),
-              ],
-            ),
-          ),
-        );
 
     return AlixCard(
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.fromLTRB(18, 14, 8, 14),
+      child: Row(
         children: [
-          Text(I18n.t('customer.wallet.number_label').toUpperCase(),
-              style: theme.textTheme.titleSmall?.copyWith(color: muted)),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(I18n.t('customer.wallet.number_label').toUpperCase(),
+                    style: theme.textTheme.titleSmall?.copyWith(color: muted)),
+                const SizedBox(height: 4),
+                Text(
                   number,
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
-              ),
-              IconButton(
-                tooltip: I18n.t('customer.wallet.copy'),
-                icon: const Icon(Icons.copy_rounded),
-                onPressed: () => _copy(context, number),
-              ),
-            ],
+              ],
+            ),
           ),
-          if (r != null) ...[
-            const SizedBox(height: 4),
-            Text(I18n.t('customer.wallet.transfer_hint'), style: theme.textTheme.bodySmall?.copyWith(color: muted)),
-            const Divider(height: 22),
-            if (r.receiver.isNotEmpty) line(I18n.t('customer.wallet.req_receiver'), r.receiver),
-            if (r.inn.isNotEmpty) line(I18n.t('customer.wallet.req_inn'), r.inn),
-            line(I18n.t('customer.wallet.req_account'), r.account),
-            if (r.mfo.isNotEmpty) line(I18n.t('customer.wallet.req_mfo'), r.mfo),
-            line(I18n.t('customer.wallet.req_purpose'), purpose),
-          ],
+          IconButton(
+            tooltip: I18n.t('customer.wallet.copy'),
+            icon: const Icon(Icons.copy_rounded),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: number));
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(
+                    content: Text(I18n.t('customer.wallet.copied', {'text': number}))));
+            },
+          ),
         ],
       ),
     );

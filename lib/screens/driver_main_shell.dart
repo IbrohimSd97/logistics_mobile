@@ -1227,6 +1227,10 @@ class DriverWalletBodyState extends State<DriverWalletBody> {
               icon: const Icon(Icons.payments_outlined),
               label: Text(I18n.t('driver.withdraw_card_btn')),
             ),
+            if (_w?.walletNumber case final number? when number.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              WalletNumberCard(number: number),
+            ],
           ],
           const SizedBox(height: 26),
           AlixSectionTitle(

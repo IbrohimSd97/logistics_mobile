@@ -429,7 +429,6 @@ class CustomerBillingInfo {
     this.recentCompanyTx = const [],
     this.personalWalletNumber,
     this.companyWalletNumber,
-    this.bankTransfer,
   });
 
   final bool isCompanyStaff;
@@ -445,9 +444,6 @@ class CustomerBillingInfo {
   final List<WalletTransaction> recentCompanyTx;
   final String? personalWalletNumber;
   final String? companyWalletNumber;
-
-  /// ALIX rekvizitlari — hamyonni bank o'tkazmasi bilan to'ldirish uchun.
-  final BankTransferRequisites? bankTransfer;
 
   bool get isCorporateBilling => billingSource == 'company';
 
@@ -473,34 +469,6 @@ class CustomerBillingInfo {
           .toList(),
       personalWalletNumber: personal?['wallet_number']?.toString(),
       companyWalletNumber: companyWallet?['wallet_number']?.toString(),
-      bankTransfer: BankTransferRequisites.fromMap(m['bank_transfer'] as Map<String, dynamic>?),
-    );
-  }
-}
-
-/// `billing-info.bank_transfer` — pul o'tkaziladigan ALIX hisobi.
-class BankTransferRequisites {
-  const BankTransferRequisites({
-    required this.receiver,
-    required this.inn,
-    required this.account,
-    required this.mfo,
-  });
-
-  final String receiver;
-  final String inn;
-  final String account;
-  final String mfo;
-
-  static BankTransferRequisites? fromMap(Map<String, dynamic>? m) {
-    if (m == null) return null;
-    final account = m['account']?.toString() ?? '';
-    if (account.isEmpty) return null;
-    return BankTransferRequisites(
-      receiver: m['receiver']?.toString() ?? '',
-      inn: m['inn']?.toString() ?? '',
-      account: account,
-      mfo: m['mfo']?.toString() ?? '',
     );
   }
 }

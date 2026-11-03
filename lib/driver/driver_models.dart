@@ -431,16 +431,18 @@ class DriverOrderCancelReasonInfo {
 }
 
 class DriverWalletSnapshot {
-  const DriverWalletSnapshot({this.balance, this.currency = 'UZS'});
+  const DriverWalletSnapshot({this.balance, this.currency = 'UZS', this.walletNumber});
 
   final String? balance;
   final String? currency;
+  final String? walletNumber;
 
   static DriverWalletSnapshot? fromMap(dynamic data) {
     if (data is! Map<String, dynamic>) return null;
     return DriverWalletSnapshot(
       balance: data['balance']?.toString() ?? data['available_balance']?.toString(),
       currency: data['currency']?.toString() ?? 'UZS',
+      walletNumber: data['wallet_number']?.toString(),
     );
   }
 }
