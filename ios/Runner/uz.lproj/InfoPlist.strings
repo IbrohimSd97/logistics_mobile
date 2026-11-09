@@ -1,0 +1,5 @@
+/* iOS ruxsat so'rovlari matni — o'zbekcha. */
+"NSCameraUsageDescription" = "ALIX haydovchi guvohnomasi, selfi va mashina rasmlarini olish uchun kameradan foydalanadi.";
+"NSPhotoLibraryUsageDescription" = "ALIX hujjat rasmlarini galereyadan tanlash uchun ruxsat so'raydi.";
+"NSLocationWhenInUseUsageDescription" = "Manzilni xaritada belgilash va yetkazib berishni kuzatish uchun joylashuvingiz kerak.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Buyurtma bajarilayotganda joylashuvingiz mijozga yetkazib berish holatini ko'rsatish uchun ishlatiladi.";

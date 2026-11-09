@@ -5,7 +5,14 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<string>ru</string>
+	<!-- Ilova tillari. Ruxsat so'rovlari matni {ru,uz}.lproj/InfoPlist.strings
+	     da; qurilma tili ikkalasi ham bo'lmasa ruscha (App Store asosiy tili). -->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ru</string>
+		<string>uz</string>
+	</array>
 	<!-- Yandex MapKit kaliti — qiymat xcconfig'dan keladi (Secrets.xcconfig),
 	     shuning uchun repoda ochiq saqlanmaydi. -->
 	<key>YandexMapKitApiKey</key>
@@ -13,13 +20,13 @@
 	<!-- Buyurtma manzilini xaritada belgilash va haydovchi joylashuvini
 	     kuzatish uchun. Bu matnlarsiz iOS ruxsat so'ramaydi. -->
 	<key>NSCameraUsageDescription</key>
-	<string>ALIX haydovchi guvohnomasi, selfi va mashina rasmlarini olish uchun kameradan foydalanadi.</string>
+	<string>ALIX использует камеру, чтобы сфотографировать водительское удостоверение, селфи и автомобиль.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>ALIX hujjat rasmlarini galereyadan tanlash uchun ruxsat so'raydi.</string>
+	<string>ALIX запрашивает доступ к галерее, чтобы выбрать фото документов.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Manzilni xaritada belgilash va yetkazib berishni kuzatish uchun joylashuvingiz kerak.</string>
+	<string>Ваше местоположение нужно, чтобы отметить адрес на карте и отслеживать доставку.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Buyurtma bajarilayotganda joylashuvingiz mijozga yetkazib berish holatini ko'rsatish uchun ishlatiladi.</string>
+	<string>Во время выполнения заказа ваше местоположение используется, чтобы показывать клиенту статус доставки.</string>
 	<key>CFBundleDisplayName</key>
 	<string>ALIX</string>
 	<key>CFBundleExecutable</key>

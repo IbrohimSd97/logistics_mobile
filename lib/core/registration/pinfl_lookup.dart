@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -13,6 +14,9 @@ import '../session/session_store.dart';
 import '../theme/app_palette.dart';
 
 /// Soliq bazasidagi (Didox) shaxs — `POST /api/registration/pinfl-lookup` javobi.
+///
+/// Haydovchi STIR kiritsa (yuridik shaxs) — `isCompany`: `fullName` kompaniya
+/// nomi, F.I.Sh. — direktorniki.
 class PinflPerson {
   const PinflPerson({
     required this.lastName,
@@ -20,6 +24,8 @@ class PinflPerson {
     required this.middleName,
     required this.fullName,
     this.birthDate,
+    this.isCompany = false,
+    this.directorName,
   });
 
   final String lastName;
@@ -30,16 +36,23 @@ class PinflPerson {
   /// YYYY-MM-DD (PINFL'dan). Ba'zan bo'lmasligi mumkin.
   final String? birthDate;
 
+  /// STIR bo'yicha topilgan yuridik shaxs.
+  final bool isCompany;
+  final String? directorName;
+
   static PinflPerson? fromMap(Object? raw) {
     if (raw is! Map) return null;
     String s(String k) => (raw[k] ?? '').toString();
     final bd = s('birth_date');
+    final director = s('director_name');
     return PinflPerson(
       lastName: s('last_name'),
       firstName: s('first_name'),
       middleName: s('middle_name'),
       fullName: s('full_name'),
       birthDate: bd.isEmpty ? null : bd,
+      isCompany: s('kind') == 'company',
+      directorName: director.isEmpty ? null : director,
     );
   }
 }
@@ -57,18 +70,28 @@ enum PinflLookupStatus {
 
   /// Didox topmadi yoki ishlamayapti — F.I.Sh./sana qo'lda kiritiladi.
   manual,
+
+  /// STIR (yuridik shaxs) topilmadi yoki Didox ishlamayapti — qo'lda kiritib
+  /// bo'lmaydi, raqamni tekshirib qayta urinish kerak.
+  failed,
 }
 
 /// Ro'yxatdan o'tish formasidagi PINFL holati (mijoz va haydovchi uchun umumiy).
 ///
 /// Forma `confirmed` bo'lsa F.I.Sh./sana maydonlarini yashiradi va so'rovga
 /// `didox_confirmed=1` qo'shadi; `manual` bo'lsa eski maydonlarni ko'rsatadi.
+///
+/// `allowTin` (haydovchi): 14 xonali JShShIR (YATT) yoki 9 xonali STIR
+/// (yuridik shaxs). STIR faqat soliq bazasi orqali tasdiqlanadi.
 class PinflLookupController extends ChangeNotifier {
-  PinflLookupController({String? initialPinfl}) : pinfl = TextEditingController(text: initialPinfl ?? '') {
+  PinflLookupController({String? initialPinfl, this.allowTin = false})
+      : pinfl = TextEditingController(text: initialPinfl ?? '') {
     pinfl.addListener(_onTextChanged);
   }
 
   final TextEditingController pinfl;
+  final bool allowTin;
+  Timer? _tinDebounce;
   PinflLookupStatus status = PinflLookupStatus.idle;
   PinflPerson? person;
   String? message;
@@ -80,14 +103,25 @@ class PinflLookupController extends ChangeNotifier {
   bool get confirmed => status == PinflLookupStatus.confirmed;
   bool get manual => status == PinflLookupStatus.manual;
   String get value => pinfl.text.trim();
-  bool get isValid => RegExp(r'^\d{14}$').hasMatch(value);
+  bool get failed => status == PinflLookupStatus.failed;
+
+  /// 9 xonali STIR — yuridik shaxs.
+  bool get isTin => allowTin && RegExp(r'^\d{9}$').hasMatch(value);
+  bool get isValid => RegExp(r'^\d{14}$').hasMatch(value) || isTin;
 
   void _onTextChanged() {
     // Tekshirilgan raqam o'zgartirilsa — natija endi unga tegishli emas.
     if (value != _checked && status != PinflLookupStatus.idle && status != PinflLookupStatus.loading) {
       _set(PinflLookupStatus.idle);
     }
-    if (isValid && value != _checked && status == PinflLookupStatus.idle) {
+    _tinDebounce?.cancel();
+    if (!isValid || value == _checked || status != PinflLookupStatus.idle) return;
+    if (isTin) {
+      // 9 xona JShShIR yozilayotganda ham bo'ladi — yozish to'xtagach tekshiramiz.
+      _tinDebounce = Timer(const Duration(milliseconds: 1200), () {
+        if (isTin && value != _checked && status == PinflLookupStatus.idle) lookup();
+      });
+    } else {
       lookup();
     }
   }
@@ -104,7 +138,7 @@ class PinflLookupController extends ChangeNotifier {
           .post(
             Uri.parse('${ApiConfig.baseUrl}/api/registration/pinfl-lookup'),
             headers: jsonAuthHeaders(token),
-            body: jsonEncode({'pinfl': pinflValue}),
+            body: jsonEncode({'pinfl': pinflValue, if (allowTin) 'allow_tin': 1}),
           )
           .timeout(const Duration(seconds: 20));
       final data = decodeJsonEnvelopeOrThrow(res)['data'];
@@ -115,12 +149,17 @@ class PinflLookupController extends ChangeNotifier {
         _set(PinflLookupStatus.found);
       } else {
         final notFound = data is Map && data['status'] == 'not_found';
-        _set(PinflLookupStatus.manual,
-            msg: I18n.t(notFound ? 'pinfl.not_found' : 'pinfl.unavailable'));
+        if (pinflValue.length == 9) {
+          _set(PinflLookupStatus.failed, msg: I18n.t(notFound ? 'pinfl.tin_not_found' : 'pinfl.tin_unavailable'));
+        } else {
+          _set(PinflLookupStatus.manual,
+              msg: I18n.t(notFound ? 'pinfl.not_found' : 'pinfl.unavailable'));
+        }
       }
     } catch (_) {
       if (value != pinflValue) return;
-      _set(PinflLookupStatus.manual, msg: I18n.t('pinfl.unavailable'));
+      _set(pinflValue.length == 9 ? PinflLookupStatus.failed : PinflLookupStatus.manual,
+          msg: I18n.t(pinflValue.length == 9 ? 'pinfl.tin_unavailable' : 'pinfl.unavailable'));
     }
   }
 
@@ -149,12 +188,15 @@ class PinflLookupController extends ChangeNotifier {
   void _set(PinflLookupStatus s, {String? msg}) {
     status = s;
     message = msg;
-    if (s == PinflLookupStatus.idle || s == PinflLookupStatus.manual) person = null;
+    if (s == PinflLookupStatus.idle || s == PinflLookupStatus.manual || s == PinflLookupStatus.failed) {
+      person = null;
+    }
     notifyListeners();
   }
 
   @override
   void dispose() {
+    _tinDebounce?.cancel();
     pinfl.removeListener(_onTextChanged);
     pinfl.dispose();
     super.dispose();
@@ -199,8 +241,10 @@ class PinflLookupField extends StatelessWidget {
               ],
               decoration: InputDecoration(
                 labelText: label,
-                hintText: '00000000000000',
-                helperText: c.status == PinflLookupStatus.idle ? I18n.t('pinfl.helper') : null,
+                hintText: c.allowTin ? I18n.t('pinfl.hint_or_tin') : '00000000000000',
+                helperText: c.status == PinflLookupStatus.idle
+                    ? I18n.t(c.allowTin ? 'pinfl.helper_or_tin' : 'pinfl.helper')
+                    : null,
                 helperMaxLines: 3,
                 suffixIcon: switch (c.status) {
                   PinflLookupStatus.loading => const Padding(
@@ -208,7 +252,7 @@ class PinflLookupField extends StatelessWidget {
                       child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                     ),
                   PinflLookupStatus.confirmed => const Icon(Icons.verified_rounded, color: AppPalette.success),
-                  PinflLookupStatus.manual => IconButton(
+                  PinflLookupStatus.manual || PinflLookupStatus.failed => IconButton(
                       tooltip: I18n.t('pinfl.retry'),
                       icon: const Icon(Icons.refresh_rounded),
                       onPressed: c.isValid ? c.lookup : null,
@@ -218,6 +262,10 @@ class PinflLookupField extends StatelessWidget {
               ),
               validator: (v) {
                 final s = (v ?? '').trim();
+                if (c.allowTin) {
+                  if (s.length != 14 && s.length != 9) return I18n.t('pinfl.must_be_14_or_9');
+                  return null;
+                }
                 if (s.length != 14) return I18n.t('pinfl.must_be_14');
                 return null;
               },
@@ -231,9 +279,9 @@ class PinflLookupField extends StatelessWidget {
               const SizedBox(height: 12),
               _ConfirmedCard(person: c.person!, pinfl: c.value, onChange: c.reset),
             ],
-            if (c.status == PinflLookupStatus.manual && c.message != null) ...[
+            if ((c.status == PinflLookupStatus.manual || c.failed) && c.message != null) ...[
               const SizedBox(height: 12),
-              AlixBanner(message: c.message!, tone: AlixTone.warning),
+              AlixBanner(message: c.message!, tone: c.failed ? AlixTone.danger : AlixTone.warning),
             ],
           ],
         );
@@ -253,7 +301,18 @@ class _PersonLines extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (person.isCompany) ...[
+          Text(I18n.t('pinfl.company_kind'), style: t.labelMedium),
+          const SizedBox(height: 2),
+        ] else ...[
+          Text(I18n.t('pinfl.yatt_kind'), style: t.labelMedium),
+          const SizedBox(height: 2),
+        ],
         Text(person.fullName, style: t.titleMedium),
+        if (person.isCompany && person.directorName != null) ...[
+          const SizedBox(height: 4),
+          Text(I18n.t('pinfl.director', {'name': person.directorName!}), style: t.bodyMedium),
+        ],
         if (person.birthDate != null) ...[
           const SizedBox(height: 4),
           Text(I18n.t('pinfl.birth_date', {'date': person.birthDate!}), style: t.bodyMedium),
@@ -282,7 +341,7 @@ class _ConfirmCard extends StatelessWidget {
           const SizedBox(height: 8),
           _PersonLines(person: person),
           const SizedBox(height: 12),
-          Text(I18n.t('pinfl.is_this_you'), style: t.bodyMedium),
+          Text(I18n.t(person.isCompany ? 'pinfl.is_this_your_company' : 'pinfl.is_this_you'), style: t.bodyMedium),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -325,7 +384,8 @@ class _ConfirmedCard extends StatelessWidget {
               children: [
                 _PersonLines(person: person),
                 const SizedBox(height: 4),
-                Text(I18n.t('pinfl.number', {'pinfl': pinfl}), style: Theme.of(context).textTheme.bodySmall),
+                Text(I18n.t(person.isCompany ? 'pinfl.tin_number' : 'pinfl.number', {'pinfl': pinfl}),
+                    style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),

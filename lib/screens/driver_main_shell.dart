@@ -19,6 +19,7 @@ import '../core/i18n/language_picker.dart';
 import '../core/i18n/wallet_tx_labels.dart';
 import '../core/session/session_store.dart';
 import '../core/theme/theme_controller.dart';
+import '../core/widgets/support_phone_tile.dart';
 import '../customer/customer_api.dart';
 import '../customer/pages/customer_physical_registration_page.dart';
 import '../driver/driver_api.dart';
@@ -1436,16 +1437,7 @@ class DriverProfileBody extends StatelessWidget {
                 subtitle: Text(I18n.t('settings.security_subtitle')),
               ),
               Divider(height: 1, color: cs.outlineVariant),
-              ListTile(
-                leading: const Icon(Icons.help_outline_rounded),
-                title: Text(I18n.t('settings.help')),
-                trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(I18n.t('driver.help_about_driver'))),
-                  );
-                },
-              ),
+              const SupportPhoneTile(),
             ],
           ),
         ),

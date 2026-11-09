@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -46,14 +45,8 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
   XFile? _ownershipFile;
   String? _ownershipUrl; // server'dagi mavjud hujjat (prefill)
 
-  /// Backenddagi `max:10240` (kilobayt) bilan bir xil.
-  static const int _maxUploadBytes = 10 * 1024 * 1024;
-
-  /// v1: faqat tadbirkorlik sub'ekti — 1=YATT, 4=Yuridik shaxs.
-  /// Jismoniy shaxs (3) va o'z-o'zini band qilish (2) yopilgan.
-  int _legalType = 1;
-  XFile? _legalPdf;
-  String? _legalUrl; // server'dagi mavjud hujjat (prefill)
+  // Yuridik shakl (YATT / yuridik shaxs) so'ralmaydi — server 1-bosqichdagi
+  // JShShIR/STIR'dan aniqlaydi; guvohnoma ham talab qilinmaydi.
 
   AvtoparkItem? _avtopark;
   List<AvtoparkItem> _avtoparks = [];
@@ -72,10 +65,7 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
     if (widget.data?.step3 != null) {
       final own = widget.data!.i3('vehicle_ownership');
       if (own == 1 || own == 2) _ownership = own!;
-      final lt = widget.data!.i3('legal_entity_type');
-      if (lt == 1 || lt == 4) _legalType = lt!;
       _ownershipUrl = widget.data!.s3('ownership_contract_img_url');
-      _legalUrl = widget.data!.s3('legal_certificate_img_url');
     }
     _loadAvtoparks();
   }
@@ -181,37 +171,6 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
     return _picker.pickImage(source: src, imageQuality: 82);
   }
 
-  /// Guvohnoma uchun PDF tanlash.
-  ///
-  /// Kamera OCHILMAYDI: backend `legal_certificate_pdf` maydonida faqat PDF
-  /// qabul qiladi (`mimes:pdf`, 10 MB), rasm yuborilsa 422 qaytaradi.
-  Future<XFile?> _pickPdf() =>
-      withoutKeyboard(() => _pickPdfRaw());
-
-  Future<XFile?> _pickPdfRaw() async {
-    final picked = await FilePicker.pickFile(
-      dialogTitle: I18n.t('driver.reg.pick_pdf'),
-      type: FileType.custom,
-      allowedExtensions: const ['pdf'],
-    );
-    if (picked == null) return null;
-
-    // Ba'zi Android fayl menejerlari kengaytma filtriga bo'ysunmaydi,
-    // shuning uchun tanlovdan keyin qayta tekshiramiz.
-    if ((picked.extension ?? '').toLowerCase() != 'pdf') {
-      _toast(I18n.t('driver.reg.pdf_only'));
-      return null;
-    }
-
-    final size = await picked.length();
-    if (size != null && size > _maxUploadBytes) {
-      _toast(I18n.t('driver.reg.file_too_large'));
-      return null;
-    }
-
-    return picked.xFile;
-  }
-
   Future<void> _submit() async {
     // Hujjat majburiy: yangi tanlangan yoki server'da mavjud (URL) bo'lsa yetarli.
     if (_ownership == 2 &&
@@ -220,19 +179,10 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
       _toast(I18n.t('driver.reg.upload_ownership_doc'));
       return;
     }
-    if ((_legalType == 1 || _legalType == 4) &&
-        _legalPdf == null &&
-        (_legalUrl ?? '').isEmpty) {
-      _toast(I18n.t('driver.reg.upload_legal_pdf'));
-      return;
-    }
     // Admin rad etgan hujjat qayta yuklanishi shart — mavjudi qabul qilinmaydi.
-    if ((_ownership == 2 &&
-            _ownershipFile == null &&
-            _fieldError('ownership_contract_img') != null) ||
-        ((_legalType == 1 || _legalType == 4) &&
-            _legalPdf == null &&
-            _fieldError('legal_certificate_img') != null)) {
+    if (_ownership == 2 &&
+        _ownershipFile == null &&
+        _fieldError('ownership_contract_img') != null) {
       _toast(I18n.t('driver.reg.retake_rejected_msg'));
       return;
     }
@@ -252,8 +202,6 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
         sessionId: widget.sessionId,
         vehicleOwnership: _ownership,
         ownershipFile: _ownershipFile,
-        legalEntityType: _legalType,
-        legalCertificatePdf: _legalPdf,
         companyId: _avtopark?.id,
         companyOffertaAccepted: _companyOfferta,
       );
@@ -356,39 +304,6 @@ class _DriverRegistrationStep3PageState extends State<DriverRegistrationStep3Pag
                 if (f != null) setState(() => _ownershipFile = f);
               }),
             _errorNote('ownership_contract_img'),
-            const Divider(height: 32),
-            Text(I18n.t('driver.reg.legal_title'),
-                style: Theme.of(context).textTheme.titleSmall),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                I18n.t('driver.reg.legal_business_only_note'),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-            RadioListTile<int>(
-              value: 1,
-              groupValue: _legalType,
-              title: Text(I18n.t('driver.reg.legal_yatt')),
-              subtitle: Text(I18n.t('driver.reg.legal_yatt_subtitle')),
-              onChanged: (v) => setState(() => _legalType = v ?? 1),
-              contentPadding: EdgeInsets.zero,
-            ),
-            RadioListTile<int>(
-              value: 4,
-              groupValue: _legalType,
-              title: Text(I18n.t('driver.reg.legal_entity')),
-              subtitle: Text(I18n.t('driver.reg.legal_entity_subtitle')),
-              onChanged: (v) => setState(() => _legalType = v ?? 1),
-              contentPadding: EdgeInsets.zero,
-            ),
-            if (_legalType == 1 || _legalType == 4)
-              _fileRow(I18n.t('driver.reg.legal_pdf'), _legalPdf, _legalUrl,
-                  () async {
-                final f = await _pickPdf();
-                if (f != null) setState(() => _legalPdf = f);
-              }),
-            _errorNote('legal_certificate_img'),
             const Divider(height: 32),
             Text(I18n.t('driver.reg.avtopark_title'),
                 style: Theme.of(context).textTheme.titleSmall),

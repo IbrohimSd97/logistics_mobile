@@ -226,13 +226,13 @@ class DriverApi {
 
   /// POST /api/driver/registration/step3 (auth.temp, multipart)
   /// vehicleOwnership: 1=O'zimniki, 2=Boshqa hujjat asosida (ownershipFile required)
-  /// legalEntityType: 1=YATT, 4=Yuridik shaxs (v1'da faqat shu ikkitasi)
+  ///
+  /// Yuridik shakl va guvohnoma yuborilmaydi: server 1-bosqichdagi raqamdan
+  /// aniqlaydi (JShShIR → YATT, STIR → yuridik shaxs).
   Future<DriverStepResult> registrationStep3({
     required String sessionId,
     required int vehicleOwnership,
     XFile? ownershipFile,
-    required int legalEntityType,
-    XFile? legalCertificatePdf,
     int? companyId,
     bool companyOffertaAccepted = false,
   }) async {
@@ -242,7 +242,6 @@ class DriverApi {
       ..headers.addAll(_multiAuth(token))
       ..fields['session_id'] = sessionId
       ..fields['vehicle_ownership'] = '$vehicleOwnership'
-      ..fields['legal_entity_type'] = '$legalEntityType'
       ..fields['company_offerta_accepted'] = companyOffertaAccepted ? '1' : '0';
 
     if (companyId != null) {
@@ -251,15 +250,6 @@ class DriverApi {
 
     if (vehicleOwnership == 2 && ownershipFile != null) {
       req.files.add(await _filePart('ownership_contract_file', ownershipFile));
-    }
-    if ((legalEntityType == 1 || legalEntityType == 4) && legalCertificatePdf != null) {
-      req.files.add(
-        await _filePart(
-          'legal_certificate_pdf',
-          legalCertificatePdf,
-          contentTypeOverride: MediaType('application', 'pdf'),
-        ),
-      );
     }
 
     final res = await http.Response.fromStream(await req.send());

@@ -57,7 +57,8 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
   final _last = TextEditingController();
   final _first = TextEditingController();
   final _middle = TextEditingController();
-  final _pinfl = PinflLookupController();
+  // Haydovchi: JShShIR (YATT) yoki STIR (yuridik shaxs) — yuridik shakl shundan aniqlanadi.
+  final _pinfl = PinflLookupController(allowTin: true);
   final _licSeries = TextEditingController();
   final _licNumber = TextEditingController();
 

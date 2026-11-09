@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/brand/alix_components.dart';
+import '../../core/config/app_links.dart';
 import '../../core/theme/app_palette.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/session/session_store.dart';
@@ -72,7 +74,9 @@ class DriverFailedPage extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.support_agent_rounded, color: AppPalette.orange),
                   title: Text(I18n.t('common.app_name')),
-                  subtitle: const Text('+998 71 200 00 00'),
+                  subtitle: const Text(AppLinks.supportPhoneDisplay),
+                  trailing: const Icon(Icons.call_rounded, color: AppPalette.orange),
+                  onTap: () => launchUrl(Uri.parse('tel:${AppLinks.supportPhone}')),
                 ),
               ),
               const SizedBox(height: 10),

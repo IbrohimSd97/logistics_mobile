@@ -288,8 +288,6 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
         scheduledPickupAt: _scheduledMode ? _scheduledAt : null,
         durationMin: route?.durationMin,
         recipientPhone: _recipient.self ? null : _recipient.phoneE164,
-        recipientTin: _recipient.self ? null : _recipient.tinValue,
-        recipientName: _recipient.self || _recipient.foundName != null ? null : _recipient.name.text.trim(),
       );
       if (!mounted) return;
       setState(() => _submitting = false);

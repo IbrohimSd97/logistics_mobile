@@ -1085,15 +1085,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                                       ),
                                     ],
                                   )
-                                : _canFinish && _order.hasRecipient
-                                    // Yukni qabul qiluvchi tasdiqlaydi (ilova yoki SMS havola).
-                                    ? AlixBanner(
-                                        message: I18n.t('order.detail.recipient_waits', {
-                                          'name': _order.recipientName ?? _order.recipientPhone ?? '',
-                                        }),
-                                        tone: AlixTone.progress,
-                                        icon: Icons.hourglass_top_rounded,
-                                      )
+                                // Qabul qiluvchi bo'lsa ham buyurtmani mijoz yakunlaydi.
                                 : _canFinish
                                     ? SlideButton(
                                         label: I18n.t('order.detail.finish_slide'),

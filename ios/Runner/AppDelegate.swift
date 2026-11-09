@@ -16,10 +16,20 @@ import YandexMapsMobile
       YMKMapKit.setApiKey(key)
     }
 
-    // Xarita yozuvlari ilova tiliga mos bo'lsin. Til Flutter tomonda
-    // `shared_preferences`ga yoziladi; u yerda hali qiymat bo'lmasa — uz_UZ.
+    // Ilova tili Flutter tomonda `shared_preferences`ga yoziladi. Hali
+    // tanlanmagan bo'lsa — iOS ruxsat so'rovlari uchun tanlagan til
+    // ({ru,uz}.lproj); Flutter ham xuddi shu qoida bilan tanlaydi.
     let saved = UserDefaults.standard.string(forKey: "flutter.alix_locale")
-    YMKMapKit.setLocale(saved == "ru" ? "ru_RU" : "uz_UZ")
+    let lang = saved ?? (Bundle.main.preferredLocalizations.first == "uz" ? "uz" : "ru")
+
+    // Foydalanuvchi ilovada tilni almashtirgan bo'lsa, ruxsat so'rovlari ham
+    // shu tilda chiqsin (iOS uni keyingi ishga tushirishda qo'llaydi).
+    if let saved, UserDefaults.standard.stringArray(forKey: "AppleLanguages")?.first != saved {
+      UserDefaults.standard.set([saved], forKey: "AppleLanguages")
+    }
+
+    // Xarita yozuvlari ilova tiliga mos bo'lsin.
+    YMKMapKit.setLocale(lang == "ru" ? "ru_RU" : "uz_UZ")
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

@@ -11,4 +11,8 @@ class AppLinks {
 
   /// Avtopark (fleet) offertasi — haydovchi avtoparkka biriktirilganda.
   static const String avtoparkOffertaUrl = 'https://alix.uz/legal/fleet-offer.html';
+
+  /// Qo'llab-quvvatlash telefoni (profil → "Qo'llab-quvvatlash").
+  static const String supportPhone = '+998935612000';
+  static const String supportPhoneDisplay = '+998 93 561 20 00';
 }

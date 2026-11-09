@@ -62,11 +62,28 @@ class I18n extends ChangeNotifier {
         case 'uz':
           _locale = AppLocaleCode.uz;
           break;
+        default:
+          _locale = _deviceDefault();
       }
       notifyListeners();
     } catch (e) {
       debugPrint('I18n.load error: $e');
     }
+  }
+
+  /// Til hali tanlanmagan bo'lsa — qurilma tillari ro'yxatidagi birinchi
+  /// o'zbek yoki rus tili, shunda ilova tili ruxsat so'rovlari tili bilan
+  /// bir xil bo'ladi (App Review, Guideline 4):
+  ///   - iOS matnni {ru,uz}.lproj dan xuddi shu qoida bilan tanlaydi,
+  ///     ikkalasi ham bo'lmasa ruscha (CFBundleDevelopmentRegion);
+  ///   - Android ruxsat oynasini tizim tilida o'zi chizadi.
+  /// Ikkalasi ham bo'lmasa: iOS'da ruscha, Android'da o'zbekcha.
+  static AppLocaleCode _deviceDefault() {
+    for (final l in PlatformDispatcher.instance.locales) {
+      if (l.languageCode == 'uz') return AppLocaleCode.uz;
+      if (l.languageCode == 'ru') return AppLocaleCode.ru;
+    }
+    return defaultTargetPlatform == TargetPlatform.iOS ? AppLocaleCode.ru : AppLocaleCode.uz;
   }
 
   Future<void> setLocale(AppLocaleCode l) async {

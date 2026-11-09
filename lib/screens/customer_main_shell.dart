@@ -5,6 +5,7 @@ import '../core/brand/alix_components.dart';
 import '../core/brand/order_status_tone.dart';
 import '../core/brand/alix_logo.dart';
 import '../core/theme/app_palette.dart';
+import '../core/widgets/support_phone_tile.dart';
 import '../core/widgets/gradient_button.dart';
 import '../core/api/api_exception.dart';
 import '../core/api/auth_api.dart';
@@ -1617,16 +1618,7 @@ class CustomerProfileBody extends StatelessWidget {
                 subtitle: Text(I18n.t('settings.security_subtitle')),
               ),
               Divider(height: 1, color: cs.outlineVariant),
-              ListTile(
-                leading: const Icon(Icons.help_outline_rounded),
-                title: Text(I18n.t('settings.help')),
-                trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(I18n.t('customer.help_about_customer'))),
-                  );
-                },
-              ),
+              const SupportPhoneTile(),
             ],
           ),
         ),
