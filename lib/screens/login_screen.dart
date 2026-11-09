@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:smart_auth/smart_auth.dart';
@@ -221,11 +221,14 @@ class _LoginScreenState extends State<LoginScreen>
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 10),
         backgroundColor: AppPalette.danger,
-        action: SnackBarAction(
-          label: I18n.t('auth.details_action'),
-          textColor: Colors.white,
-          onPressed: () => _showNetworkHelpDialog(url),
-        ),
+        // Dasturchi yo'riqnomasi (CORS, localhost) — faqat debug'da.
+        action: kDebugMode
+            ? SnackBarAction(
+                label: I18n.t('auth.details_action'),
+                textColor: Colors.white,
+                onPressed: () => _showNetworkHelpDialog(url),
+              )
+            : null,
       ),
     );
   }

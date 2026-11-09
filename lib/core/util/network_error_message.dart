@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+
+import '../i18n/i18n.dart';
 
 bool _looksLikeBrowserNetworkFailure(Object error) {
   final lower = error.toString().toLowerCase();
@@ -8,7 +10,11 @@ bool _looksLikeBrowserNetworkFailure(Object error) {
 }
 
 /// SnackBar uchun qisqa matn (2–4 qator).
+///
+/// Release'da foydalanuvchiga faqat ilova tilidagi qisqa xabar — manzil,
+/// xato matni va dasturchi yo'riqnomasi faqat debug'da.
 String formatNetworkFailureShort(Object error, {required String url}) {
+  if (!kDebugMode) return I18n.t('common.network_unreachable');
   final raw = error.toString();
 
   final buf = StringBuffer();

@@ -122,7 +122,7 @@ class RecipientApi {
 
   Future<Map<String, String>> _headers() async {
     final t = await _session.getRefreshToken();
-    if (t == null || t.isEmpty) throw ApiException('Kirish sessiyasi yo‘q. Qayta kiring.');
+    if (t == null || t.isEmpty) throw ApiException(I18n.t('auth.no_session'));
     return {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
@@ -142,7 +142,7 @@ class RecipientApi {
 
   Future<RecipientOrder> order(int id) async {
     final res = await http.get(_url('/$id'), headers: await _headers());
-    return RecipientOrder.fromMap(decodeJsonEnvelopeOrThrow(res)['data']) ?? (throw ApiException('Javobda data yo‘q'));
+    return RecipientOrder.fromMap(decodeJsonEnvelopeOrThrow(res)['data']) ?? (throw ApiException(I18n.t('err.no_data_in_response')));
   }
 
   /// Haydovchi joylashuvi — yuk yo'lda bo'lmasa yoki hali yo'q bo'lsa null.
@@ -160,7 +160,7 @@ class RecipientApi {
   /// POST /api/recipient/orders/{id}/finish — "Qabul qildim".
   Future<RecipientOrder> finish(int id) async {
     final res = await http.post(_url('/$id/finish'), headers: await _headers());
-    return RecipientOrder.fromMap(decodeJsonEnvelopeOrThrow(res)['data']) ?? (throw ApiException('Javobda data yo‘q'));
+    return RecipientOrder.fromMap(decodeJsonEnvelopeOrThrow(res)['data']) ?? (throw ApiException(I18n.t('err.no_data_in_response')));
   }
 
   /// POST /api/customer/recipient-lookup — buyurtma formasi uchun.

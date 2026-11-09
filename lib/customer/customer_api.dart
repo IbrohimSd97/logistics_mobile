@@ -19,7 +19,7 @@ class CustomerApi {
   Future<String> _requireBearer() async {
     final t = await _session.getRefreshToken();
     if (t == null || t.isEmpty) {
-      throw ApiException('Kirish sessiyasi yo‘q. Qayta kiring.');
+      throw ApiException(I18n.t('auth.no_session'));
     }
     return t;
   }
@@ -119,7 +119,7 @@ class CustomerApi {
     );
     final map = _decodeResponse(res);
     final data = map['data'] as Map<String, dynamic>?;
-    if (data == null) throw ApiException('Javobda data yo‘q');
+    if (data == null) throw ApiException(I18n.t('err.no_data_in_response'));
     final id = _int(data['order_id']);
     if (id == null) throw ApiException('order_id yo‘q');
     return CreateOrderResult(
@@ -266,7 +266,7 @@ class CustomerApi {
     final map = _decodeResponse(res);
     final data = map['data'];
     final r = WalletPaymentResult.fromMap(data is Map<String, dynamic> ? data : null);
-    if (r == null) throw ApiException('Javobda data yo‘q');
+    if (r == null) throw ApiException(I18n.t('err.no_data_in_response'));
     return r;
   }
 
@@ -319,7 +319,7 @@ class CustomerApi {
     final map = _decodeResponse(res);
     final session = CardTopUpSession.fromData(map['data']);
     if (session == null || (!session.credited && session.paymentLink == null)) {
-      throw ApiException('To`lov havolasi olinmadi');
+      throw ApiException(I18n.t('err.bad_response'));
     }
     return session;
   }
@@ -337,7 +337,7 @@ class CustomerApi {
     final map = _decodeResponse(res);
     final status = CardTopUpStatus.fromData(map['data']);
     if (status == null) {
-      throw ApiException('To`ldirish holati olinmadi');
+      throw ApiException(I18n.t('err.bad_response'));
     }
     return status;
   }

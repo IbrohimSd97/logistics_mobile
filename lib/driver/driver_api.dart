@@ -23,7 +23,7 @@ class DriverApi {
   Future<String> _requireRefresh() async {
     final t = await _session.getRefreshToken();
     if (t == null || t.isEmpty) {
-      throw ApiException('Kirish sessiyasi yo‘q. Qayta kiring.');
+      throw ApiException(I18n.t('auth.no_session'));
     }
     return t;
   }
@@ -31,7 +31,7 @@ class DriverApi {
   Future<String> _requireTemp() async {
     final t = await _session.getTempRegistrationToken();
     if (t == null || t.isEmpty) {
-      throw ApiException('Vaqtinchalik token yo‘q. Qayta kiring (OTP).');
+      throw ApiException(I18n.t('auth.no_session'));
     }
     return t;
   }
@@ -62,7 +62,7 @@ class DriverApi {
     final map = _decode(res);
     final data = map['data'];
     if (data is! Map<String, dynamic>) {
-      throw ApiException('Javobda data yo‘q');
+      throw ApiException(I18n.t('err.no_data_in_response'));
     }
     return DriverRegistrationStatus.fromMap(data);
   }
@@ -75,7 +75,7 @@ class DriverApi {
     final map = _decode(res);
     final data = map['data'];
     if (data is! Map<String, dynamic>) {
-      throw ApiException('Javobda data yo‘q');
+      throw ApiException(I18n.t('err.no_data_in_response'));
     }
     return DriverRegistrationRejects.fromMap(data);
   }
@@ -90,7 +90,7 @@ class DriverApi {
     final map = _decode(res);
     final data = map['data'];
     if (data is! Map<String, dynamic>) {
-      throw ApiException('Javobda data yo‘q');
+      throw ApiException(I18n.t('err.no_data_in_response'));
     }
     return DriverRegistrationData.fromMap(data);
   }
@@ -157,7 +157,7 @@ class DriverApi {
     final map = _decode(res);
     final data = map['data'];
     if (data is! Map<String, dynamic>) {
-      throw ApiException('Javobda data yo‘q');
+      throw ApiException(I18n.t('err.no_data_in_response'));
     }
     return DriverStepResult.fromMap(data);
   }
@@ -219,7 +219,7 @@ class DriverApi {
     final map = _decode(res);
     final data = map['data'];
     if (data is! Map<String, dynamic>) {
-      throw ApiException('Javobda data yo‘q');
+      throw ApiException(I18n.t('err.no_data_in_response'));
     }
     return DriverStepResult.fromMap(data);
   }
@@ -256,7 +256,7 @@ class DriverApi {
     final map = _decode(res);
     final data = map['data'];
     if (data is! Map<String, dynamic>) {
-      throw ApiException('Javobda data yo‘q');
+      throw ApiException(I18n.t('err.no_data_in_response'));
     }
     return DriverStepResult.fromMap(data);
   }

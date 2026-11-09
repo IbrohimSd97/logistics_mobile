@@ -121,13 +121,13 @@ class AuthApi {
 
     final data = map['data'] as Map<String, dynamic>?;
     if (data == null) {
-      throw ApiException('Javobda data yo‘q');
+      throw ApiException(I18n.t('err.no_data_in_response'));
     }
     // Backend contract (2026-05): temp token may be `data.temp_token`.
     // Backward-compat: accept legacy `data.access_token`.
     final token = (data['temp_token'] ?? data['access_token']) as String?;
     if (token == null || token.isEmpty) {
-      throw ApiException('Temp token kelmadi');
+      throw ApiException(I18n.t('err.bad_response'));
     }
     return OtpVerifyResult(
       isVerified: _asBool(data['is_verified']),
@@ -176,7 +176,7 @@ class AuthApi {
     final data = map['data'] as Map<String, dynamic>?;
     final tt = data?['temp_token']?.toString();
     if (tt == null || tt.isEmpty) {
-      throw ApiException('Temp token kelmadi');
+      throw ApiException(I18n.t('err.bad_response'));
     }
     return tt;
   }
@@ -199,13 +199,13 @@ class AuthApi {
 
     final data = map['data'] as Map<String, dynamic>?;
     if (data == null) {
-      throw ApiException('Javobda data yo‘q');
+      throw ApiException(I18n.t('err.no_data_in_response'));
     }
     // Backend contract (2026-05): refresh token is `data.refresh_token`.
     // Backward-compat: accept legacy `data.access_token`.
     final token = (data['refresh_token'] ?? data['access_token']) as String?;
     if (token == null || token.isEmpty) {
-      throw ApiException('Refresh token kelmadi');
+      throw ApiException(I18n.t('err.bad_response'));
     }
     Map<String, dynamic>? meta;
     final rawMeta = data['meta'];

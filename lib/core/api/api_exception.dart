@@ -1,3 +1,5 @@
+import '../i18n/i18n.dart';
+
 class ApiException implements Exception {
   ApiException(this.message, {this.errors = const {}, this.statusCode});
 
@@ -14,7 +16,7 @@ class ApiException implements Exception {
   }
 
   static ApiException fromJson(Map<String, dynamic> json, [int? statusCode]) {
-    final msg = json['message'] as String? ?? 'So‘rov bajarilmadi';
+    final msg = json['message'] as String? ?? I18n.t('err.http_unknown');
     final raw = json['errors'];
     final Map<String, List<dynamic>> err = {};
     if (raw is Map<String, dynamic>) {

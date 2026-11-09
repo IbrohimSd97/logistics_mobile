@@ -55,7 +55,7 @@ class OffertaCheckboxTitle extends StatelessWidget {
                 Icon(Icons.open_in_new_rounded, size: 15, color: cs.primary),
                 const SizedBox(width: 4),
                 Text(
-                  'Offertani o‘qish',
+                  I18n.t('offerta.read'),
                   style: TextStyle(
                     color: cs.primary,
                     fontWeight: FontWeight.w600,

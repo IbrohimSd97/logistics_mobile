@@ -186,7 +186,7 @@ class _MainShellState extends State<MainShell>
       return;
     }
     if (!mounted) return;
-    _toast('Sessiya topilmadi. Iltimos, qayta kiring.');
+    _toast(I18n.t('auth.session_not_found'));
   }
 
   /// Customer → Haydovchi rejim. Driver record bor bo'lsa status'ga qarab,
@@ -244,17 +244,17 @@ class _MainShellState extends State<MainShell>
     if (temp == null || temp.isEmpty) {
       final refresh = await _session.getRefreshToken();
       if (refresh == null || refresh.isEmpty) {
-        _toast('Sessiya topilmadi. Iltimos, qayta kiring.');
+        _toast(I18n.t('auth.session_not_found'));
         return;
       }
       try {
         temp = await const AuthApi().issueTempTokenFromRefresh(refresh);
         await _session.saveTempRegistrationToken(temp);
       } on ApiException catch (e) {
-        _toast('Temp token: ${e.firstFieldMessage}');
+        _toast(e.firstFieldMessage);
         return;
       } catch (e) {
-        _toast('Tarmoq xatosi: $e');
+        _toast(I18n.t('common.network_unreachable'));
         return;
       }
     }
@@ -345,7 +345,7 @@ class _MainShellState extends State<MainShell>
       // 404/403 → record yo'q. Registratsiya.
     } catch (e) {
       if (!mounted) return;
-      _toast('Tarmoq xatosi: $e');
+      _toast(I18n.t('common.network_unreachable'));
       return;
     }
 
@@ -355,7 +355,7 @@ class _MainShellState extends State<MainShell>
     if (temp == null || temp.isEmpty) {
       final refresh = await _session.getRefreshToken();
       if (refresh == null || refresh.isEmpty) {
-        _toast('Sessiya topilmadi.');
+        _toast(I18n.t('auth.session_not_found'));
         return;
       }
       try {

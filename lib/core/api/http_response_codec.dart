@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'api_exception.dart';
+import '../i18n/i18n.dart';
 
 typedef JsonMap = Map<String, dynamic>;
 
@@ -13,15 +14,15 @@ bool _looksLikeHtml(String body) {
 
 String _humanHttpMessage(int statusCode) {
   return switch (statusCode) {
-    400 => 'So‘rov noto‘g‘ri ($statusCode)',
-    401 => 'Avtorizatsiya kerak ($statusCode)',
-    403 => 'Ruxsat yo‘q ($statusCode)',
-    404 => 'Topilmadi ($statusCode)',
-    409 => 'Konflikt ($statusCode)',
-    422 => 'Validatsiya xatosi ($statusCode)',
-    429 => 'Juda koʻp so‘rov ($statusCode)',
-    >= 500 && < 600 => 'Server xatosi ($statusCode)',
-    _ => 'So‘rov bajarilmadi ($statusCode)',
+    400 => '${I18n.t('err.http_400')} ($statusCode)',
+    401 => '${I18n.t('err.http_401')} ($statusCode)',
+    403 => '${I18n.t('err.http_403')} ($statusCode)',
+    404 => '${I18n.t('err.http_404')} ($statusCode)',
+    409 => '${I18n.t('err.http_409')} ($statusCode)',
+    422 => '${I18n.t('err.http_422')} ($statusCode)',
+    429 => '${I18n.t('err.http_429')} ($statusCode)',
+    >= 500 && < 600 => '${I18n.t('err.http_500')} ($statusCode)',
+    _ => '${I18n.t('err.http_unknown')} ($statusCode)',
   };
 }
 
@@ -77,7 +78,7 @@ JsonMap decodeJsonEnvelopeOrThrow(http.Response res) {
   }
 
   if (decoded is! Map<String, dynamic>) {
-    throw ApiException('Server javobi noto‘g‘ri formatda', statusCode: res.statusCode);
+    throw ApiException(I18n.t('err.bad_response'), statusCode: res.statusCode);
   }
 
   final map = decoded;

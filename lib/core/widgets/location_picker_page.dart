@@ -19,13 +19,13 @@ import 'gradient_button.dart';
 class LocationPickerPage extends StatefulWidget {
   const LocationPickerPage({
     super.key,
-    this.title = 'Manzilni tanlash',
+    this.title,
     this.initialLatLng,
     this.initialAddress,
     this.useCurrentLocation = false,
   });
 
-  final String title;
+  final String? title;
   final LatLng? initialLatLng;
   final String? initialAddress;
 
@@ -195,7 +195,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(widget.title ?? I18n.t('picker.title')),
         actions: [
           IconButton(
             tooltip: I18n.t('common.refresh'),
@@ -271,7 +271,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   child: TextField(
                     controller: _searchCtrl,
                     decoration: InputDecoration(
-                      hintText: 'Manzilni qidirish (kamida 3 belgi)',
+                      hintText: I18n.t('picker.search_hint'),
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: _searching
                           ? const Padding(
@@ -368,8 +368,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                           Expanded(
                             child: Text(
                               _resolving
-                                  ? 'Manzil aniqlanmoqda…'
-                                  : (_address.isEmpty ? 'Tanlangan joy' : _address),
+                                  ? I18n.t('picker.resolving')
+                                  : (_address.isEmpty ? I18n.t('picker.selected_place') : _address),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -388,7 +388,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       ),
                       const SizedBox(height: 12),
                       GradientButton(
-                        label: 'Tasdiqlash',
+                        label: I18n.t('common.confirm'),
                         icon: Icons.check_rounded,
                         onPressed: _confirm,
                       ),
