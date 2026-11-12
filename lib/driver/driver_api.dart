@@ -337,6 +337,24 @@ class DriverApi {
     return DriverFleetInfo.fromMap(data);
   }
 
+  /// GET /api/driver/wallet/withdraw-info
+  Future<DriverWithdrawInfo> withdrawInfo() async {
+    final token = await _requireRefresh();
+    final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/api/driver/wallet/withdraw-info'), headers: _jsonAuth(token));
+    return DriverWithdrawInfo.fromMap(_decode(res)['data']);
+  }
+
+  /// POST /api/driver/wallet/withdraw — o'z kompaniyasi hisob raqamiga. Server xabarini qaytaradi.
+  Future<String> withdraw(double amount) async {
+    final token = await _requireRefresh();
+    final res = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/api/driver/wallet/withdraw'),
+      headers: _jsonAuth(token),
+      body: jsonEncode({'amount': amount}),
+    );
+    return (_decode(res)['message'] ?? '').toString();
+  }
+
   /// GET /api/driver/wallet/transactions
   Future<List<DriverWalletTx>> walletTransactions() async {
     final token = await _requireRefresh();

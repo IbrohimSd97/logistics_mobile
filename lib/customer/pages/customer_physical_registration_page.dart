@@ -1,10 +1,5 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/api/auth_api.dart';
@@ -14,7 +9,6 @@ import '../../core/brand/alix_components.dart';
 import '../../core/i18n/i18n.dart';
 import '../../core/registration/pinfl_lookup.dart';
 import '../../core/session/session_store.dart';
-import '../../core/theme/app_palette.dart';
 import '../../core/widgets/gradient_button.dart';
 import '../../core/widgets/offerta_link.dart';
 
@@ -42,15 +36,8 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
   final _middle = TextEditingController();
   final _pinfl = PinflLookupController();
   DateTime? _birthDate;
-  int _docType = 1;
   bool _offerta = false;
   bool _loading = false;
-
-  XFile? _front;
-  XFile? _back;
-  XFile? _selfie;
-
-  final _picker = ImagePicker();
 
   static String _fmtDate(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -91,30 +78,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
     setState(() => _birthDate = picked);
   }
 
-  MediaType _guessMediaType(String name) {
-    final lower = name.toLowerCase();
-    if (lower.endsWith('.png')) return MediaType('image', 'png');
-    if (lower.endsWith('.webp')) return MediaType('image', 'webp');
-    if (lower.endsWith('.heic')) return MediaType('image', 'heic');
-    if (lower.endsWith('.heif')) return MediaType('image', 'heif');
-    return MediaType('image', 'jpeg');
-  }
 
-  Future<http.MultipartFile> _part(String field, XFile f) async {
-    final mt = _guessMediaType(f.name);
-    if (kIsWeb) {
-      final bytes = await f.readAsBytes();
-      return http.MultipartFile.fromBytes(field, bytes, filename: f.name, contentType: mt);
-    }
-    final length = await File(f.path).length();
-    return http.MultipartFile(
-      field,
-      File(f.path).openRead(),
-      length,
-      filename: f.name,
-      contentType: mt,
-    );
-  }
 
   Future<void> _submit() async {
     if (!_offerta) {
@@ -145,13 +109,6 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
       );
       return;
     }
-    if (_front == null || _back == null || _selfie == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(I18n.t('customer.reg.upload_3_images'))),
-      );
-      return;
-    }
-
     final temp = await SessionStore().getTempRegistrationToken();
     if (!mounted) return;
     if (temp == null || temp.isEmpty) {
@@ -169,7 +126,6 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
         ..headers['Authorization'] = 'Bearer $temp'
         ..fields['pinfl'] = _pinfl.value
         ..fields['phone_number'] = _phoneCtrl.text.replaceAll(RegExp(r'\s'), '')
-        ..fields['id_document_type'] = '$_docType'
         ..fields['offerta_accepted'] = '1';
 
       if (_pinfl.confirmed) {
@@ -182,10 +138,6 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
           ..['middle_name'] = _middle.text.trim()
           ..['birth_date'] = _fmtDate(_birthDate!);
       }
-
-      req.files.add(await _part('id_doc_front_img', _front!));
-      req.files.add(await _part('id_doc_back_img', _back!));
-      req.files.add(await _part('id_doc_selfie_img', _selfie!));
 
       final streamed = await req.send();
       final res = await http.Response.fromStream(streamed);
@@ -245,56 +197,6 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
     }
   }
 
-  Future<XFile?> _pickFromSheet({required bool preferCamera}) async {
-    if (kIsWeb) {
-      return _picker.pickImage(source: ImageSource.gallery, imageQuality: 82);
-    }
-    final src = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: Text(I18n.t('customer.reg.camera')),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: Text(I18n.t('customer.reg.gallery')),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (src == null) return null;
-    return _picker.pickImage(
-      source: src,
-      imageQuality: 82,
-      preferredCameraDevice: preferCamera ? CameraDevice.front : CameraDevice.rear,
-    );
-  }
-
-  Future<void> _pickFront() async {
-    final f = await _pickFromSheet(preferCamera: false);
-    if (!mounted || f == null) return;
-    setState(() => _front = f);
-  }
-
-  Future<void> _pickBack() async {
-    final f = await _pickFromSheet(preferCamera: false);
-    if (!mounted || f == null) return;
-    setState(() => _back = f);
-  }
-
-  Future<void> _pickSelfie() async {
-    final f = await _pickFromSheet(preferCamera: true);
-    if (!mounted || f == null) return;
-    setState(() => _selfie = f);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -312,11 +214,7 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
               _pinfl.reset();
               setState(() {
                 _birthDate = null;
-                _docType = 1;
                 _offerta = false;
-                _front = null;
-                _back = null;
-                _selfie = null;
               });
             },
           ),
@@ -362,24 +260,6 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
               readOnly: true,
               decoration: InputDecoration(labelText: I18n.t('customer.reg.phone_label')),
             ),
-            const SizedBox(height: 24),
-            AlixSectionTitle(I18n.t('customer.reg.document_section')),
-            DropdownMenu<int>(
-              initialSelection: _docType,
-              expandedInsets: EdgeInsets.zero,
-              label: Text(I18n.t('customer.reg.doc_type_required')),
-              dropdownMenuEntries: [
-                DropdownMenuEntry(value: 1, label: I18n.t('customer.reg.doc_passport')),
-                DropdownMenuEntry(value: 2, label: I18n.t('customer.reg.doc_driver_license')),
-              ],
-              onSelected: (v) => setState(() => _docType = v ?? 1),
-            ),
-            const SizedBox(height: 12),
-            _imgRow(I18n.t('customer.reg.img_front'), _front, _pickFront),
-            const SizedBox(height: 10),
-            _imgRow(I18n.t('customer.reg.img_back'), _back, _pickBack),
-            const SizedBox(height: 10),
-            _imgRow(I18n.t('customer.reg.img_selfie'), _selfie, _pickSelfie),
             const SizedBox(height: 18),
             CheckboxListTile(
               value: _offerta,
@@ -404,63 +284,4 @@ class _CustomerPhysicalRegistrationPageState extends State<CustomerPhysicalRegis
     );
   }
 
-  Widget _imgRow(String label, XFile? file, VoidCallback onPick) {
-    final theme = Theme.of(context);
-    const radius = AppPalette.radiusChip;
-
-    Widget thumb;
-    if (file == null) {
-      thumb = Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(radius),
-        ),
-        child: Icon(Icons.image_outlined, color: theme.colorScheme.onSurfaceVariant),
-      );
-    } else if (kIsWeb) {
-      thumb = ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Image.network(file.path, width: 52, height: 52, fit: BoxFit.cover),
-      );
-    } else {
-      thumb = ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Image.file(File(file.path), width: 52, height: 52, fit: BoxFit.cover),
-      );
-    }
-
-    return AlixCard(
-      tone: AlixSurfaceTone.cream,
-      padding: const EdgeInsets.all(12),
-      onTap: onPick,
-      child: Row(
-        children: [
-          thumb,
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: theme.textTheme.titleMedium),
-                const SizedBox(height: 2),
-                Text(
-                  file?.name ?? I18n.t('customer.reg.not_picked'),
-                  style: theme.textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (file != null)
-            const Icon(Icons.check_circle_rounded, color: AppPalette.success)
-          else
-            const Icon(Icons.photo_camera_outlined, color: AppPalette.orange),
-        ],
-      ),
-    );
-  }
 }

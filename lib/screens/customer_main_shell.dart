@@ -16,6 +16,7 @@ import '../core/session/session_store.dart';
 import '../core/theme/theme_controller.dart';
 import '../customer/customer_api.dart';
 import '../customer/customer_models.dart';
+import '../customer/widgets/customer_profile_switcher.dart';
 import '../customer/pages/customer_order_create_page.dart';
 import '../customer/pages/customer_order_detail_page.dart';
 import '../customer/pages/customer_physical_registration_page.dart';
@@ -1466,6 +1467,8 @@ class CustomerProfileBody extends StatelessWidget {
     required this.onLogout,
     required this.onBecomeDriver,
     required this.onOpenRegistration,
+    this.onProfileSwitched,
+    this.onOpenPersonalRegistration,
   });
 
   final String phoneDisplay;
@@ -1474,6 +1477,10 @@ class CustomerProfileBody extends StatelessWidget {
   final VoidCallback onLogout;
   final VoidCallback onBecomeDriver;
   final Future<void> Function() onOpenRegistration;
+
+  /// Profil (shaxsiy ↔ kompaniya xodimi) almashtirildi.
+  final VoidCallback? onProfileSwitched;
+  final Future<void> Function()? onOpenPersonalRegistration;
 
   String get _initial {
     final d = phoneDisplay.replaceAll(RegExp(r'\D'), '');
@@ -1523,6 +1530,11 @@ class CustomerProfileBody extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 22),
+        if (hasRefreshSession && onProfileSwitched != null && onOpenPersonalRegistration != null)
+          CustomerProfileSwitchCard(
+            onSwitched: onProfileSwitched!,
+            onOpenPersonalRegistration: onOpenPersonalRegistration!,
+          ),
         if (!hasRefreshSession)
           AlixCard(
             tone: AlixSurfaceTone.cream,

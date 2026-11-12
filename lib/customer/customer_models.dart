@@ -748,3 +748,56 @@ class OrderFiscalReceipt {
     );
   }
 }
+
+/// Mijoz profili: shaxsiy (o'z hamyoni) yoki kompaniya xodimi (kompaniya hamyoni).
+/// `GET /api/customer/profiles` — bitta raqamda bir nechta bo'lishi mumkin.
+class CustomerProfileOption {
+  const CustomerProfileOption({
+    required this.id,
+    required this.isCompanyStaff,
+    required this.fullName,
+    this.companyName,
+  });
+
+  final int id;
+  final bool isCompanyStaff;
+  final String fullName;
+  final String? companyName;
+
+  static CustomerProfileOption? fromMap(Object? raw) {
+    if (raw is! Map) return null;
+    final id = int.tryParse('${raw['id']}');
+    if (id == null) return null;
+    final company = (raw['company_name'] ?? '').toString();
+    return CustomerProfileOption(
+      id: id,
+      isCompanyStaff: raw['kind'] == 'company_staff',
+      fullName: (raw['full_name'] ?? '').toString(),
+      companyName: company.isEmpty ? null : company,
+    );
+  }
+}
+
+class CustomerProfilesInfo {
+  const CustomerProfilesInfo({required this.activeId, required this.hasPersonal, required this.profiles});
+
+  final int? activeId;
+  final bool hasPersonal;
+  final List<CustomerProfileOption> profiles;
+
+  CustomerProfileOption? get active =>
+      profiles.where((p) => p.id == activeId).firstOrNull ?? (profiles.isEmpty ? null : profiles.first);
+
+  static CustomerProfilesInfo fromMap(Object? raw) {
+    final m = raw is Map ? raw : const {};
+    final list = (m['profiles'] is List ? m['profiles'] as List : const [])
+        .map(CustomerProfileOption.fromMap)
+        .whereType<CustomerProfileOption>()
+        .toList();
+    return CustomerProfilesInfo(
+      activeId: int.tryParse('${m['active_id']}'),
+      hasPersonal: m['has_personal'] == true,
+      profiles: list,
+    );
+  }
+}

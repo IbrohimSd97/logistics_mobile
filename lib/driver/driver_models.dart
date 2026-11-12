@@ -491,9 +491,15 @@ class DriverFleetInfo {
     this.avtoparkCurrency,
     this.myTotalToAvtopark,
     this.recentMyEarnings = const [],
+    this.isCompanyDriver = false,
+    this.driverCompanyName,
   });
 
   final bool isFleet;
+
+  /// Haydovchi kompaniyasi xodimi: daromad kompaniya hamyoniga, o'z hamyoni yo'q.
+  final bool isCompanyDriver;
+  final String? driverCompanyName;
   final String personalBalance;
   final String personalCurrency;
   final int? avtoparkId;
@@ -512,6 +518,8 @@ class DriverFleetInfo {
     final earnings = (m['recent_my_earnings'] as List?) ?? const [];
     return DriverFleetInfo(
       isFleet: m['is_fleet'] == true,
+      isCompanyDriver: m['is_company_driver'] == true,
+      driverCompanyName: (m['driver_company'] is Map) ? (m['driver_company'] as Map)['name']?.toString() : null,
       personalBalance: personal?['balance']?.toString() ?? '0',
       personalCurrency: personal?['currency']?.toString() ?? 'UZS',
       avtoparkId: _int(avtopark?['id']),
@@ -575,4 +583,39 @@ List<Map<String, dynamic>> mapListFrom(dynamic v) {
     if (v['data'] is List) return mapListFrom(v['data']);
   }
   return [];
+}
+
+/// `GET /api/driver/wallet/withdraw-info` — hisob raqamiga yechish imkoniyati.
+class DriverWithdrawInfo {
+  const DriverWithdrawInfo({
+    required this.canWithdraw,
+    required this.available,
+    required this.minAmount,
+    this.reason,
+    this.companyName,
+    this.bankAccount,
+    this.bankMfo,
+  });
+
+  final bool canWithdraw;
+  final double available;
+  final double minAmount;
+  final String? reason;
+  final String? companyName;
+  final String? bankAccount;
+  final String? bankMfo;
+
+  static DriverWithdrawInfo fromMap(Object? raw) {
+    final m = raw is Map ? raw : const {};
+    final c = m['company'] is Map ? m['company'] as Map : const {};
+    return DriverWithdrawInfo(
+      canWithdraw: m['can_withdraw'] == true,
+      available: double.tryParse('${m['available']}') ?? 0,
+      minAmount: double.tryParse('${m['min_amount']}') ?? 1000,
+      reason: m['reason']?.toString(),
+      companyName: c['name']?.toString(),
+      bankAccount: c['bank_account']?.toString(),
+      bankMfo: c['bank_mfo']?.toString(),
+    );
+  }
 }

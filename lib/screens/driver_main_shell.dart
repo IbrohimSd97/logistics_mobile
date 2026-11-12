@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../driver/widgets/driver_withdraw_sheet.dart';
 import '../core/brand/alix_components.dart';
 import '../core/brand/order_status_tone.dart';
 import '../core/brand/alix_logo.dart';
@@ -1212,7 +1213,13 @@ class DriverWalletBodyState extends State<DriverWalletBody> {
           ],
           // Avtopark haydovchisida shaxsiy balans bo'lmaydi — pul avtoparkka
           // tushadi, shuning uchun unga faqat tushumlar tarixi ko'rsatiladi.
-          if (!isFleet) ...[
+          // Haydovchi kompaniyasi xodimi: o'z hamyoni yo'q — daromad kompaniyaga.
+          if (_fleet?.isCompanyDriver ?? false) ...[
+            AlixBanner(
+              message: I18n.t('driver.company_driver_wallet_note', {'company': _fleet?.driverCompanyName ?? ''}),
+              icon: Icons.business_rounded,
+            ),
+          ] else if (!isFleet) ...[
             _DriverBalanceCard(
               label: I18n.t('driver.fleet_earnings_balance'),
               amount:
@@ -1220,12 +1227,11 @@ class DriverWalletBodyState extends State<DriverWalletBody> {
             ),
             const SizedBox(height: 14),
             OutlinedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(I18n.t('driver.withdraw_not_ready'))),
-                );
+              onPressed: () async {
+                final sent = await showDriverWithdrawSheet(context);
+                if (sent && mounted) _load();
               },
-              icon: const Icon(Icons.payments_outlined),
+              icon: const Icon(Icons.account_balance_rounded),
               label: Text(I18n.t('driver.withdraw_card_btn')),
             ),
             if (_w?.walletNumber case final number? when number.isNotEmpty) ...[

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:smart_auth/smart_auth.dart';
 
+import '../customer/widgets/customer_profile_switcher.dart';
 import '../core/api/api_exception.dart';
 import '../core/api/auth_api.dart';
 import '../core/config/api_config.dart';
@@ -412,6 +413,12 @@ class _LoginScreenState extends State<LoginScreen>
       }
       Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => target));
       return;
+    }
+
+    // Mijoz: bitta raqamda shaxsiy va kompaniya xodimi profili bo'lsa — tanlov.
+    if (userType != 'driver') {
+      await askCustomerProfileIfNeeded(context);
+      if (!mounted) return;
     }
 
     // Active driver yoki driver yozuvi yo'q → user_type bo'yicha asosiy shell.

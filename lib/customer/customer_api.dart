@@ -56,6 +56,24 @@ class CustomerApi {
     return CustomerProfile.fromMap(map['data'] as Map<String, dynamic>?);
   }
 
+  /// GET /api/customer/profiles — shaxsiy va kompaniya xodimi profillari.
+  Future<CustomerProfilesInfo> profiles() async {
+    final token = await _requireBearer();
+    final res = await http.get(Uri.parse('${ApiConfig.baseUrl}/api/customer/profiles'), headers: _jsonAuth(token));
+    return CustomerProfilesInfo.fromMap(_decodeResponse(res)['data']);
+  }
+
+  /// POST /api/customer/profiles/select — faol profil (buyurtmalar va hamyon shunga bog'liq).
+  Future<void> selectProfile(int customerId) async {
+    final token = await _requireBearer();
+    final res = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/api/customer/profiles/select'),
+      headers: _jsonAuth(token),
+      body: jsonEncode({'customer_id': customerId}),
+    );
+    _decodeResponse(res);
+  }
+
   /// GET /api/customer/tariff/lists
   Future<List<TariffItem>> tariffLists() async {
     final token = await _requireBearer();

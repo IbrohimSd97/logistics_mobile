@@ -4,11 +4,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/http_response_codec.dart';
 import '../api/request_headers.dart';
 import '../brand/alix_components.dart';
 import '../config/api_config.dart';
+import '../config/app_links.dart';
 import '../i18n/i18n.dart';
 import '../session/session_store.dart';
 import '../theme/app_palette.dart';
@@ -74,6 +76,10 @@ enum PinflLookupStatus {
   /// STIR (yuridik shaxs) topilmadi yoki Didox ishlamayapti — qo'lda kiritib
   /// bo'lmaydi, raqamni tekshirib qayta urinish kerak.
   failed,
+
+  /// Shu raqam bilan boshqa odam allaqachon ro'yxatdan o'tgan — davom etib
+  /// bo'lmaydi, operatorga murojaat qilish kerak (server xabari, raqami bilan).
+  taken,
 }
 
 /// Ro'yxatdan o'tish formasidagi PINFL holati (mijoz va haydovchi uchun umumiy).
@@ -84,13 +90,18 @@ enum PinflLookupStatus {
 /// `allowTin` (haydovchi): 14 xonali JShShIR (YATT) yoki 9 xonali STIR
 /// (yuridik shaxs). STIR faqat soliq bazasi orqali tasdiqlanadi.
 class PinflLookupController extends ChangeNotifier {
-  PinflLookupController({String? initialPinfl, this.allowTin = false})
-      : pinfl = TextEditingController(text: initialPinfl ?? '') {
+  PinflLookupController({String? initialPinfl, this.allowTin = false, String? purpose})
+      : purpose = purpose ?? (allowTin ? 'driver' : 'customer'),
+        pinfl = TextEditingController(text: initialPinfl ?? '') {
     pinfl.addListener(_onTextChanged);
   }
 
   final TextEditingController pinfl;
   final bool allowTin;
+
+  /// Kim uchun ro'yxatdan o'tish: `customer` | `driver` — server shu rolda
+  /// takroriy raqamni tekshiradi.
+  final String purpose;
   Timer? _tinDebounce;
   PinflLookupStatus status = PinflLookupStatus.idle;
   PinflPerson? person;
@@ -104,6 +115,7 @@ class PinflLookupController extends ChangeNotifier {
   bool get manual => status == PinflLookupStatus.manual;
   String get value => pinfl.text.trim();
   bool get failed => status == PinflLookupStatus.failed;
+  bool get taken => status == PinflLookupStatus.taken;
 
   /// 9 xonali STIR — yuridik shaxs.
   bool get isTin => allowTin && RegExp(r'^\d{9}$').hasMatch(value);
@@ -138,11 +150,17 @@ class PinflLookupController extends ChangeNotifier {
           .post(
             Uri.parse('${ApiConfig.baseUrl}/api/registration/pinfl-lookup'),
             headers: jsonAuthHeaders(token),
-            body: jsonEncode({'pinfl': pinflValue, if (allowTin) 'allow_tin': 1}),
+            body: jsonEncode({'pinfl': pinflValue, if (allowTin) 'allow_tin': 1, 'for': purpose}),
           )
           .timeout(const Duration(seconds: 20));
-      final data = decodeJsonEnvelopeOrThrow(res)['data'];
+      final envelope = decodeJsonEnvelopeOrThrow(res);
+      final data = envelope['data'];
       if (value != pinflValue) return; // foydalanuvchi bu orada raqamni o'zgartirdi
+      if (data is Map && data['status'] == 'exists') {
+        final msg = (envelope['message'] ?? '').toString();
+        _set(PinflLookupStatus.taken, msg: msg.isNotEmpty ? msg : I18n.t('pinfl.taken'));
+        return;
+      }
       final found = data is Map && data['status'] == 'found' ? PinflPerson.fromMap(data['person']) : null;
       if (found != null) {
         person = found;
@@ -188,7 +206,7 @@ class PinflLookupController extends ChangeNotifier {
   void _set(PinflLookupStatus s, {String? msg}) {
     status = s;
     message = msg;
-    if (s == PinflLookupStatus.idle || s == PinflLookupStatus.manual || s == PinflLookupStatus.failed) {
+    if (s == PinflLookupStatus.idle || s == PinflLookupStatus.manual || s == PinflLookupStatus.failed || s == PinflLookupStatus.taken) {
       person = null;
     }
     notifyListeners();
@@ -252,6 +270,7 @@ class PinflLookupField extends StatelessWidget {
                       child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                     ),
                   PinflLookupStatus.confirmed => const Icon(Icons.verified_rounded, color: AppPalette.success),
+                  PinflLookupStatus.taken => const Icon(Icons.block_rounded, color: AppPalette.danger),
                   PinflLookupStatus.manual || PinflLookupStatus.failed => IconButton(
                       tooltip: I18n.t('pinfl.retry'),
                       icon: const Icon(Icons.refresh_rounded),
@@ -278,6 +297,19 @@ class PinflLookupField extends StatelessWidget {
             if (c.status == PinflLookupStatus.confirmed && c.person != null) ...[
               const SizedBox(height: 12),
               _ConfirmedCard(person: c.person!, pinfl: c.value, onChange: c.reset),
+            ],
+            if (c.taken) ...[
+              const SizedBox(height: 12),
+              AlixBanner(message: c.message ?? I18n.t('pinfl.taken'), tone: AlixTone.danger),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: const Icon(Icons.call_rounded),
+                  label: Text(I18n.t('pinfl.call_operator', {'phone': AppLinks.supportPhoneDisplay})),
+                  onPressed: () => launchUrl(Uri.parse('tel:${AppLinks.supportPhone}')),
+                ),
+              ),
             ],
             if ((c.status == PinflLookupStatus.manual || c.failed) && c.message != null) ...[
               const SizedBox(height: 12),

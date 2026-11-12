@@ -534,8 +534,47 @@ class _MainShellState extends State<MainShell>
             _bumpRefresh();
           }
         },
+        onProfileSwitched: _reopenCustomer,
+        onOpenPersonalRegistration: _openPersonalRegistration,
       ),
     ];
+  }
+
+  /// Profil almashtirildi — buyurtmalar va hamyon boshqa profilniki: shell qayta ochiladi.
+  void _reopenCustomer() {
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => MainShell(
+          initialMode: 'customer',
+          phoneDisplay: widget.phoneDisplay,
+          userId: widget.userId,
+          hasRefreshSession: true,
+        ),
+      ),
+    );
+  }
+
+  /// Kompaniya xodimi shu raqam bilan shaxsiy (o'z hamyonli) profil ochadi.
+  Future<void> _openPersonalRegistration() async {
+    final refresh = await _session.getRefreshToken();
+    if (refresh == null || refresh.isEmpty) {
+      _toast(I18n.t('auth.session_not_found'));
+      return;
+    }
+    try {
+      final temp = await const AuthApi().issueTempTokenFromRefresh(refresh);
+      await _session.saveTempRegistrationToken(temp);
+    } catch (_) {
+      if (mounted) _toast(I18n.t('common.network_unreachable'));
+      return;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => CustomerPhysicalRegistrationPage(phoneDisplay: widget.phoneDisplay),
+      ),
+    );
   }
 
   List<Widget> _driverChildren() {
