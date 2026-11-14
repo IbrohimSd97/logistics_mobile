@@ -24,6 +24,7 @@ import '../customer_api.dart';
 import '../customer_models.dart';
 import '../widgets/order_fiscal_receipts_section.dart';
 import 'customer_order_create_page.dart';
+import 'customer_payment_select_page.dart';
 
 class CustomerOrderDetailPage extends StatefulWidget {
   const CustomerOrderDetailPage({super.key, required this.order});
@@ -565,6 +566,27 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
 
   /// Buyurtmani takrorlash — order create page'ni shu order ma'lumotlari bilan
   /// to'ldirilgan holda ochadi. Detail page yopiladi va orders tab'iga qaytadi.
+  /// To'lanmagan buyurtma — to'lov tanlash sahifasi (yaratishdagi bilan bir xil).
+  Future<void> _payNow() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CustomerPaymentSelectPage(
+          result: CreateOrderResult(
+            orderId: _order.id,
+            orderNumber: _order.orderNumber,
+            status: _order.status,
+            distanceKm: _order.distanceKm,
+            basePrice: _order.basePrice,
+            totalPrice: _order.totalPrice,
+            currency: _order.currency,
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _reloadOrder();
+  }
+
   void _repeatOrder() {
     Navigator.of(context).pushReplacement<void, void>(
       MaterialPageRoute<void>(
@@ -1114,7 +1136,31 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                                         icon: Icons.task_alt_rounded,
                                         onSlide: _finish,
                                       )
-                                    : OutlinedButton.icon(
+                                    : _order.status == 1
+                                        // To'lanmagan buyurtma: avval to'lash, yoki bekor qilish.
+                                        ? Column(
+                                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                                            children: [
+                                              FilledButton.icon(
+                                                onPressed: _busy ? null : _payNow,
+                                                icon: const Icon(Icons.payments_outlined),
+                                                label: Text(I18n.t('order.detail.pay_now')),
+                                                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              OutlinedButton.icon(
+                                                onPressed: _busy ? null : _cancel,
+                                                icon: const Icon(Icons.cancel_outlined),
+                                                label: Text(I18n.t('order.detail.cancel_btn')),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: cs.error,
+                                                  side: BorderSide(color: cs.error.withValues(alpha: 0.6)),
+                                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                                ),
+                                              ),
+                                            ],
+                                          )
+                                        : OutlinedButton.icon(
                                         onPressed: _busy ? null : _cancel,
                                         icon: const Icon(Icons.cancel_outlined),
                                         label: Text(I18n.t('order.detail.cancel_btn')),

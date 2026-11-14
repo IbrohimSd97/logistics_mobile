@@ -526,11 +526,13 @@ class CustomerHomeBodyState extends State<CustomerHomeBody> {
       final arch = await CustomerApi.instance.archiveOrders();
       final w = await CustomerApi.instance.wallet();
       if (!mounted) return;
+      // To'lanmagan (status 1) buyurtmalar joriy hisobiga kirmaydi — ular alohida tabda.
+      final paidCurrent = cur.where((o) => o.status != 1).toList();
       setState(() {
-        _currentCount = cur.length;
+        _currentCount = paidCurrent.length;
         _archiveCount = arch.length;
         _balanceStr = w.balance;
-        _activeOrder = _pickActive(cur);
+        _activeOrder = _pickActive(paidCurrent);
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -681,7 +683,7 @@ class CustomerHomeBodyState extends State<CustomerHomeBody> {
                   value: '$_archiveCount',
                   caption: I18n.t('customer.tile_archive_subtitle'),
                   icon: Icons.history_rounded,
-                  onTap: () => widget.onOpenOrders(1),
+                  onTap: () => widget.onOpenOrders(2),
                 ),
               ),
             ],
@@ -738,6 +740,9 @@ class CustomerOrdersBody extends StatefulWidget {
 class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
   List<CustomerOrder> _current = [];
   List<CustomerOrder> _archive = [];
+
+  /// Yaratilgan, lekin to'lanmagan (status 1) — alohida tab.
+  List<CustomerOrder> _unpaid = [];
   bool _loading = true;
   String? _error;
 
@@ -761,6 +766,7 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
       setState(() {
         _current = [];
         _archive = [];
+        _unpaid = [];
         _loading = false;
         _error = null;
       });
@@ -775,7 +781,8 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
       final a = await CustomerApi.instance.archiveOrders();
       if (!mounted) return;
       setState(() {
-        _current = c;
+        _current = c.where((o) => o.status != 1).toList();
+        _unpaid = c.where((o) => o.status == 1).toList();
         _archive = a;
         _loading = false;
       });
@@ -803,8 +810,8 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
     }
 
     return DefaultTabController(
-      length: 2,
-      initialIndex: widget.initialTab.clamp(0, 1),
+      length: 3,
+      initialIndex: widget.initialTab.clamp(0, 2),
       child: Column(
         children: [
           // Tab'lar sahifa fonida turadi — brendda ular alohida "panel" emas,
@@ -819,6 +826,23 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
               indicatorWeight: 2.5,
               tabs: [
                 Tab(text: I18n.t('customer.tab_current')),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(I18n.t('customer.tab_unpaid')),
+                      if (_unpaid.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(color: cs.error, borderRadius: BorderRadius.circular(10)),
+                          child: Text('${_unpaid.length}',
+                              style: TextStyle(color: cs.onError, fontSize: 11, fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
                 Tab(text: I18n.t('customer.tab_archive')),
               ],
             ),
@@ -829,6 +853,8 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
                 : TabBarView(
                     children: [
                       _orderList(_current, widget.onOpenDetail, _error),
+                      _orderList(_unpaid, widget.onOpenDetail, _error,
+                          emptyTitle: I18n.t('customer.unpaid_empty'), emptyHint: I18n.t('customer.unpaid_hint')),
                       _orderList(_archive, widget.onOpenDetail, _error),
                     ],
                   ),
@@ -838,7 +864,8 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
     );
   }
 
-  Widget _orderList(List<CustomerOrder> list, void Function(CustomerOrder) onTap, String? err) {
+  Widget _orderList(List<CustomerOrder> list, void Function(CustomerOrder) onTap, String? err,
+      {String? emptyTitle, String? emptyHint}) {
     if (err != null && list.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -862,8 +889,8 @@ class CustomerOrdersBodyState extends State<CustomerOrdersBody> {
         children: [
           AlixEmptyState(
             icon: Icons.inventory_2_outlined,
-            title: I18n.t('customer.empty_list'),
-            message: I18n.t('customer.no_active_order_hint'),
+            title: emptyTitle ?? I18n.t('customer.empty_list'),
+            message: emptyHint ?? I18n.t('customer.no_active_order_hint'),
           ),
         ],
       );
