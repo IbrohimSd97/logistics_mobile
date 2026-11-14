@@ -6,6 +6,7 @@ import 'core/api/logging_http_client.dart';
 import 'core/api/net_log.dart';
 import 'core/api/net_log_overlay.dart';
 import 'core/i18n/i18n.dart';
+import 'core/links/deep_link_service.dart';
 import 'core/push/push_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
@@ -39,6 +40,7 @@ Future<void> _bootstrap() async {
   // pushsiz ishlayveradi.
   PushService.instance.onTap = PushTapRouter.open;
   await PushService.instance.init();
+  DeepLinkService.instance.init();
   runApp(const MyApp());
 }
 

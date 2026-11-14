@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api/api_exception.dart';
+import '../core/config/api_config.dart';
 import '../customer/customer_api.dart';
 import '../customer/customer_models.dart';
 import '../customer/pages/customer_order_detail_page.dart';
@@ -25,6 +27,7 @@ class PushTapRouter {
   static final navigatorKey = GlobalKey<NavigatorState>();
 
   static Future<void> open(Map<String, dynamic> data) async {
+    if (data['type']?.toString() == 'recipient_link') return _openRecipientLink(data['token']?.toString() ?? '');
     if (data['type']?.toString() != 'order_status') return;
     final orderId = int.tryParse(data['order_id']?.toString() ?? '');
     if (orderId == null) return;
@@ -40,6 +43,19 @@ class PushTapRouter {
     } catch (e) {
       // Buyurtmani olib bo'lmadi (tarmoq, sessiya) — ilova shunchaki ochiq qoladi.
       debugPrint('PushTapRouter: $e');
+    }
+  }
+
+  /// SMS havolasi: buyurtma shu akkauntga tegishli bo'lsa — ilovadagi sahifa,
+  /// aks holda (boshqa raqam bilan kirilgan, tarmoq xatosi) — o'sha veb sahifa.
+  static Future<void> _openRecipientLink(String token) async {
+    if (token.isEmpty) return;
+    try {
+      final order = await RecipientApi.instance.orderByToken(token);
+      await navigatorKey.currentState?.push(MaterialPageRoute<void>(builder: (_) => RecipientOrderPage(order: order)));
+    } catch (e) {
+      debugPrint('PushTapRouter recipient link: $e');
+      await launchUrl(Uri.parse('${ApiConfig.baseUrl}/t/$token'), mode: LaunchMode.inAppBrowserView);
     }
   }
 

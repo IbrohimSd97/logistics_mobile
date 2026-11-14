@@ -223,6 +223,10 @@ class PushService {
     );
   }
 
+  /// Push bo'lmagan tashqi manba (masalan SMS havolasi) — xuddi push bosilgandek
+  /// navbatga qo'yiladi va ilova tayyor bo'lgach ochiladi.
+  void handleExternal(Map<String, dynamic> data) => _handleTap(data);
+
   void _handleTap(Map<String, dynamic>? data) {
     if (data == null || data.isEmpty) return;
     if (!_appReady) {

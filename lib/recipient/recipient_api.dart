@@ -140,6 +140,12 @@ class RecipientApi {
     return data is List ? data.map(RecipientOrder.fromMap).whereType<RecipientOrder>().toList() : const [];
   }
 
+  /// SMS'dagi `/t/{token}` havolasi bo'yicha (faqat shu foydalanuvchi qabul qiluvchi bo'lsa).
+  Future<RecipientOrder> orderByToken(String token) async {
+    final res = await http.get(_url('/by-token/$token'), headers: await _headers());
+    return RecipientOrder.fromMap(decodeJsonEnvelopeOrThrow(res)['data']) ?? (throw ApiException(I18n.t('err.no_data_in_response')));
+  }
+
   Future<RecipientOrder> order(int id) async {
     final res = await http.get(_url('/$id'), headers: await _headers());
     return RecipientOrder.fromMap(decodeJsonEnvelopeOrThrow(res)['data']) ?? (throw ApiException(I18n.t('err.no_data_in_response')));

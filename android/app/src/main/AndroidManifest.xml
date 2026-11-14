@@ -39,6 +39,22 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- SMS'dagi qabul qiluvchi havolasi: https://admin.alix.uz/t/{token} (App Links). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="admin.alix.uz" android:pathPrefix="/t/" />
+            </intent-filter>
+            <!-- Kuzatish sahifasidagi "Ilovada ochish": alix://t/{token} -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="alix" android:host="t" />
+            </intent-filter>
+            <!-- Havolalarni app_links paketi boshqaradi (Flutter'ning o'z deep link'i emas). -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="false" />
         </activity>
         <!-- Push: ilova yopiq bo'lganda tizim ko'rsatadigan bildirishnoma uchun
              kanal va ikonka (backend config push.android_channel_id bilan bir xil). -->

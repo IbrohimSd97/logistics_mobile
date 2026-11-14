@@ -6,5 +6,10 @@
 	     eksportida Xcode buni avtomatik "production" ga almashtiradi. -->
 	<key>aps-environment</key>
 	<string>development</string>
+	<!-- SMS'dagi qabul qiluvchi havolasi https://admin.alix.uz/t/{token} ilovada ochiladi. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:admin.alix.uz</string>
+	</array>
 </dict>
 </plist>
