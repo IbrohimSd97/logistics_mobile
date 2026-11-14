@@ -32,7 +32,7 @@ class MapMarkers {
       textDirection: TextDirection.ltr,
       text: TextSpan(
         text: label,
-        style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+        style: TextStyle(color: Colors.white, fontSize: label.length > 1 ? 22 : 30, fontWeight: FontWeight.w900),
       ),
     )..layout();
     tp.paint(canvas, center - Offset(tp.width / 2, tp.height / 2));

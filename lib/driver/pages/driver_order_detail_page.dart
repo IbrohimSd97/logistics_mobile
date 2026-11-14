@@ -1,3 +1,4 @@
+import '../../core/orders/second_pickup.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -56,6 +57,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   /// bir marta tayyorlanib saqlanadi.
   BitmapDescriptor? _pinA;
   BitmapDescriptor? _pinB;
+  BitmapDescriptor? _pinA2;
   BitmapDescriptor? _driverIcon;
 
   /// Bottom sheet'ning hozirgi balandligi (0..1). Recenter FAB shu qiymatga
@@ -131,11 +133,13 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     // boshlanish to'q (ink), manzil brend orange.
     final a = await MapMarkers.abPin('A', AppPalette.ink);
     final b = await MapMarkers.abPin('B', AppPalette.orange);
+    final a2 = await MapMarkers.abPin('A2', const Color(0xFF7C3AED));
     final driver = await MapMarkers.driverArrow(AppPalette.orange);
     if (!mounted) return;
     setState(() {
       _pinA = a;
       _pinB = b;
+      _pinA2 = a2;
       _driverIcon = driver;
     });
   }
@@ -380,7 +384,34 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
         }
       }
 
-      // Status==5 → pickup'dan 100m uzoqlashganda InTransit
+      // Status==5 → pickup'dan 100m uzoqlashganda InTransit. A2 bo'lsa:
+      // A'dan uzoqlashsa — "A2 ga yo'lga chiqdi", A2 dan uzoqlashsa — InTransit,
+      // A2 ga yo'lda — avtomatik hech narsa (yetib kelganini haydovchi bildiradi).
+      final p2 = _order.pickup2;
+      if (!_autoTransitionTriggered && _order.status == 5 && p2 != null) {
+        final origin = p2.atPickup2 ? _pickup2 : (p2.headingToPickup2 ? null : _pickup);
+        if (origin != null &&
+            Geolocator.distanceBetween(origin.latitude, origin.longitude, pos.latitude, pos.longitude) >=
+                _autoTransitionDistanceM) {
+          _autoTransitionTriggered = true;
+          try {
+            if (p2.atPickup2) {
+              await DriverApi.instance.inTransit(_order.id);
+              if (!mounted) return;
+              setState(() => _order = _orderWithStatus(6));
+            } else {
+              await DriverApi.instance.leftPickup1(_order.id);
+              if (!mounted) return;
+              setState(() => _order = _orderWithStatus(5, pickup2Stage: 'to_pickup2'));
+              _autoTransitionTriggered = false;
+            }
+            _refetchRoute();
+          } catch (e) {
+            _autoTransitionTriggered = false;
+          }
+        }
+        return;
+      }
       final pickupLatLng = _pickup;
       if (!_autoTransitionTriggered && _order.status == 5 && pickupLatLng != null) {
         final dist = Geolocator.distanceBetween(
@@ -436,6 +467,9 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       ? LatLng(_order.pickupLat!, _order.pickupLng!)
       : null;
 
+  /// Ikkinchi olib ketish nuqtasi (A2), bo'lmasa null.
+  LatLng? get _pickup2 => _order.pickup2 != null ? LatLng(_order.pickup2!.lat, _order.pickup2!.lng) : null;
+
   LatLng? get _delivery => (_order.deliveryLat != null && _order.deliveryLng != null)
       ? LatLng(_order.deliveryLat!, _order.deliveryLng!)
       : null;
@@ -465,6 +499,10 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     if (s == 6 || s == 7) {
       final from = _acceptPoint ?? _pickup;
       return (from, _delivery);
+    }
+    // A'da yuklab bo'lib A2 ga ketmoqda — chiziq A2 gacha.
+    if (s == 5 && (_order.pickup2?.headingToPickup2 ?? false)) {
+      return (_acceptPoint ?? _pickup, _pickup2);
     }
     return (null, null);
   }
@@ -675,15 +713,26 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     return perHour.toDouble();
   }
 
-  DriverOrder _orderWithStatus(int newStatus) {
+  DriverOrder _orderWithStatus(int newStatus, {String? pickup2Stage}) {
     // Optimistik yangilanish — status bilan birga mos bosqich vaqtlarini ham
     // darhol to'ldiramiz (timeline/banner refreshsiz yangilansin). Statuslar:
     // 3=Accepted, 5=Loading(=ArrivedPickup collapse), 6=InTransit,
     // 8=Unloading(=ArrivedDelivery collapse), 9=Delivered.
     final nowIso = DateTime.now().toIso8601String();
     String? at(String? cur, bool set) => set ? (cur ?? nowIso) : cur;
+    final p2 = _order.pickup2;
     return DriverOrder(
       id: _order.id,
+      pickup2: p2 == null
+          ? null
+          : SecondPickup(
+              address: p2.address,
+              lat: p2.lat,
+              lng: p2.lng,
+              stage: pickup2Stage ?? (newStatus == 5 && p2.stage == null ? 'at_pickup1' : p2.stage),
+              leftPickup1At: pickup2Stage == 'to_pickup2' ? DateTime.now() : p2.leftPickup1At,
+              arrivedAt: pickup2Stage == 'at_pickup2' ? DateTime.now() : p2.arrivedAt,
+            ),
       orderNumber: _order.orderNumber,
       status: newStatus,
       totalPrice: _order.totalPrice,
@@ -774,6 +823,28 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
 
   Future<void> _arrivedPickup() async =>
       _doAction(() => DriverApi.instance.arrivedPickup(_order.id), newStatus: 5);
+
+  /// A2 da bo'lsa: A'da ketgan kutish (yuklash boshlanishi → A'dan chiqish).
+  int _pickup1WaitSeconds() {
+    final p2 = _order.pickup2;
+    final start = DateTime.tryParse(_order.loadingStartedAt ?? '');
+    if (p2 == null || !p2.atPickup2 || p2.leftPickup1At == null || start == null) return 0;
+    return p2.leftPickup1At!.toUtc().difference(start.toUtc()).inSeconds.clamp(0, 1 << 30);
+  }
+
+  Future<void> _leftPickup1() async {
+    await _doAction(() => DriverApi.instance.leftPickup1(_order.id), newStatus: 5);
+    if (!mounted) return;
+    setState(() => _order = _orderWithStatus(5, pickup2Stage: 'to_pickup2'));
+    _refetchRoute();
+  }
+
+  Future<void> _arrivedPickup2() async {
+    await _doAction(() => DriverApi.instance.arrivedPickup2(_order.id), newStatus: 5);
+    if (!mounted) return;
+    setState(() => _order = _orderWithStatus(5, pickup2Stage: 'at_pickup2'));
+    _refetchRoute();
+  }
 
   Future<void> _inTransit() async =>
       _doAction(() => DriverApi.instance.inTransit(_order.id), newStatus: 6);
@@ -920,6 +991,13 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                     ..._buildRoutePolylines(routePoints, s),
                   // A pin doim (mavjud bo'lsa). B pin — faqat InTransit/Unloading bosqichlari.
                   if (p != null && _pinA != null) _routeMarker(p, isStart: true),
+                  if (_pickup2 != null && _pinA2 != null)
+                    PlacemarkMapObject(
+                      mapId: const MapObjectId('pickup2'),
+                      point: latLngToPoint(_pickup2!),
+                      opacity: 1,
+                      icon: PlacemarkIcon.single(PlacemarkIconStyle(image: _pinA2!, scale: 0.75)),
+                    ),
                   if (d != null && _pinB != null &&
                       (s == 6 || s == 7 || s == 8 || s == 9 || s == 10))
                     _routeMarker(d, isStart: false),
@@ -1072,7 +1150,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                               ],
                             ),
                             const SizedBox(height: 14),
-                            _StageHint(status: s, distanceKm: _route?.distanceKm),
+                            _StageHint(status: s, distanceKm: _route?.distanceKm, pickup2Stage: _order.pickup2?.stage),
                             const SizedBox(height: 14),
                             // Deadline banner — accept'dan keyin doim ko'rinadi
                             if (_order.deliveryDeadlineAt != null && (s ?? 0) >= 3)
@@ -1088,9 +1166,14 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                 orderPrice: _order.totalPrice,
                                 isDriver: true,
                               ),
-                            if (s == 5 && _order.loadingStartedAt != null && _order.cargoType != null)
+                            if (s == 5 && _order.loadingStartedAt != null && _order.cargoType != null &&
+                                !(_order.pickup2?.headingToPickup2 ?? false))
                               _WaitCountdown(
-                                startedAtIso: _order.loadingStartedAt!,
+                                // A2 da: hisob A2 ga kelgan vaqtdan, A'da ketgan vaqt bepul oynadan ayiriladi.
+                                startedAtIso: (_order.pickup2?.atPickup2 ?? false) && _order.pickup2!.arrivedAt != null
+                                    ? _order.pickup2!.arrivedAt!.toUtc().toIso8601String()
+                                    : _order.loadingStartedAt!,
+                                consumedSeconds: _pickup1WaitSeconds(),
                                 freeMinutes: _order.cargoType!.pickupFreeWaitMinutes,
                                 paidPrice: _order.cargoType!.pickupPaidWaitPrice,
                                 paidIntervalMin: _order.cargoType!.pickupPaidWaitIntervalMin,
@@ -1118,6 +1201,17 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                     label: I18n.t('order.detail.address_pickup'),
                                     address: _order.pickupAddress ?? '—',
                                   ),
+                                  if (_order.pickup2 != null) ...[
+                                    const SizedBox(height: 8),
+                                    const _DottedDivider(),
+                                    const SizedBox(height: 8),
+                                    _AddressRow(
+                                      isStart: true,
+                                      badge: 'A2',
+                                      label: I18n.t('order.detail.address_pickup2'),
+                                      address: _order.pickup2!.address,
+                                    ),
+                                  ],
                                   const SizedBox(height: 8),
                                   const _DottedDivider(),
                                   const SizedBox(height: 8),
@@ -1290,6 +1384,20 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
           onSlide: _arrivedPickup,
         );
       case 5:
+        final p2 = _order.pickup2;
+        if (p2 != null && !p2.atPickup2) {
+          return p2.headingToPickup2
+              ? SlideButton(
+                  label: I18n.t('driver.detail.arrived_pickup2_slide'),
+                  icon: Icons.pin_drop_rounded,
+                  onSlide: _arrivedPickup2,
+                )
+              : SlideButton(
+                  label: I18n.t('driver.detail.left_pickup1_slide'),
+                  icon: Icons.alt_route_rounded,
+                  onSlide: _leftPickup1,
+                );
+        }
         return SlideButton(
           label: I18n.t('driver.detail.in_transit_slide'),
           icon: Icons.local_shipping_rounded,
@@ -1539,10 +1647,13 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _StageHint extends StatelessWidget {
-  const _StageHint({required this.status, this.distanceKm});
+  const _StageHint({required this.status, this.distanceKm, this.pickup2Stage});
 
   final int? status;
   final double? distanceKm;
+
+  /// A2 bo'lsa: at_pickup1 / to_pickup2 / at_pickup2.
+  final String? pickup2Stage;
 
   @override
   Widget build(BuildContext context) {
@@ -1556,8 +1667,16 @@ class _StageHint extends StatelessWidget {
         icon = Icons.pin_drop_rounded;
         break;
       case 5:
-        text = I18n.t('driver.detail.stage_loading');
-        icon = Icons.downloading_rounded;
+        if (pickup2Stage == 'to_pickup2') {
+          text = I18n.t('driver.detail.stage_to_pickup2', {'km': distanceKm != null ? distanceKm!.toStringAsFixed(1) : '—'});
+          icon = Icons.alt_route_rounded;
+        } else if (pickup2Stage == 'at_pickup1') {
+          text = I18n.t('driver.detail.stage_loading_pickup1');
+          icon = Icons.downloading_rounded;
+        } else {
+          text = I18n.t('driver.detail.stage_loading');
+          icon = Icons.downloading_rounded;
+        }
         break;
       case 6:
         text = I18n.t('driver.detail.stage_in_transit', {'km': distanceKm != null ? distanceKm!.toStringAsFixed(1) : '—'});
@@ -1604,6 +1723,7 @@ class _StageHint extends StatelessWidget {
 class _WaitCountdown extends StatelessWidget {
   const _WaitCountdown({
     required this.startedAtIso,
+    this.consumedSeconds = 0,
     required this.freeMinutes,
     required this.paidPrice,
     required this.paidIntervalMin,
@@ -1611,6 +1731,9 @@ class _WaitCountdown extends StatelessWidget {
   });
 
   final String startedAtIso;
+
+  /// Oldingi nuqtada (A) sarflangan kutish — bepul oyna ikkala nuqta uchun bitta.
+  final int consumedSeconds;
   final int freeMinutes;
   final String? paidPrice;
   final int paidIntervalMin;
@@ -1621,7 +1744,7 @@ class _WaitCountdown extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final started = DateTime.tryParse(startedAtIso);
     if (started == null) return const SizedBox.shrink();
-    final elapsed = DateTime.now().toUtc().difference(started.toUtc());
+    final elapsed = DateTime.now().toUtc().difference(started.toUtc()) + Duration(seconds: consumedSeconds);
     final freeSeconds = freeMinutes * 60;
     final remainingSec = freeSeconds - elapsed.inSeconds;
 
@@ -1708,8 +1831,10 @@ class _WaitCountdown extends StatelessWidget {
 }
 
 class _AddressRow extends StatelessWidget {
-  const _AddressRow({required this.isStart, required this.label, required this.address});
+  const _AddressRow({required this.isStart, required this.label, required this.address, this.badge});
 
+  /// Doira ichidagi yozuv (standart A/B); A2 uchun binafsha.
+  final String? badge;
   final bool isStart;
   final String label;
   final String address;
@@ -1718,7 +1843,7 @@ class _AddressRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     // Boshlanish to'q, manzil orange — buyurtmalar ro'yxatidagi bilan bir xil.
-    final color = isStart ? cs.onSurface : AppPalette.orange;
+    final color = badge != null ? const Color(0xFF7C3AED) : (isStart ? cs.onSurface : AppPalette.orange);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1728,9 +1853,9 @@ class _AddressRow extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           child: Text(
-            isStart ? 'A' : 'B',
+            badge ?? (isStart ? 'A' : 'B'),
             style: TextStyle(
-              color: isStart ? cs.surface : Colors.white,
+              color: badge != null ? Colors.white : (isStart ? cs.surface : Colors.white),
               fontWeight: FontWeight.w800,
               fontSize: 11,
             ),

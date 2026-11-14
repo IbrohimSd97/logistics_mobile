@@ -40,12 +40,16 @@ class DriverApi {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Accept-Language': I18n.instance.code,
+        // Server shu bo'yicha yangi buyurtma turlarini (A → A2 → B) ko'rsatadi.
+        'X-Client-Features': 'multi_pickup',
         'Authorization': 'Bearer $token',
       };
 
   Map<String, String> _multiAuth(String token) => {
         'Accept': 'application/json',
         'Accept-Language': I18n.instance.code,
+        // Server shu bo'yicha yangi buyurtma turlarini (A → A2 → B) ko'rsatadi.
+        'X-Client-Features': 'multi_pickup',
         'Authorization': 'Bearer $token',
       };
 
@@ -103,6 +107,8 @@ class DriverApi {
     final res = await http.get(url, headers: {
       'Accept': 'application/json',
       'Accept-Language': I18n.instance.code,
+      // Server shu bo'yicha yangi buyurtma turlarini (A → A2 → B) ko'rsatadi.
+      'X-Client-Features': 'multi_pickup',
     });
     final map = _decode(res);
     final list = mapListFrom(map['data']);
@@ -444,6 +450,12 @@ class DriverApi {
   Future<void> arrivedPickup(int orderId) => _statusEndpoint('arrived-pickup', orderId);
 
   Future<void> inTransit(int orderId) => _statusEndpoint('in-transit', orderId);
+
+  /// A → A2 → B: A'da yuklash tugadi, ikkinchi nuqtaga yo'lga chiqdi.
+  Future<void> leftPickup1(int orderId) => _statusEndpoint('left-pickup1', orderId);
+
+  /// A → A2 → B: ikkinchi olib ketish nuqtasiga yetib keldi.
+  Future<void> arrivedPickup2(int orderId) => _statusEndpoint('arrived-pickup2', orderId);
 
   Future<void> arrivedDelivery(int orderId) => _statusEndpoint('arrived-delivery', orderId);
 

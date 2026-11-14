@@ -41,7 +41,8 @@ class MapRoute {
 
   int get durationMin => (durationWithTrafficSec / 60).round();
 
-  static Future<MapRoute?> fetch(LatLng from, LatLng to) async {
+  /// `via` — oraliq nuqta (ikkinchi olib ketish manzili, A → A2 → B).
+  static Future<MapRoute?> fetch(LatLng from, LatLng to, {LatLng? via}) async {
     try {
       final (_, resultFuture) = await YandexDriving.requestRoutes(
         points: [
@@ -49,6 +50,11 @@ class MapRoute {
             point: latLngToPoint(from),
             requestPointType: RequestPointType.wayPoint,
           ),
+          if (via != null)
+            RequestPoint(
+              point: latLngToPoint(via),
+              requestPointType: RequestPointType.wayPoint,
+            ),
           RequestPoint(
             point: latLngToPoint(to),
             requestPointType: RequestPointType.wayPoint,

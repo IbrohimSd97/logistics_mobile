@@ -96,6 +96,8 @@ class CancelReasonsApi {
     final res = await http.get(url, headers: {
       'Accept': 'application/json',
       'Accept-Language': I18n.instance.code,
+      // Server shu bo'yicha yangi buyurtma turlarini (A → A2 → B) ko'rsatadi.
+      'X-Client-Features': 'multi_pickup',
       'Authorization': 'Bearer $token',
     });
     final map = decodeJsonEnvelopeOrThrow(res);

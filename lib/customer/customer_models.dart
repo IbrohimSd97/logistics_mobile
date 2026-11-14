@@ -1,3 +1,5 @@
+import '../core/orders/second_pickup.dart';
+
 class CustomerProfile {
   const CustomerProfile({
     required this.userId,
@@ -130,6 +132,7 @@ class CargoTypeMini {
 class CustomerOrder {
   const CustomerOrder({
     required this.id,
+    this.pickup2,
     this.orderNumber,
     this.status,
     this.totalPrice,
@@ -188,6 +191,8 @@ class CustomerOrder {
   final String? basePrice;
   final String? distanceKm;
   final String? currency;
+  /// Ikkinchi olib ketish nuqtasi (bo'lmasa null).
+  final SecondPickup? pickup2;
   final String? pickupAddress;
   final double? pickupLat;
   final double? pickupLng;
@@ -254,6 +259,7 @@ class CustomerOrder {
       basePrice: m['base_price']?.toString(),
       distanceKm: m['distance_km']?.toString(),
       currency: m['currency']?.toString(),
+      pickup2: SecondPickup.fromMap(m['pickup2']),
       pickupAddress: m['pickup_address']?.toString(),
       pickupLat: _double(m['pickup_lat']),
       pickupLng: _double(m['pickup_lng']),

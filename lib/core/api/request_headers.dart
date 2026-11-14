@@ -12,6 +12,8 @@ Map<String, String> jsonAuthHeaders(String token) => {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'Accept-Language': I18n.instance.code,
+      // Server shu bo'yicha yangi buyurtma turlarini (A → A2 → B) ko'rsatadi.
+      'X-Client-Features': 'multi_pickup',
       'Authorization': 'Bearer $token',
     };
 
@@ -19,15 +21,21 @@ Map<String, String> jsonHeaders() => {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
       'Accept-Language': I18n.instance.code,
+      // Server shu bo'yicha yangi buyurtma turlarini (A → A2 → B) ko'rsatadi.
+      'X-Client-Features': 'multi_pickup',
     };
 
 Map<String, String> formAuthHeaders(String token) => {
       'Accept': 'application/json',
       'Accept-Language': I18n.instance.code,
+      // Server shu bo'yicha yangi buyurtma turlarini (A → A2 → B) ko'rsatadi.
+      'X-Client-Features': 'multi_pickup',
       'Authorization': 'Bearer $token',
     };
 
 Map<String, String> formHeaders() => {
       'Accept': 'application/json',
       'Accept-Language': I18n.instance.code,
+      // Server shu bo'yicha yangi buyurtma turlarini (A → A2 → B) ko'rsatadi.
+      'X-Client-Features': 'multi_pickup',
     };

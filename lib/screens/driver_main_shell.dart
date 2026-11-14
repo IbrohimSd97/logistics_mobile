@@ -1051,7 +1051,10 @@ class _DriverOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _DriverRoute(
-            pickup: order.pickupAddress ?? '—',
+            // A2 bo'lsa olib ketish qatoriga qo'shiladi (A → A2 → B).
+            pickup: order.pickup2 == null
+                ? (order.pickupAddress ?? '—')
+                : '${order.pickupAddress ?? '—'}\n＋ ${I18n.t('order.detail.address_pickup2')}: ${order.pickup2!.address}',
             delivery: order.deliveryAddress ?? '—',
           ),
           const SizedBox(height: 14),
@@ -1959,7 +1962,10 @@ class _DriverFeedOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _DriverRoute(
-            pickup: order.pickupAddress ?? '—',
+            // A2 bo'lsa olib ketish qatoriga qo'shiladi (A → A2 → B).
+            pickup: order.pickup2 == null
+                ? (order.pickupAddress ?? '—')
+                : '${order.pickupAddress ?? '—'}\n＋ ${I18n.t('order.detail.address_pickup2')}: ${order.pickup2!.address}',
             delivery: order.deliveryAddress ?? '—',
           ),
           const SizedBox(height: 14),
@@ -2014,7 +2020,7 @@ class _DriverRoute extends StatelessWidget {
 
     Widget address(String value) => Text(
           value,
-          maxLines: 1,
+          maxLines: value.contains('\n') ? 2 : 1,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.bodyMedium
               ?.copyWith(fontWeight: FontWeight.w600, height: 1),

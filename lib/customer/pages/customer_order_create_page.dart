@@ -58,6 +58,11 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
   LatLng? _pickup;
   LatLng? _delivery;
 
+  /// Ixtiyoriy ikkinchi olib ketish nuqtasi (A → A2 → B).
+  final _pickup2Addr = TextEditingController();
+  LatLng? _pickup2;
+  bool _withPickup2 = false;
+
   List<CargoType> _cargoTypes = [];
   CargoType? _selected;
   bool _loadingTariffs = true;
@@ -101,6 +106,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
   void dispose() {
     _pickupAddr.dispose();
     _deliveryAddr.dispose();
+    _pickup2Addr.dispose();
     _weight.dispose();
     _comment.dispose();
     _recipient.dispose();
@@ -193,6 +199,29 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
     setState(() => _scheduledAt = picked);
   }
 
+  Future<void> _pickSecondPickup() async {
+    final result = await Navigator.of(context).push<LocationPickerResult>(
+      MaterialPageRoute<LocationPickerResult>(
+        builder: (_) => LocationPickerPage(
+          title: I18n.t('order.create.pickup2_picker_title'),
+          initialLatLng: _pickup2 ?? _pickup,
+          initialAddress: _pickup2Addr.text.isEmpty ? null : _pickup2Addr.text,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _pickup2 = result.latLng;
+      _pickup2Addr.text = result.address;
+    });
+  }
+
+  void _removeSecondPickup() => setState(() {
+        _withPickup2 = false;
+        _pickup2 = null;
+        _pickup2Addr.clear();
+      });
+
   Future<void> _submit() async {
     final pickup = _pickupAddr.text.trim();
     final delivery = _deliveryAddr.text.trim();
@@ -215,6 +244,12 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
     if (pickup.isEmpty || delivery.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(I18n.t('order.create.address_required'))),
+      );
+      return;
+    }
+    if (_withPickup2 && (_pickup2 == null || _pickup2Addr.text.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(I18n.t('order.create.pickup2_required'))),
       );
       return;
     }
@@ -273,7 +308,8 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
       // Yo'l vaqtini Yandex'dan olamiz — u tirbandlikni hisobga oladi,
       // serverdagi OSRM esa yo'q. Marshrut topilmasa `null` yuboriladi va
       // server o'z hisobiga qaytadi.
-      final route = await MapRoute.fetch(_pickup!, _delivery!);
+      final via = _withPickup2 ? _pickup2 : null;
+      final route = await MapRoute.fetch(_pickup!, _delivery!, via: via);
 
       final r = await CustomerApi.instance.createOrder(
         cargoTypeId: _selected!.id,
@@ -288,6 +324,9 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
         scheduledPickupAt: _scheduledMode ? _scheduledAt : null,
         durationMin: route?.durationMin,
         recipientPhone: _recipient.self ? null : _recipient.phoneE164,
+        pickup2Address: via != null ? _pickup2Addr.text.trim() : null,
+        pickup2Lat: via?.latitude,
+        pickup2Lng: via?.longitude,
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -373,6 +412,34 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
               onPickFromMap: () => _pickFromMap(isPickup: true),
             ),
             const SizedBox(height: 12),
+            if (_withPickup2) ...[
+              _LocationField(
+                label: I18n.t('order.create.pickup2_field_label'),
+                markerColor: const Color(0xFF7C3AED),
+                controller: _pickup2Addr,
+                latLng: _pickup2,
+                onPickFromMap: _pickSecondPickup,
+                onRemove: _removeSecondPickup,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+                child: Text(I18n.t('order.create.pickup2_hint'), style: Theme.of(context).textTheme.bodySmall),
+              ),
+              const SizedBox(height: 12),
+            ] else ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () {
+                    setState(() => _withPickup2 = true);
+                    _pickSecondPickup();
+                  },
+                  icon: const Icon(Icons.add_location_alt_outlined),
+                  label: Text(I18n.t('order.create.pickup2_add')),
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
             _LocationField(
               label: I18n.t('order.create.delivery_field_label'),
               markerColor: AppPalette.orange,
@@ -520,7 +587,11 @@ class _LocationField extends StatelessWidget {
     required this.controller,
     required this.latLng,
     required this.onPickFromMap,
+    this.onRemove,
   });
+
+  /// Ixtiyoriy nuqtani olib tashlash (A2).
+  final VoidCallback? onRemove;
 
   final String label;
 
@@ -557,6 +628,13 @@ class _LocationField extends StatelessWidget {
                 AlixStatusChip(
                   label: I18n.t('order.create.location_selected'),
                   tone: AlixTone.success,
+                ),
+              if (onRemove != null)
+                IconButton(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  tooltip: I18n.t('order.create.pickup2_remove'),
+                  visualDensity: VisualDensity.compact,
                 ),
             ],
           ),
