@@ -86,7 +86,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       _setText(_pinfl.pinfl, widget.data!.s1('national_id'));
       _setText(_licSeries, widget.data!.s1('car_license_series'));
       _setText(_licNumber, widget.data!.s1('car_license_number'));
-      _licFull.text = LicenseInputFormatter.format(_licSeries.text, _licNumber.text);
+      _licFull.text = SeriesNumberFormatter.license.format(_licSeries.text, _licNumber.text);
       _birthDate = _parseDate(widget.data!.s1('birth_date')) ?? _birthDate;
       _licIssuedDate =
           _parseDate(widget.data!.s1('car_license_issued_date')) ?? _licIssuedDate;
@@ -469,9 +469,9 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                 keyboardType: TextInputType.visiblePassword, // harf ham, raqam ham; avtotuzatishsiz
                 autocorrect: false,
                 enableSuggestions: false,
-                inputFormatters: [LicenseInputFormatter()],
+                inputFormatters: const [SeriesNumberFormatter.license],
                 onChanged: (v) {
-                  final (series, number) = LicenseInputFormatter.split(v);
+                  final (series, number) = SeriesNumberFormatter.license.split(v);
                   _licSeries.text = series;
                   _licNumber.text = number;
                 },
@@ -480,7 +480,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                   hintText: 'AF 1234567',
                   helperText: I18n.t('driver.reg.license_full_hint'),
                 ),
-                validator: (v) => LicenseInputFormatter.isComplete(v ?? '') ? null : I18n.t('driver.reg.license_full_invalid'),
+                validator: (v) => SeriesNumberFormatter.license.isComplete(v ?? '') ? null : I18n.t('driver.reg.license_full_invalid'),
               ),
               _errorNote('car_license_series'),
               _errorNote('car_license_number'),

@@ -175,6 +175,7 @@ class DriverApi {
     required String plateNumber,
     String? color,
     required String capacityKg,
+    String? cargoVolumeM3,
     required String regCertSeries,
     required String regCertNumber,
     String? regCertIssuedDate,
@@ -202,6 +203,7 @@ class DriverApi {
       ..fields['has_trailer'] = hasTrailer ? '1' : '0'
       ..fields['project_offerta_accepted'] = projectOffertaAccepted ? '1' : '0';
     if (color != null && color.isNotEmpty) req.fields['color'] = color;
+    if (cargoVolumeM3 != null && cargoVolumeM3.isNotEmpty) req.fields['cargo_volume_m3'] = cargoVolumeM3;
     if (regCertIssuedDate != null && regCertIssuedDate.isNotEmpty) {
       req.fields['reg_certificate_issued_date'] = regCertIssuedDate;
     }

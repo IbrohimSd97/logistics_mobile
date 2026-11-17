@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../core/forms/license_input_formatter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart' show CameraLensDirection;
@@ -50,6 +51,10 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
   final _capacityKg = TextEditingController();
   final _regSeries = TextEditingController();
   final _regNumber = TextEditingController();
+  /// Yuk hajmi (m³).
+  final _cargoVolume = TextEditingController();
+  /// UI da bitta maydon (AAF 1234567) — seriya/raqam yuqoridagi ikki controller'ga ajratiladi.
+  final _regFull = TextEditingController();
   final _trailerPlate = TextEditingController();
 
   DateTime? _regIssuedDate;
@@ -85,6 +90,8 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
       _setText(_capacityKg, widget.data!.s2('capacity_kg'));
       _setText(_regSeries, widget.data!.s2('reg_certificate_series'));
       _setText(_regNumber, widget.data!.s2('reg_certificate_number'));
+      _setText(_cargoVolume, widget.data!.s2('cargo_volume_m3'));
+      _regFull.text = SeriesNumberFormatter.techPassport.format(_regSeries.text, _regNumber.text);
       _setText(_trailerPlate, widget.data!.s2('trailer_plate_number'));
       _regIssuedDate =
           _parseDate(widget.data!.s2('reg_certificate_issued_date')) ?? _regIssuedDate;
@@ -123,6 +130,8 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
     _capacityKg.dispose();
     _regSeries.dispose();
     _regNumber.dispose();
+    _cargoVolume.dispose();
+    _regFull.dispose();
     _trailerPlate.dispose();
     super.dispose();
   }
@@ -250,6 +259,7 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
         plateNumber: PlateKind.normalize(_plate.text, _plateKind),
         color: _color.text.trim().isEmpty ? null : _color.text.trim(),
         capacityKg: _capacityKg.text.trim(),
+        cargoVolumeM3: _cargoVolume.text.trim(),
         regCertSeries: _regSeries.text.trim(),
         regCertNumber: _regNumber.text.trim(),
         regCertIssuedDate: _regIssuedDate == null ? null : _fmtDate(_regIssuedDate!),
@@ -377,56 +387,53 @@ class _DriverRegistrationStep2PageState extends State<DriverRegistrationStep2Pag
                 },
               ),
               _errorNote('capacity_kg'),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _cargoVolume,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                decoration: InputDecoration(
+                  labelText: I18n.t('driver.reg.cargo_volume_required'),
+                  hintText: '18',
+                  suffixText: 'm³',
+                ),
+                validator: (v) {
+                  final n = double.tryParse((v ?? '').trim());
+                  if (n == null || n < 0.5 || n > 200) return I18n.t('driver.reg.cargo_volume_invalid');
+                  return null;
+                },
+              ),
+              _errorNote('cargo_volume_m3'),
               const SizedBox(height: 16),
               Text(I18n.t('driver.reg.techpassport_section'),
                   style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextFormField(
-                          controller: _regSeries,
-                          textCapitalization: TextCapitalization.characters,
-                          // Tex passport seriyasi — faqat harf, ko'pi bilan 3 ta.
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp('[A-Za-z]')),
-                            LengthLimitingTextInputFormatter(3),
-                          ],
-                          decoration: InputDecoration(labelText: I18n.t('driver.reg.series_required'), hintText: I18n.t('driver.reg.techpassport_series_hint')),
-                          validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
-                        ),
-                        _errorNote('reg_certificate_series'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextFormField(
-                          controller: _regNumber,
-                          keyboardType: TextInputType.number,
-                          // Tex passport raqami — faqat raqam, ko'pi bilan 7 ta.
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(7),
-                          ],
-                          decoration: InputDecoration(labelText: I18n.t('driver.reg.number_required'), hintText: I18n.t('driver.reg.number_hint')),
-                          validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.field_required_short') : null,
-                        ),
-                        _errorNote('reg_certificate_number'),
-                      ],
-                    ),
-                  ),
-                ],
+              TextFormField(
+                controller: _regFull,
+                textCapitalization: TextCapitalization.characters,
+                keyboardType: TextInputType.visiblePassword, // harf ham, raqam ham; avtotuzatishsiz
+                autocorrect: false,
+                enableSuggestions: false,
+                inputFormatters: const [SeriesNumberFormatter.techPassport],
+                onChanged: (v) {
+                  final (series, number) = SeriesNumberFormatter.techPassport.split(v);
+                  _regSeries.text = series;
+                  _regNumber.text = number;
+                },
+                decoration: InputDecoration(
+                  labelText: I18n.t('driver.reg.techpassport_full_required'),
+                  hintText: 'AAF 1234567',
+                  helperText: I18n.t('driver.reg.techpassport_full_hint'),
+                ),
+                validator: (v) => SeriesNumberFormatter.techPassport.isComplete(v ?? '')
+                    ? null
+                    : I18n.t('driver.reg.techpassport_full_invalid'),
               ),
+              _errorNote('reg_certificate_series'),
+              _errorNote('reg_certificate_number'),
               const SizedBox(height: 14),
               InkWell(
                 onTap: _pickIssued,
