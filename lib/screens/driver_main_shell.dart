@@ -1051,10 +1051,11 @@ class _DriverOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _DriverRoute(
-            // A2 bo'lsa olib ketish qatoriga qo'shiladi (A → A2 → B).
-            pickup: order.pickup2 == null
-                ? (order.pickupAddress ?? '—')
-                : '${order.pickupAddress ?? '—'}\n＋ ${I18n.t('order.detail.address_pickup2')}: ${order.pickup2!.address}',
+            // Qo'shimcha olib ketish nuqtalari (A2 … A5) olib ketish qatoriga qo'shiladi.
+            pickup: [
+              order.pickupAddress ?? '—',
+              for (final pp in order.pickups) '＋ ${pp.label}: ${pp.address}',
+            ].join('\n'),
             delivery: order.deliveryAddress ?? '—',
           ),
           const SizedBox(height: 14),
@@ -1962,10 +1963,11 @@ class _DriverFeedOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _DriverRoute(
-            // A2 bo'lsa olib ketish qatoriga qo'shiladi (A → A2 → B).
-            pickup: order.pickup2 == null
-                ? (order.pickupAddress ?? '—')
-                : '${order.pickupAddress ?? '—'}\n＋ ${I18n.t('order.detail.address_pickup2')}: ${order.pickup2!.address}',
+            // Qo'shimcha olib ketish nuqtalari (A2 … A5) olib ketish qatoriga qo'shiladi.
+            pickup: [
+              order.pickupAddress ?? '—',
+              for (final pp in order.pickups) '＋ ${pp.label}: ${pp.address}',
+            ].join('\n'),
             delivery: order.deliveryAddress ?? '—',
           ),
           const SizedBox(height: 14),

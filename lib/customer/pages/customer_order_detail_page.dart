@@ -49,7 +49,8 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
   /// bir marta tayyorlanib saqlanadi — har rebuild'da qayta chizilmasligi uchun.
   BitmapDescriptor? _pinA;
   BitmapDescriptor? _pinB;
-  BitmapDescriptor? _pinA2;
+  /// Qo'shimcha olib ketish nuqtalari belgilari: 'A2' … 'A5'.
+  final Map<String, BitmapDescriptor> _extraPins = {};
   BitmapDescriptor? _driverIcon;
 
   MapRoute? _route;
@@ -93,13 +94,17 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
     // boshlanish to'q (ink), manzil brend orange.
     final a = await MapMarkers.abPin('A', AppPalette.ink);
     final b = await MapMarkers.abPin('B', AppPalette.orange);
-    final a2 = await MapMarkers.abPin('A2', const Color(0xFF7C3AED));
+    final extra = <String, BitmapDescriptor>{
+      for (final pp in _order.pickups) pp.label: await MapMarkers.abPin(pp.label, const Color(0xFF7C3AED)),
+    };
     final driver = await MapMarkers.driverArrow(AppPalette.orange);
     if (!mounted) return;
     setState(() {
       _pinA = a;
       _pinB = b;
-      _pinA2 = a2;
+      _extraPins
+        ..clear()
+        ..addAll(extra);
       _driverIcon = driver;
     });
   }
@@ -268,8 +273,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
       return;
     }
     setState(() => _routeLoading = true);
-    final p2 = _order.pickup2;
-    final r = await MapRoute.fetch(from, to, via: p2 != null ? LatLng(p2.lat, p2.lng) : null);
+    final r = await MapRoute.fetch(from, to, via: [for (final pp in _order.pickups) LatLng(pp.lat, pp.lng)]);
     if (!mounted) return;
     setState(() {
       _route = r;
@@ -770,13 +774,14 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                       outlineWidth: 1.5,
                     ),
                   if (p != null && _pinA != null) _routeMarker(p, isStart: true),
-                  if (_order.pickup2 != null && _pinA2 != null)
-                    PlacemarkMapObject(
-                      mapId: const MapObjectId('pickup2'),
-                      point: latLngToPoint(LatLng(_order.pickup2!.lat, _order.pickup2!.lng)),
-                      opacity: 1,
-                      icon: PlacemarkIcon.single(PlacemarkIconStyle(image: _pinA2!, scale: 0.75)),
-                    ),
+                  for (final pp in _order.pickups)
+                    if (_extraPins[pp.label] != null)
+                      PlacemarkMapObject(
+                        mapId: MapObjectId('pickup_${pp.seq}'),
+                        point: latLngToPoint(LatLng(pp.lat, pp.lng)),
+                        opacity: 1,
+                        icon: PlacemarkIcon.single(PlacemarkIconStyle(image: _extraPins[pp.label]!, scale: 0.75)),
+                      ),
                   if (d != null && _pinB != null) _routeMarker(d, isStart: false),
                   // Driver markeri — real-vaqt poll'dan kelgan lokatsiya
                   // ustun, fallback accept_lat/lng. Faqat driver yo'lda
@@ -996,15 +1001,15 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                                     label: I18n.t('order.detail.address_pickup'),
                                     address: _order.pickupAddress ?? '—',
                                   ),
-                                  if (_order.pickup2 != null) ...[
+                                  for (final pp in _order.pickups) ...[
                                     const SizedBox(height: 8),
                                     const _DottedDivider(),
                                     const SizedBox(height: 8),
                                     _AddressRow(
                                       isStart: true,
-                                      badge: 'A2',
-                                      label: I18n.t('order.detail.address_pickup2'),
-                                      address: _order.pickup2!.address,
+                                      badge: pp.label,
+                                      label: I18n.t('order.detail.address_pickup_extra', {'label': pp.label}),
+                                      address: pp.address,
                                     ),
                                   ],
                                   const SizedBox(height: 8),

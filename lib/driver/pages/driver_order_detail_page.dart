@@ -1,4 +1,4 @@
-import '../../core/orders/second_pickup.dart';
+import '../../core/orders/pickup_points.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -57,7 +57,8 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   /// bir marta tayyorlanib saqlanadi.
   BitmapDescriptor? _pinA;
   BitmapDescriptor? _pinB;
-  BitmapDescriptor? _pinA2;
+  /// Qo'shimcha olib ketish nuqtalari belgilari: 'A2' … 'A5'.
+  final Map<String, BitmapDescriptor> _extraPins = {};
   BitmapDescriptor? _driverIcon;
 
   /// Bottom sheet'ning hozirgi balandligi (0..1). Recenter FAB shu qiymatga
@@ -133,13 +134,17 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     // boshlanish to'q (ink), manzil brend orange.
     final a = await MapMarkers.abPin('A', AppPalette.ink);
     final b = await MapMarkers.abPin('B', AppPalette.orange);
-    final a2 = await MapMarkers.abPin('A2', const Color(0xFF7C3AED));
+    final extra = <String, BitmapDescriptor>{
+      for (final pp in _order.pickups) pp.label: await MapMarkers.abPin(pp.label, const Color(0xFF7C3AED)),
+    };
     final driver = await MapMarkers.driverArrow(AppPalette.orange);
     if (!mounted) return;
     setState(() {
       _pinA = a;
       _pinB = b;
-      _pinA2 = a2;
+      _extraPins
+        ..clear()
+        ..addAll(extra);
       _driverIcon = driver;
     });
   }
@@ -384,25 +389,25 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
         }
       }
 
-      // Status==5 → pickup'dan 100m uzoqlashganda InTransit. A2 bo'lsa:
-      // A'dan uzoqlashsa — "A2 ga yo'lga chiqdi", A2 dan uzoqlashsa — InTransit,
-      // A2 ga yo'lda — avtomatik hech narsa (yetib kelganini haydovchi bildiradi).
-      final p2 = _order.pickup2;
-      if (!_autoTransitionTriggered && _order.status == 5 && p2 != null) {
-        final origin = p2.atPickup2 ? _pickup2 : (p2.headingToPickup2 ? null : _pickup);
+      // Status==5 → pickup'dan 100m uzoqlashganda InTransit. Bir nechta nuqta bo'lsa:
+      // joriy nuqtadan uzoqlashsa — keyingisiga "jo'nadi" (oxirgisidan — InTransit),
+      // nuqtaga yo'lda — avtomatik hech narsa (yetib kelganini haydovchi bildiradi).
+      final prog = _progress;
+      if (!_autoTransitionTriggered && _order.status == 5 && prog != null) {
+        final origin = prog.atPickup ? _pointLatLng(prog.seq) : null;
         if (origin != null &&
             Geolocator.distanceBetween(origin.latitude, origin.longitude, pos.latitude, pos.longitude) >=
                 _autoTransitionDistanceM) {
           _autoTransitionTriggered = true;
           try {
-            if (p2.atPickup2) {
+            if (prog.readyForTransit) {
               await DriverApi.instance.inTransit(_order.id);
               if (!mounted) return;
               setState(() => _order = _orderWithStatus(6));
             } else {
-              await DriverApi.instance.leftPickup1(_order.id);
+              await DriverApi.instance.pickupLeave(_order.id);
               if (!mounted) return;
-              setState(() => _order = _orderWithStatus(5, pickup2Stage: 'to_pickup2'));
+              setState(() => _order = _advancedPickup(leave: true));
               _autoTransitionTriggered = false;
             }
             _refetchRoute();
@@ -467,8 +472,20 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       ? LatLng(_order.pickupLat!, _order.pickupLng!)
       : null;
 
-  /// Ikkinchi olib ketish nuqtasi (A2), bo'lmasa null.
-  LatLng? get _pickup2 => _order.pickup2 != null ? LatLng(_order.pickup2!.lat, _order.pickup2!.lng) : null;
+  /// Olib ketish nuqtasi koordinatasi: 1 = A, 2..5 = A2..A5.
+  LatLng? _pointLatLng(int seq) {
+    if (seq <= 1) return _pickup;
+    for (final pp in _order.pickups) {
+      if (pp.seq == seq) return LatLng(pp.lat, pp.lng);
+    }
+    return null;
+  }
+
+  /// Joriy olib ketish bosqichi (faqat Loading va qo'shimcha nuqtalar bo'lsa).
+  /// Server bilan bir xil mantiq bo'yicha mahalliy hisoblanadi — optimistik yangilanishlar ham darhol aks etadi.
+  PickupProgress? get _progress => _order.status == 5
+      ? PickupProgress.compute(points: _order.pickups, arrivedAtA: true, pickup1LeftAt: _order.pickup1LeftAt)
+      : null;
 
   LatLng? get _delivery => (_order.deliveryLat != null && _order.deliveryLng != null)
       ? LatLng(_order.deliveryLat!, _order.deliveryLng!)
@@ -500,9 +517,10 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       final from = _acceptPoint ?? _pickup;
       return (from, _delivery);
     }
-    // A'da yuklab bo'lib A2 ga ketmoqda — chiziq A2 gacha.
-    if (s == 5 && (_order.pickup2?.headingToPickup2 ?? false)) {
-      return (_acceptPoint ?? _pickup, _pickup2);
+    // Bir nuqtada yuklab bo'lib keyingisiga ketmoqda — chiziq o'sha nuqtagacha.
+    final prog = _progress;
+    if (s == 5 && prog != null && prog.toPickup) {
+      return (_acceptPoint ?? _pickup, _pointLatLng(prog.seq));
     }
     return (null, null);
   }
@@ -713,26 +731,29 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
     return perHour.toDouble();
   }
 
-  DriverOrder _orderWithStatus(int newStatus, {String? pickup2Stage}) {
+  /// Joriy nuqtadan jo'nash ([leave]) yoki keyingisiga yetib kelish — optimistik.
+  DriverOrder _advancedPickup({required bool leave}) {
+    final prog = _progress;
+    if (prog == null) return _order;
+    final now = DateTime.now();
+    if (leave && prog.seq == 1) return _orderWithStatus(5, pickup1LeftAt: now);
+    return _orderWithStatus(5, pickups: [
+      for (final pp in _order.pickups)
+        pp.seq == prog.seq ? (leave ? pp.copyWith(leftAt: now) : pp.copyWith(arrivedAt: now)) : pp,
+    ]);
+  }
+
+  DriverOrder _orderWithStatus(int newStatus, {DateTime? pickup1LeftAt, List<PickupPoint>? pickups}) {
     // Optimistik yangilanish — status bilan birga mos bosqich vaqtlarini ham
     // darhol to'ldiramiz (timeline/banner refreshsiz yangilansin). Statuslar:
     // 3=Accepted, 5=Loading(=ArrivedPickup collapse), 6=InTransit,
     // 8=Unloading(=ArrivedDelivery collapse), 9=Delivered.
     final nowIso = DateTime.now().toIso8601String();
     String? at(String? cur, bool set) => set ? (cur ?? nowIso) : cur;
-    final p2 = _order.pickup2;
     return DriverOrder(
       id: _order.id,
-      pickup2: p2 == null
-          ? null
-          : SecondPickup(
-              address: p2.address,
-              lat: p2.lat,
-              lng: p2.lng,
-              stage: pickup2Stage ?? (newStatus == 5 && p2.stage == null ? 'at_pickup1' : p2.stage),
-              leftPickup1At: pickup2Stage == 'to_pickup2' ? DateTime.now() : p2.leftPickup1At,
-              arrivedAt: pickup2Stage == 'at_pickup2' ? DateTime.now() : p2.arrivedAt,
-            ),
+      pickups: pickups ?? _order.pickups,
+      pickup1LeftAt: pickup1LeftAt ?? _order.pickup1LeftAt,
       orderNumber: _order.orderNumber,
       status: newStatus,
       totalPrice: _order.totalPrice,
@@ -824,25 +845,41 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
   Future<void> _arrivedPickup() async =>
       _doAction(() => DriverApi.instance.arrivedPickup(_order.id), newStatus: 5);
 
-  /// A2 da bo'lsa: A'da ketgan kutish (yuklash boshlanishi → A'dan chiqish).
-  int _pickup1WaitSeconds() {
-    final p2 = _order.pickup2;
+  /// Oldingi nuqtalarda allaqachon ketgan kutish (soniya) — bepul oyna hammasi uchun bitta.
+  int _consumedWaitSeconds() {
     final start = DateTime.tryParse(_order.loadingStartedAt ?? '');
-    if (p2 == null || !p2.atPickup2 || p2.leftPickup1At == null || start == null) return 0;
-    return p2.leftPickup1At!.toUtc().difference(start.toUtc()).inSeconds.clamp(0, 1 << 30);
+    final left1 = _order.pickup1LeftAt;
+    if (start == null || left1 == null) return 0;
+    var sec = left1.toUtc().difference(start.toUtc()).inSeconds.clamp(0, 1 << 30);
+    for (final pp in _order.pickups) {
+      if (pp.arrivedAt != null && pp.leftAt != null) {
+        sec += pp.leftAt!.toUtc().difference(pp.arrivedAt!.toUtc()).inSeconds.clamp(0, 1 << 30);
+      }
+    }
+    return sec;
   }
 
-  Future<void> _leftPickup1() async {
-    await _doAction(() => DriverApi.instance.leftPickup1(_order.id), newStatus: 5);
+  /// Kutish hisobi joriy nuqtada qachondan boshlangan (A: yuklash boshlanishi; A2…: yetib kelish).
+  String? _waitStartIso() {
+    final prog = _progress;
+    if (prog == null || prog.seq == 1) return _order.loadingStartedAt;
+    for (final pp in _order.pickups) {
+      if (pp.seq == prog.seq) return pp.arrivedAt?.toUtc().toIso8601String();
+    }
+    return _order.loadingStartedAt;
+  }
+
+  Future<void> _pickupLeave() async {
+    await _doAction(() => DriverApi.instance.pickupLeave(_order.id), newStatus: 5);
     if (!mounted) return;
-    setState(() => _order = _orderWithStatus(5, pickup2Stage: 'to_pickup2'));
+    setState(() => _order = _advancedPickup(leave: true));
     _refetchRoute();
   }
 
-  Future<void> _arrivedPickup2() async {
-    await _doAction(() => DriverApi.instance.arrivedPickup2(_order.id), newStatus: 5);
+  Future<void> _pickupArrive() async {
+    await _doAction(() => DriverApi.instance.pickupArrive(_order.id), newStatus: 5);
     if (!mounted) return;
-    setState(() => _order = _orderWithStatus(5, pickup2Stage: 'at_pickup2'));
+    setState(() => _order = _advancedPickup(leave: false));
     _refetchRoute();
   }
 
@@ -991,13 +1028,14 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                     ..._buildRoutePolylines(routePoints, s),
                   // A pin doim (mavjud bo'lsa). B pin — faqat InTransit/Unloading bosqichlari.
                   if (p != null && _pinA != null) _routeMarker(p, isStart: true),
-                  if (_pickup2 != null && _pinA2 != null)
-                    PlacemarkMapObject(
-                      mapId: const MapObjectId('pickup2'),
-                      point: latLngToPoint(_pickup2!),
-                      opacity: 1,
-                      icon: PlacemarkIcon.single(PlacemarkIconStyle(image: _pinA2!, scale: 0.75)),
-                    ),
+                  for (final pp in _order.pickups)
+                    if (_extraPins[pp.label] != null)
+                      PlacemarkMapObject(
+                        mapId: MapObjectId('pickup_${pp.seq}'),
+                        point: latLngToPoint(LatLng(pp.lat, pp.lng)),
+                        opacity: 1,
+                        icon: PlacemarkIcon.single(PlacemarkIconStyle(image: _extraPins[pp.label]!, scale: 0.75)),
+                      ),
                   if (d != null && _pinB != null &&
                       (s == 6 || s == 7 || s == 8 || s == 9 || s == 10))
                     _routeMarker(d, isStart: false),
@@ -1150,7 +1188,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                               ],
                             ),
                             const SizedBox(height: 14),
-                            _StageHint(status: s, distanceKm: _route?.distanceKm, pickup2Stage: _order.pickup2?.stage),
+                            _StageHint(status: s, distanceKm: _route?.distanceKm, progress: _progress),
                             const SizedBox(height: 14),
                             // Deadline banner — accept'dan keyin doim ko'rinadi
                             if (_order.deliveryDeadlineAt != null && (s ?? 0) >= 3)
@@ -1167,13 +1205,12 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                 isDriver: true,
                               ),
                             if (s == 5 && _order.loadingStartedAt != null && _order.cargoType != null &&
-                                !(_order.pickup2?.headingToPickup2 ?? false))
+                                !(_progress?.toPickup ?? false) && _waitStartIso() != null)
                               _WaitCountdown(
-                                // A2 da: hisob A2 ga kelgan vaqtdan, A'da ketgan vaqt bepul oynadan ayiriladi.
-                                startedAtIso: (_order.pickup2?.atPickup2 ?? false) && _order.pickup2!.arrivedAt != null
-                                    ? _order.pickup2!.arrivedAt!.toUtc().toIso8601String()
-                                    : _order.loadingStartedAt!,
-                                consumedSeconds: _pickup1WaitSeconds(),
+                                // Bir nechta nuqta: hisob joriy nuqtaga kelgan vaqtdan,
+                                // oldingi nuqtalarda ketgan vaqt bepul oynadan ayiriladi.
+                                startedAtIso: _waitStartIso()!,
+                                consumedSeconds: _consumedWaitSeconds(),
                                 freeMinutes: _order.cargoType!.pickupFreeWaitMinutes,
                                 paidPrice: _order.cargoType!.pickupPaidWaitPrice,
                                 paidIntervalMin: _order.cargoType!.pickupPaidWaitIntervalMin,
@@ -1201,15 +1238,15 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                     label: I18n.t('order.detail.address_pickup'),
                                     address: _order.pickupAddress ?? '—',
                                   ),
-                                  if (_order.pickup2 != null) ...[
+                                  for (final pp in _order.pickups) ...[
                                     const SizedBox(height: 8),
                                     const _DottedDivider(),
                                     const SizedBox(height: 8),
                                     _AddressRow(
                                       isStart: true,
-                                      badge: 'A2',
-                                      label: I18n.t('order.detail.address_pickup2'),
-                                      address: _order.pickup2!.address,
+                                      badge: pp.label,
+                                      label: I18n.t('order.detail.address_pickup_extra', {'label': pp.label}),
+                                      address: pp.address,
                                     ),
                                   ],
                                   const SizedBox(height: 8),
@@ -1384,18 +1421,18 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
           onSlide: _arrivedPickup,
         );
       case 5:
-        final p2 = _order.pickup2;
-        if (p2 != null && !p2.atPickup2) {
-          return p2.headingToPickup2
+        final prog = _progress;
+        if (prog != null && !prog.readyForTransit) {
+          return prog.canArrive
               ? SlideButton(
-                  label: I18n.t('driver.detail.arrived_pickup2_slide'),
+                  label: I18n.t('driver.detail.pickup_arrive_slide', {'label': prog.label}),
                   icon: Icons.pin_drop_rounded,
-                  onSlide: _arrivedPickup2,
+                  onSlide: _pickupArrive,
                 )
               : SlideButton(
-                  label: I18n.t('driver.detail.left_pickup1_slide'),
+                  label: I18n.t('driver.detail.pickup_leave_slide', {'label': 'A${prog.seq + 1}'}),
                   icon: Icons.alt_route_rounded,
-                  onSlide: _leftPickup1,
+                  onSlide: _pickupLeave,
                 );
         }
         return SlideButton(
@@ -1647,13 +1684,13 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _StageHint extends StatelessWidget {
-  const _StageHint({required this.status, this.distanceKm, this.pickup2Stage});
+  const _StageHint({required this.status, this.distanceKm, this.progress});
 
   final int? status;
   final double? distanceKm;
 
-  /// A2 bo'lsa: at_pickup1 / to_pickup2 / at_pickup2.
-  final String? pickup2Stage;
+  /// Bir nechta olib ketish nuqtasi bo'lsa — joriy bosqich.
+  final PickupProgress? progress;
 
   @override
   Widget build(BuildContext context) {
@@ -1667,11 +1704,17 @@ class _StageHint extends StatelessWidget {
         icon = Icons.pin_drop_rounded;
         break;
       case 5:
-        if (pickup2Stage == 'to_pickup2') {
-          text = I18n.t('driver.detail.stage_to_pickup2', {'km': distanceKm != null ? distanceKm!.toStringAsFixed(1) : '—'});
+        final prog = progress;
+        if (prog != null && prog.toPickup) {
+          text = I18n.t('driver.detail.stage_to_pickup', {
+            'label': prog.label,
+            'km': distanceKm != null ? distanceKm!.toStringAsFixed(1) : '—',
+          });
           icon = Icons.alt_route_rounded;
-        } else if (pickup2Stage == 'at_pickup1') {
-          text = I18n.t('driver.detail.stage_loading_pickup1');
+        } else if (prog != null) {
+          text = prog.readyForTransit
+              ? I18n.t('driver.detail.stage_loading_last', {'label': prog.label, 'seq': prog.seq, 'total': prog.total})
+              : I18n.t('driver.detail.stage_loading_at', {'label': prog.label, 'seq': prog.seq, 'total': prog.total, 'next': 'A${prog.seq + 1}'});
           icon = Icons.downloading_rounded;
         } else {
           text = I18n.t('driver.detail.stage_loading');

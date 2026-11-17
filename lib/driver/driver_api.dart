@@ -453,11 +453,11 @@ class DriverApi {
 
   Future<void> inTransit(int orderId) => _statusEndpoint('in-transit', orderId);
 
-  /// A → A2 → B: A'da yuklash tugadi, ikkinchi nuqtaga yo'lga chiqdi.
-  Future<void> leftPickup1(int orderId) => _statusEndpoint('left-pickup1', orderId);
+  /// Joriy olib ketish nuqtasida yuklash tugadi — keyingisiga jo'nadi.
+  Future<void> pickupLeave(int orderId) => _statusEndpoint('pickup-leave', orderId);
 
-  /// A → A2 → B: ikkinchi olib ketish nuqtasiga yetib keldi.
-  Future<void> arrivedPickup2(int orderId) => _statusEndpoint('arrived-pickup2', orderId);
+  /// Keyingi olib ketish nuqtasiga yetib keldi.
+  Future<void> pickupArrive(int orderId) => _statusEndpoint('pickup-arrive', orderId);
 
   Future<void> arrivedDelivery(int orderId) => _statusEndpoint('arrived-delivery', orderId);
 

@@ -966,9 +966,10 @@ class _CustomerOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _OrderRoute(
-            pickup: order.pickup2 == null
-                ? (order.pickupAddress ?? '—')
-                : '${order.pickupAddress ?? '—'}\n＋ ${I18n.t('order.detail.address_pickup2')}: ${order.pickup2!.address}',
+            pickup: [
+              order.pickupAddress ?? '—',
+              for (final pp in order.pickups) '＋ ${pp.label}: ${pp.address}',
+            ].join('\n'),
             delivery: order.deliveryAddress ?? '—',
           ),
           const SizedBox(height: 14),

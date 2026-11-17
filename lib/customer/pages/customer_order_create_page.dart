@@ -1,3 +1,4 @@
+import '../../core/orders/pickup_points.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
@@ -59,9 +60,8 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
   LatLng? _delivery;
 
   /// Ixtiyoriy ikkinchi olib ketish nuqtasi (A → A2 → B).
-  final _pickup2Addr = TextEditingController();
-  LatLng? _pickup2;
-  bool _withPickup2 = false;
+  /// Qo'shimcha olib ketish nuqtalari (A2 … A5), "＋" bilan qo'shiladi.
+  final List<_ExtraPickup> _extraPickups = [];
 
   List<CargoType> _cargoTypes = [];
   CargoType? _selected;
@@ -106,7 +106,9 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
   void dispose() {
     _pickupAddr.dispose();
     _deliveryAddr.dispose();
-    _pickup2Addr.dispose();
+    for (final e in _extraPickups) {
+      e.addr.dispose();
+    }
     _weight.dispose();
     _comment.dispose();
     _recipient.dispose();
@@ -199,28 +201,30 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
     setState(() => _scheduledAt = picked);
   }
 
-  Future<void> _pickSecondPickup() async {
+  /// Qo'shimcha nuqtani xaritadan tanlash; [index] null — yangi nuqta qo'shiladi.
+  Future<void> _pickExtraPickup([int? index]) async {
+    final current = index != null ? _extraPickups[index] : null;
     final result = await Navigator.of(context).push<LocationPickerResult>(
       MaterialPageRoute<LocationPickerResult>(
         builder: (_) => LocationPickerPage(
-          title: I18n.t('order.create.pickup2_picker_title'),
-          initialLatLng: _pickup2 ?? _pickup,
-          initialAddress: _pickup2Addr.text.isEmpty ? null : _pickup2Addr.text,
+          title: I18n.t('order.create.pickup_extra_picker_title', {'label': 'A${(index ?? _extraPickups.length) + 2}'}),
+          initialLatLng: current?.latLng ?? (_extraPickups.isNotEmpty ? _extraPickups.last.latLng : null) ?? _pickup,
+          initialAddress: (current?.addr.text.isEmpty ?? true) ? null : current!.addr.text,
         ),
       ),
     );
     if (result == null || !mounted) return;
     setState(() {
-      _pickup2 = result.latLng;
-      _pickup2Addr.text = result.address;
+      if (current != null) {
+        current.latLng = result.latLng;
+        current.addr.text = result.address;
+      } else if (_extraPickups.length < maxExtraPickups) {
+        _extraPickups.add(_ExtraPickup(TextEditingController(text: result.address), result.latLng));
+      }
     });
   }
 
-  void _removeSecondPickup() => setState(() {
-        _withPickup2 = false;
-        _pickup2 = null;
-        _pickup2Addr.clear();
-      });
+  void _removeExtraPickup(int index) => setState(() => _extraPickups.removeAt(index).addr.dispose());
 
   Future<void> _submit() async {
     final pickup = _pickupAddr.text.trim();
@@ -247,7 +251,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
       );
       return;
     }
-    if (_withPickup2 && (_pickup2 == null || _pickup2Addr.text.trim().isEmpty)) {
+    if (_extraPickups.any((e) => e.latLng == null || e.addr.text.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(I18n.t('order.create.pickup2_required'))),
       );
@@ -308,7 +312,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
       // Yo'l vaqtini Yandex'dan olamiz — u tirbandlikni hisobga oladi,
       // serverdagi OSRM esa yo'q. Marshrut topilmasa `null` yuboriladi va
       // server o'z hisobiga qaytadi.
-      final via = _withPickup2 ? _pickup2 : null;
+      final via = [for (final e in _extraPickups) e.latLng!];
       final route = await MapRoute.fetch(_pickup!, _delivery!, via: via);
 
       final r = await CustomerApi.instance.createOrder(
@@ -324,9 +328,10 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
         scheduledPickupAt: _scheduledMode ? _scheduledAt : null,
         durationMin: route?.durationMin,
         recipientPhone: _recipient.self ? null : _recipient.phoneE164,
-        pickup2Address: via != null ? _pickup2Addr.text.trim() : null,
-        pickup2Lat: via?.latitude,
-        pickup2Lng: via?.longitude,
+        pickups: [
+          for (final e in _extraPickups)
+            {'address': e.addr.text.trim(), 'lat': e.latLng!.latitude, 'lng': e.latLng!.longitude},
+        ],
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -412,34 +417,32 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
               onPickFromMap: () => _pickFromMap(isPickup: true),
             ),
             const SizedBox(height: 12),
-            if (_withPickup2) ...[
+            for (var i = 0; i < _extraPickups.length; i++) ...[
               _LocationField(
-                label: I18n.t('order.create.pickup2_field_label'),
+                label: I18n.t('order.create.pickup_extra_field_label', {'label': 'A${i + 2}'}),
                 markerColor: const Color(0xFF7C3AED),
-                controller: _pickup2Addr,
-                latLng: _pickup2,
-                onPickFromMap: _pickSecondPickup,
-                onRemove: _removeSecondPickup,
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
-                child: Text(I18n.t('order.create.pickup2_hint'), style: Theme.of(context).textTheme.bodySmall),
+                controller: _extraPickups[i].addr,
+                latLng: _extraPickups[i].latLng,
+                onPickFromMap: () => _pickExtraPickup(i),
+                onRemove: () => _removeExtraPickup(i),
               ),
               const SizedBox(height: 12),
-            ] else ...[
+            ],
+            if (_extraPickups.length < maxExtraPickups)
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
-                  onPressed: () {
-                    setState(() => _withPickup2 = true);
-                    _pickSecondPickup();
-                  },
-                  icon: const Icon(Icons.add_location_alt_outlined),
-                  label: Text(I18n.t('order.create.pickup2_add')),
+                  onPressed: () => _pickExtraPickup(),
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                  label: Text(I18n.t('order.create.pickup_extra_add')),
                 ),
               ),
-              const SizedBox(height: 4),
-            ],
+            if (_extraPickups.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                child: Text(I18n.t('order.create.pickup2_hint'), style: Theme.of(context).textTheme.bodySmall),
+              ),
+            const SizedBox(height: 4),
             _LocationField(
               label: I18n.t('order.create.delivery_field_label'),
               markerColor: AppPalette.orange,
@@ -691,4 +694,12 @@ class _LocationField extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Qo'shimcha olib ketish nuqtasi (forma holati).
+class _ExtraPickup {
+  _ExtraPickup(this.addr, this.latLng);
+
+  final TextEditingController addr;
+  LatLng? latLng;
 }

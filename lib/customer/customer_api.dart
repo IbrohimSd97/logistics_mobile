@@ -112,9 +112,8 @@ class CustomerApi {
     String? recipientTin,
     String? recipientName,
     /// Ixtiyoriy ikkinchi olib ketish nuqtasi (A → A2 → B).
-    String? pickup2Address,
-    double? pickup2Lat,
-    double? pickup2Lng,
+    /// Qo'shimcha olib ketish nuqtalari (A2 … A5): {address, lat, lng}.
+    List<Map<String, Object>> pickups = const [],
   }) async {
     final token = await _requireBearer();
     final url = Uri.parse('${ApiConfig.baseUrl}/api/customer/orders/create');
@@ -124,11 +123,7 @@ class CustomerApi {
       'pickup_address': pickupAddress,
       'pickup_lat': pickupLat,
       'pickup_lng': pickupLng,
-      if (pickup2Lat != null && pickup2Lng != null) ...{
-        'pickup2_address': pickup2Address ?? '',
-        'pickup2_lat': pickup2Lat,
-        'pickup2_lng': pickup2Lng,
-      },
+      if (pickups.isNotEmpty) 'pickups': pickups,
       'delivery_address': deliveryAddress,
       'delivery_lat': deliveryLat,
       'delivery_lng': deliveryLng,

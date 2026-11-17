@@ -1,4 +1,4 @@
-import '../core/orders/second_pickup.dart';
+import '../core/orders/pickup_points.dart';
 
 class CustomerProfile {
   const CustomerProfile({
@@ -132,7 +132,9 @@ class CargoTypeMini {
 class CustomerOrder {
   const CustomerOrder({
     required this.id,
-    this.pickup2,
+    this.pickups = const [],
+    this.pickup1LeftAt,
+    this.pickupProgress,
     this.orderNumber,
     this.status,
     this.totalPrice,
@@ -191,8 +193,13 @@ class CustomerOrder {
   final String? basePrice;
   final String? distanceKm;
   final String? currency;
-  /// Ikkinchi olib ketish nuqtasi (bo'lmasa null).
-  final SecondPickup? pickup2;
+  /// Qo'shimcha olib ketish nuqtalari (A2 … A5), bo'lmasa bo'sh.
+  final List<PickupPoint> pickups;
+  /// A'dan keyingi nuqtaga jo'nagan vaqt.
+  final DateTime? pickup1LeftAt;
+  /// Haydovchi olib ketish bosqichi (qo'shimcha nuqtalar bo'lsa).
+  final PickupProgress? pickupProgress;
+  bool get hasMultiPickup => pickups.isNotEmpty;
   final String? pickupAddress;
   final double? pickupLat;
   final double? pickupLng;
@@ -259,7 +266,9 @@ class CustomerOrder {
       basePrice: m['base_price']?.toString(),
       distanceKm: m['distance_km']?.toString(),
       currency: m['currency']?.toString(),
-      pickup2: SecondPickup.fromMap(m['pickup2']),
+      pickups: PickupPoint.listFrom(m['pickups']),
+      pickup1LeftAt: parsePickupTime(m['pickup1_left_at']),
+      pickupProgress: PickupProgress.fromMap(m['pickup_progress']),
       pickupAddress: m['pickup_address']?.toString(),
       pickupLat: _double(m['pickup_lat']),
       pickupLng: _double(m['pickup_lng']),
