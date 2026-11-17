@@ -8,9 +8,12 @@ import 'core/api/net_log_overlay.dart';
 import 'core/i18n/i18n.dart';
 import 'core/links/deep_link_service.dart';
 import 'core/push/push_service.dart';
+import 'core/session/session_expiry.dart';
+import 'core/session/session_store.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'screens/auth_gate.dart';
+import 'screens/login_screen.dart';
 import 'screens/push_tap_router.dart';
 
 void main() {
@@ -41,7 +44,29 @@ Future<void> _bootstrap() async {
   PushService.instance.onTap = PushTapRouter.open;
   await PushService.instance.init();
   DeepLinkService.instance.init();
+  SessionExpiry.handler = _onSessionRevoked;
   runApp(const MyApp());
+}
+
+/// Server sessiyani bekor qildi (401): sessiyani tozalab, login sahifasiga.
+Future<void> _onSessionRevoked() async {
+  final store = SessionStore();
+  if ((await store.getRefreshToken()) == null) return;
+  try {
+    await store.clear();
+  } catch (_) {}
+  final nav = PushTapRouter.navigatorKey.currentState;
+  if (nav == null) return;
+  nav.pushAndRemoveUntil(
+    MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+    (_) => false,
+  );
+  final ctx = PushTapRouter.navigatorKey.currentContext;
+  if (ctx != null && ctx.mounted) {
+    ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(
+      SnackBar(content: Text(I18n.t('auth.session_expired'))),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {

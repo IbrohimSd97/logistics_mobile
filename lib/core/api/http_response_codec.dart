@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import 'api_exception.dart';
 import '../i18n/i18n.dart';
+import '../session/session_expiry.dart';
 
 typedef JsonMap = Map<String, dynamic>;
 
@@ -59,6 +60,14 @@ Map<String, List<dynamic>> _normalizeErrorsField(Object? raw) {
 ///
 /// Throws [ApiException] for HTTP errors even when JSON decodes successfully.
 JsonMap decodeJsonEnvelopeOrThrow(http.Response res) {
+  // Token bilan yuborilgan so'rovga 401 — sessiya serverda bekor qilingan
+  // (masalan xodim kompaniyadan o'chirildi). Ilova login sahifasiga qaytadi.
+  if (res.statusCode == 401) {
+    final auth = res.request?.headers['Authorization'] ?? res.request?.headers['authorization'];
+    if (auth != null && auth.startsWith('Bearer ')) {
+      SessionExpiry.notify();
+    }
+  }
   if (res.body.isEmpty && res.statusCode >= 400) {
     throw ApiException(_humanHttpMessage(res.statusCode), statusCode: res.statusCode);
   }
