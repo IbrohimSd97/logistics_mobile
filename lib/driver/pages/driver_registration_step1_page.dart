@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../core/forms/license_input_formatter.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:camera/camera.dart' show CameraLensDirection;
 import 'package:image_picker/image_picker.dart';
 
@@ -61,6 +61,8 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
   final _pinfl = PinflLookupController(allowTin: true);
   final _licSeries = TextEditingController();
   final _licNumber = TextEditingController();
+  /// UI da bitta maydon (AF 1234567) — seriya/raqam yuqoridagi ikki controller'ga ajratiladi.
+  final _licFull = TextEditingController();
 
   DateTime? _birthDate;
   DateTime? _licIssuedDate;
@@ -84,6 +86,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
       _setText(_pinfl.pinfl, widget.data!.s1('national_id'));
       _setText(_licSeries, widget.data!.s1('car_license_series'));
       _setText(_licNumber, widget.data!.s1('car_license_number'));
+      _licFull.text = LicenseInputFormatter.format(_licSeries.text, _licNumber.text);
       _birthDate = _parseDate(widget.data!.s1('birth_date')) ?? _birthDate;
       _licIssuedDate =
           _parseDate(widget.data!.s1('car_license_issued_date')) ?? _licIssuedDate;
@@ -163,6 +166,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
     _pinfl.dispose();
     _licSeries.dispose();
     _licNumber.dispose();
+    _licFull.dispose();
     super.dispose();
   }
 
@@ -375,6 +379,7 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
                     _pinfl.reset();
                     _licSeries.clear();
                     _licNumber.clear();
+                    _licFull.clear();
                     setState(() {
                       _birthDate = null;
                       _licIssuedDate = null;
@@ -458,37 +463,24 @@ class _DriverRegistrationStep1PageState extends State<DriverRegistrationStep1Pag
               Text(I18n.t('driver.reg.driver_license_section'),
                   style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _licSeries,
-                      textCapitalization: TextCapitalization.characters,
-                      // Guvohnoma seriyasi — faqat harf, ko'pi bilan 2 ta.
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp('[A-Za-z]')),
-                        LengthLimitingTextInputFormatter(2),
-                      ],
-                      decoration: InputDecoration(labelText: I18n.t('driver.reg.series_required'), hintText: I18n.t('driver.reg.series_hint')),
-                      validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.series_required_msg') : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _licNumber,
-                      keyboardType: TextInputType.number,
-                      // Guvohnoma raqami — faqat raqam, ko'pi bilan 7 ta.
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(7),
-                      ],
-                      decoration: InputDecoration(labelText: I18n.t('driver.reg.number_required'), hintText: I18n.t('driver.reg.number_hint')),
-                      validator: (v) => (v ?? '').trim().isEmpty ? I18n.t('driver.reg.number_required_msg') : null,
-                    ),
-                  ),
-                ],
+              TextFormField(
+                controller: _licFull,
+                textCapitalization: TextCapitalization.characters,
+                keyboardType: TextInputType.visiblePassword, // harf ham, raqam ham; avtotuzatishsiz
+                autocorrect: false,
+                enableSuggestions: false,
+                inputFormatters: [LicenseInputFormatter()],
+                onChanged: (v) {
+                  final (series, number) = LicenseInputFormatter.split(v);
+                  _licSeries.text = series;
+                  _licNumber.text = number;
+                },
+                decoration: InputDecoration(
+                  labelText: I18n.t('driver.reg.license_full_required'),
+                  hintText: 'AF 1234567',
+                  helperText: I18n.t('driver.reg.license_full_hint'),
+                ),
+                validator: (v) => LicenseInputFormatter.isComplete(v ?? '') ? null : I18n.t('driver.reg.license_full_invalid'),
               ),
               _errorNote('car_license_series'),
               _errorNote('car_license_number'),
