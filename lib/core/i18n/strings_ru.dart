@@ -635,6 +635,8 @@ const Map<String, String> kStringsRu = {
   'order.create.pickup2_hint': 'Водитель забирает груз по порядку (A, A2, …), затем едет в B. Бесплатное время ожидания — одно на все точки.',
   'order.create.pickup2_required': 'Выберите каждую точку загрузки на карте или удалите её.',
   'order.detail.address_pickup_extra': 'Точка загрузки {label}',
+  'order.list.extra_pickups_one': '＋{n} точка загрузки',
+  'order.list.extra_pickups_many': '＋{n} точки загрузки',
   'driver.detail.pickup_leave_slide': 'Выехал на точку {label} — свайп',
   'driver.detail.pickup_arrive_slide': 'Прибыл на точку {label} — свайп',
   'driver.detail.stage_to_pickup': 'Езжайте на точку загрузки {label} — {km} км',

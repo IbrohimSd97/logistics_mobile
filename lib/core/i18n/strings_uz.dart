@@ -637,6 +637,8 @@ const Map<String, String> kStringsUz = {
   'order.create.pickup2_hint': 'Haydovchi nuqtalarda tartib bilan (A, A2, …) yuk oladi, so\'ng B ga boradi. Bepul kutish vaqti barcha nuqtalar uchun bitta.',
   'order.create.pickup2_required': 'Har bir olib ketish nuqtasini xaritadan tanlang yoki uni olib tashlang.',
   'order.detail.address_pickup_extra': 'Olib ketish nuqtasi {label}',
+  'order.list.extra_pickups_one': '＋{n} olib ketish nuqtasi',
+  'order.list.extra_pickups_many': '＋{n} olib ketish nuqtasi',
   'driver.detail.pickup_leave_slide': '{label} nuqtaga yo\'lga chiqdim — suring',
   'driver.detail.pickup_arrive_slide': '{label} nuqtaga yetib keldim — suring',
   'driver.detail.stage_to_pickup': '{label} olib ketish nuqtasiga boring — {km} km',

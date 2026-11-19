@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/orders/extra_pickups_badge.dart';
 import '../core/brand/alix_components.dart';
 import '../core/brand/order_status_tone.dart';
 import '../core/brand/alix_logo.dart';
@@ -652,7 +653,7 @@ class CustomerHomeBodyState extends State<CustomerHomeBody> {
               trackingLabel:
                   '${I18n.t('order.tracking')} · ${active.orderNumber ?? '#${active.id}'}',
               route:
-                  '${_shortAddress(active.pickupAddress)} → ${_shortAddress(active.deliveryAddress)}',
+                  '${_shortAddress(active.pickupAddress)}${active.pickups.isEmpty ? '' : ' ＋${active.pickups.length}'} → ${_shortAddress(active.deliveryAddress)}',
               statusLabel: _statusLabel(active.status),
               progress: _progressFor(active.status),
               onTap: () => widget.onOpenOrders(0),
@@ -966,10 +967,8 @@ class _CustomerOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _OrderRoute(
-            pickup: [
-              order.pickupAddress ?? '—',
-              for (final pp in order.pickups) '＋ ${pp.label}: ${pp.address}',
-            ].join('\n'),
+            pickup: order.pickupAddress ?? '—',
+            extraPickups: order.pickups.length,
             delivery: order.deliveryAddress ?? '—',
           ),
           const SizedBox(height: 14),
@@ -1082,37 +1081,47 @@ class _OrderTimeRangeRow extends StatelessWidget {
 /// Chiziq yukning bir nuqtadan ikkinchisiga borishini ko'rsatadi — alohida
 /// ikkita qatordan ko'ra tezroq o'qiladi.
 class _OrderRoute extends StatelessWidget {
-  const _OrderRoute({required this.pickup, required this.delivery});
+  const _OrderRoute({required this.pickup, required this.delivery, this.extraPickups = 0});
 
   final String pickup;
   final String delivery;
+
+  /// A'dan tashqari olib ketish nuqtalari soni (A2 … A5).
+  final int extraPickups;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            _dot(color: cs.onSurface),
-            Container(width: 2, height: 22, color: cs.outlineVariant),
-            _dot(color: AppPalette.orange),
-          ],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
             children: [
-              _address(context, pickup),
-              const SizedBox(height: 18),
-              _address(context, delivery),
+              _dot(color: cs.onSurface),
+              Expanded(child: Container(width: 2, constraints: const BoxConstraints(minHeight: 22), color: cs.outlineVariant)),
+              _dot(color: AppPalette.orange),
             ],
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _address(context, pickup),
+                if (extraPickups > 0) ...[
+                  const SizedBox(height: 8),
+                  ExtraPickupsBadge(count: extraPickups),
+                  const SizedBox(height: 10),
+                ] else
+                  const SizedBox(height: 18),
+                _address(context, delivery),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

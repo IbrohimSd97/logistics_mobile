@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../driver/widgets/driver_withdraw_sheet.dart';
+import '../core/orders/extra_pickups_badge.dart';
 import '../core/brand/alix_components.dart';
 import '../core/brand/order_status_tone.dart';
 import '../core/brand/alix_logo.dart';
@@ -1051,11 +1052,9 @@ class _DriverOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _DriverRoute(
-            // Qo'shimcha olib ketish nuqtalari (A2 … A5) olib ketish qatoriga qo'shiladi.
-            pickup: [
-              order.pickupAddress ?? '—',
-              for (final pp in order.pickups) '＋ ${pp.label}: ${pp.address}',
-            ].join('\n'),
+            // Qo'shimcha olib ketish nuqtalari (A2 … A5) — A ostida "＋N" belgisi.
+            pickup: order.pickupAddress ?? '—',
+            extraPickups: order.pickups.length,
             delivery: order.deliveryAddress ?? '—',
           ),
           const SizedBox(height: 14),
@@ -1963,11 +1962,9 @@ class _DriverFeedOrderCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _DriverRoute(
-            // Qo'shimcha olib ketish nuqtalari (A2 … A5) olib ketish qatoriga qo'shiladi.
-            pickup: [
-              order.pickupAddress ?? '—',
-              for (final pp in order.pickups) '＋ ${pp.label}: ${pp.address}',
-            ].join('\n'),
+            // Qo'shimcha olib ketish nuqtalari (A2 … A5) — A ostida "＋N" belgisi.
+            pickup: order.pickupAddress ?? '—',
+            extraPickups: order.pickups.length,
             delivery: order.deliveryAddress ?? '—',
           ),
           const SizedBox(height: 14),
@@ -2004,10 +2001,13 @@ class _DriverFeedOrderCard extends StatelessWidget {
 /// Yo'nalish bloki — mijoz ro'yxatidagi bilan bir xil til: to'q nuqta
 /// olib ketish, orange nuqta yetkazish, orasida bog'lovchi chiziq.
 class _DriverRoute extends StatelessWidget {
-  const _DriverRoute({required this.pickup, required this.delivery});
+  const _DriverRoute({required this.pickup, required this.delivery, this.extraPickups = 0});
 
   final String pickup;
   final String delivery;
+
+  /// A'dan tashqari olib ketish nuqtalari soni (A2 … A5).
+  final int extraPickups;
 
   @override
   Widget build(BuildContext context) {
@@ -2028,28 +2028,35 @@ class _DriverRoute extends StatelessWidget {
               ?.copyWith(fontWeight: FontWeight.w600, height: 1),
         );
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            dot(cs.onSurface),
-            Container(width: 2, height: 22, color: cs.outlineVariant),
-            dot(AppPalette.orange),
-          ],
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
             children: [
-              address(pickup),
-              const SizedBox(height: 18),
-              address(delivery),
+              dot(cs.onSurface),
+              Expanded(child: Container(width: 2, constraints: const BoxConstraints(minHeight: 22), color: cs.outlineVariant)),
+              dot(AppPalette.orange),
             ],
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                address(pickup),
+                if (extraPickups > 0) ...[
+                  const SizedBox(height: 8),
+                  ExtraPickupsBadge(count: extraPickups),
+                  const SizedBox(height: 10),
+                ] else
+                  const SizedBox(height: 18),
+                address(delivery),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
