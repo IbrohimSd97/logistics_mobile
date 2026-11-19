@@ -13,6 +13,7 @@
     <!-- Kamera majburiy emas: kamerasiz qurilmalarda ham ilova o'rnatilaversin. -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
+    <uses-feature android:name="android.hardware.wifi" android:required="false"/>
     <application
         android:label="ALIX"
         android:name=".MainApplication"
