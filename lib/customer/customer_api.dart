@@ -100,6 +100,9 @@ class CustomerApi {
     required double deliveryLat,
     required double deliveryLng,
     required int cargoWeightKg,
+    /// Yuk hajmi (m³) — ixtiyoriy. Berilsa, faqat shu hajm sig'adigan
+    /// mashinalarga ko'rinadi; berilmasa hajm bo'yicha filtr yo'q.
+    double? cargoVolumeM3,
     String? comment,
     DateTime? scheduledPickupAt,
     /// Yandex MapKit hisoblagan yo'l vaqti (daqiqa) — tirbandlik bilan.
@@ -128,6 +131,7 @@ class CustomerApi {
       'delivery_lat': deliveryLat,
       'delivery_lng': deliveryLng,
       'cargo_weight_kg': cargoWeightKg,
+      'cargo_volume_m3': ?cargoVolumeM3,
       if (comment != null && comment.isNotEmpty) 'comment': comment,
       if (scheduledPickupAt != null)
         'scheduled_pickup_at': scheduledPickupAt.toUtc().toIso8601String(),

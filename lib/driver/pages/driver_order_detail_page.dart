@@ -24,6 +24,7 @@ import '../../core/widgets/slide_button.dart';
 import '../../screens/driver_main_shell.dart' show statusLabelDriver;
 import '../driver_api.dart';
 import '../driver_models.dart';
+import '../../core/orders/cargo_size_text.dart';
 
 class DriverOrderDetailPage extends StatefulWidget {
   const DriverOrderDetailPage({
@@ -770,6 +771,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
       acceptLat: _order.acceptLat,
       acceptLng: _order.acceptLng,
       cargoWeightKg: _order.cargoWeightKg,
+      cargoVolumeM3: _order.cargoVolumeM3,
       comment: _order.comment,
       createdAt: _order.createdAt,
       cargoType: _order.cargoType,
@@ -1275,7 +1277,7 @@ class _DriverOrderDetailPageState extends State<DriverOrderDetailPage>
                                   child: _StatTile(
                                     icon: Icons.scale_rounded,
                                     label: I18n.t('order.detail.cargo_label'),
-                                    value: _order.cargoWeightKg != null ? '${_order.cargoWeightKg} ${I18n.t('common.kg')}' : '—',
+                                    value: _order.cargoWeightKg != null ? cargoSizeText(_order.cargoWeightKg, _order.cargoVolumeM3) : '—',
                                   ),
                                 ),
                                 const SizedBox(width: 10),

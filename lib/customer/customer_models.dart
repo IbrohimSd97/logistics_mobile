@@ -150,6 +150,7 @@ class CustomerOrder {
     this.acceptLat,
     this.acceptLng,
     this.cargoWeightKg,
+    this.cargoVolumeM3,
     this.comment,
     this.createdAt,
     this.cargoType,
@@ -209,6 +210,9 @@ class CustomerOrder {
   final double? acceptLat;
   final double? acceptLng;
   final int? cargoWeightKg;
+
+  /// Yuk hajmi (m³) — mijoz kiritgan bo'lsa.
+  final double? cargoVolumeM3;
   final String? comment;
   final String? createdAt;
   final CargoTypeMini? cargoType;
@@ -278,6 +282,7 @@ class CustomerOrder {
       acceptLat: _double(m['accept_lat']),
       acceptLng: _double(m['accept_lng']),
       cargoWeightKg: _intFromAny(m['cargo_weight_kg']),
+      cargoVolumeM3: _double(m['cargo_volume_m3']),
       comment: m['comment']?.toString(),
       recipientPhone: m['recipient'] is Map ? (m['recipient'] as Map)['phone']?.toString() : null,
       recipientName: m['recipient'] is Map ? (m['recipient'] as Map)['name']?.toString() : null,

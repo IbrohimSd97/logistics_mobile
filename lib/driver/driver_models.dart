@@ -269,6 +269,7 @@ class DriverOrder {
     this.acceptLat,
     this.acceptLng,
     this.cargoWeightKg,
+    this.cargoVolumeM3,
     this.comment,
     this.createdAt,
     this.cargoType,
@@ -320,6 +321,9 @@ class DriverOrder {
   final double? acceptLat;
   final double? acceptLng;
   final int? cargoWeightKg;
+
+  /// Yuk hajmi (m³) — mijoz kiritgan bo'lsa.
+  final double? cargoVolumeM3;
   final String? comment;
   final String? createdAt;
   final CargoTypeMini? cargoType;
@@ -382,6 +386,7 @@ class DriverOrder {
       acceptLat: _double(m['accept_lat']),
       acceptLng: _double(m['accept_lng']),
       cargoWeightKg: _intFromAny(m['cargo_weight_kg']),
+      cargoVolumeM3: _double(m['cargo_volume_m3']),
       comment: m['comment']?.toString(),
       createdAt: m['created_at']?.toString(),
       cargoType: CargoTypeMini.fromMap(m['cargo_type'] as Map<String, dynamic>?),

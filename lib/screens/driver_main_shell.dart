@@ -33,6 +33,7 @@ import '../driver/pages/driver_rejected_page.dart';
 import 'customer_main_shell.dart';
 import 'login_screen.dart';
 import 'account_deletion.dart';
+import '../core/orders/cargo_size_text.dart';
 
 /// Faollashtirilgan haydovchi asosiy oqimi.
 class DriverMainShell extends StatefulWidget {
@@ -1985,7 +1986,7 @@ class _DriverFeedOrderCard extends StatelessWidget {
               Icon(Icons.scale_rounded, size: 15, color: cs.onSurfaceVariant),
               const SizedBox(width: 5),
               Text(
-                '${order.cargoWeightKg ?? '—'} ${I18n.t('common.kg')}',
+                cargoSizeText(order.cargoWeightKg, order.cargoVolumeM3),
                 style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const Spacer(),

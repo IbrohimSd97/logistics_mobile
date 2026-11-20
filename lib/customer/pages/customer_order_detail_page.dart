@@ -25,6 +25,7 @@ import '../customer_models.dart';
 import '../widgets/order_fiscal_receipts_section.dart';
 import 'customer_order_create_page.dart';
 import 'customer_payment_select_page.dart';
+import '../../core/orders/cargo_size_text.dart';
 
 class CustomerOrderDetailPage extends StatefulWidget {
   const CustomerOrderDetailPage({super.key, required this.order});
@@ -603,6 +604,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
           prefillDeliveryLat: _order.deliveryLat,
           prefillDeliveryLng: _order.deliveryLng,
           prefillCargoWeightKg: _order.cargoWeightKg,
+          prefillCargoVolumeM3: _order.cargoVolumeM3,
           prefillComment: _order.comment,
         ),
       ),
@@ -1038,7 +1040,7 @@ class _CustomerOrderDetailPageState extends State<CustomerOrderDetailPage>
                                   child: _StatTile(
                                     icon: Icons.scale_rounded,
                                     label: I18n.t('order.detail.cargo_label'),
-                                    value: _order.cargoWeightKg != null ? '${_order.cargoWeightKg} ${I18n.t('common.kg')}' : '—',
+                                    value: _order.cargoWeightKg != null ? cargoSizeText(_order.cargoWeightKg, _order.cargoVolumeM3) : '—',
                                   ),
                                 ),
                                 const SizedBox(width: 10),

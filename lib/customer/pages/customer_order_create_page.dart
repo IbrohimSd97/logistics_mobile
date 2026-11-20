@@ -15,6 +15,7 @@ import '../../core/widgets/refresh_icon_button.dart';
 import '../../recipient/widgets/recipient_form.dart';
 import '../customer_api.dart';
 import 'customer_payment_select_page.dart';
+import '../../core/orders/cargo_size_text.dart';
 
 /// `POST /api/customer/orders/create`
 ///
@@ -32,6 +33,7 @@ class CustomerOrderCreatePage extends StatefulWidget {
     this.prefillDeliveryLat,
     this.prefillDeliveryLng,
     this.prefillCargoWeightKg,
+    this.prefillCargoVolumeM3,
     this.prefillComment,
   });
 
@@ -43,6 +45,7 @@ class CustomerOrderCreatePage extends StatefulWidget {
   final double? prefillDeliveryLat;
   final double? prefillDeliveryLng;
   final int? prefillCargoWeightKg;
+  final double? prefillCargoVolumeM3;
   final String? prefillComment;
 
   @override
@@ -54,6 +57,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
   final _pickupAddr = TextEditingController();
   final _deliveryAddr = TextEditingController();
   final _weight = TextEditingController(text: '1');
+  final _volume = TextEditingController();
   final _comment = TextEditingController();
   final _recipient = RecipientFormController();
   LatLng? _pickup;
@@ -96,6 +100,9 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
     if (widget.prefillCargoWeightKg != null) {
       _weight.text = widget.prefillCargoWeightKg!.toString();
     }
+    if (widget.prefillCargoVolumeM3 != null) {
+      _volume.text = formatVolumeM3(widget.prefillCargoVolumeM3!);
+    }
     if (widget.prefillComment != null && widget.prefillComment!.isNotEmpty) {
       _comment.text = widget.prefillComment!;
     }
@@ -110,6 +117,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
       e.addr.dispose();
     }
     _weight.dispose();
+    _volume.dispose();
     _comment.dispose();
     _recipient.dispose();
     super.dispose();
@@ -286,6 +294,13 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(I18n.t('order.create.weight_too_big'))));
       return;
     }
+    // Hajm ixtiyoriy: bo'sh bo'lsa yuborilmaydi (haydovchilar hajm bo'yicha filtrlanmaydi).
+    final volumeRaw = _volume.text.trim().replaceAll(',', '.');
+    final double? volume = volumeRaw.isEmpty ? null : double.tryParse(volumeRaw);
+    if (volumeRaw.isNotEmpty && (volume == null || volume < 0.1 || volume > 200)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(I18n.t('order.create.volume_invalid'))));
+      return;
+    }
     final recipientError = _recipient.validate();
     if (recipientError != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(recipientError)));
@@ -324,6 +339,7 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
         deliveryLat: _delivery!.latitude,
         deliveryLng: _delivery!.longitude,
         cargoWeightKg: w,
+        cargoVolumeM3: volume,
         comment: _comment.text.trim().isEmpty ? null : _comment.text.trim(),
         scheduledPickupAt: _scheduledMode ? _scheduledAt : null,
         durationMin: route?.durationMin,
@@ -462,6 +478,23 @@ class _CustomerOrderCreatePageState extends State<CustomerOrderCreatePage>
               decoration: InputDecoration(
                 labelText: I18n.t('order.create.weight_field_label'),
                 prefixIcon: const Icon(Icons.scale_outlined),
+              ),
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _volume,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                LengthLimitingTextInputFormatter(6),
+              ],
+              decoration: InputDecoration(
+                labelText: I18n.t('order.create.volume_field_label'),
+                helperText: I18n.t('order.create.volume_field_hint'),
+                helperMaxLines: 2,
+                prefixIcon: const Icon(Icons.view_in_ar_outlined),
+                suffixText: 'm³',
               ),
               textInputAction: TextInputAction.next,
             ),
